@@ -75,7 +75,7 @@ s3_arn = os.environ.get('s3_arn')
 
 numberOfDocs = 4
 grade_state = "LLM" # LLM, PRIORITY_SEARCH, OTHERS
-multi_region = 'enable'
+multi_region = 'disable'
 minDocSimilarity = 400
 length_of_models = 1
 doc_prefix = s3_prefix+'/'
