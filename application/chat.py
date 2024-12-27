@@ -65,7 +65,7 @@ vectorIndexName = os.environ.get('vectorIndexName')
 if vectorIndexName is None:
     vectorIndexName = projectName
 
-opensearch_url = os.environ.get('opensearch_url')
+opensearch_url = os.environ.get('opensearch')
 if opensearch_url is None:
     raise Exception ("No OpenSearch URL")
 
