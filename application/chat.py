@@ -58,6 +58,9 @@ knowledge_base_role = os.environ.get('knowledge_base_role')
 
 collectionArn = os.environ.get('collectionArn')
 vectorIndexName = os.environ.get('vectorIndexName')
+if vectorIndexName is None:
+    vectorIndexName = projectName
+
 opensearch_url = os.environ.get('opensearch_url')
 credentials = boto3.Session().get_credentials()
 service = "aoss" 
@@ -76,16 +79,6 @@ os_client = OpenSearch(
     verify_certs = True,
     connection_class=RequestsHttpConnection,
 )
-
-def is_not_exist(index_name):    
-    print('index_name: ', index_name)
-        
-    if os_client.indices.exists(index_name):
-        print('use exist index: ', index_name)    
-        return False
-    else:
-        print('no index: ', index_name)
-        return True
 
 multi_region_models = [   # Nova Pro
     {   
@@ -111,6 +104,16 @@ AI_PROMPT = "\n\nAssistant:"
 userId = "demo"
 map_chain = dict() 
 
+def is_not_exist(index_name):    
+    print('index_name: ', index_name)
+        
+    if os_client.indices.exists(index_name):
+        print('use exist index: ', index_name)    
+        return False
+    else:
+        print('no index: ', index_name)
+        return True
+    
 knowledge_base_id = ""
 data_source_id = ""
 def initiate_knowledge_base():
