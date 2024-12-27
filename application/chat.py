@@ -79,7 +79,7 @@ multi_region = 'disable'
 minDocSimilarity = 400
 length_of_models = 1
 doc_prefix = s3_prefix+'/'
-path = 'https://url/',   
+path = 'https://url/'   
 
 os_client = OpenSearch(
     hosts = [{
