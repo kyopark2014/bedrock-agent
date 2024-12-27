@@ -408,12 +408,13 @@ export class CdkBedrockAgentStack extends cdk.Stack {
     ec2Sg.connections.allowFrom(albSg, ec2.Port.tcp(targetPort), 'allow traffic from alb') // alb -> ec2
     // deploy components
     new componentDeployment(this, `component-deployment-of-${projectName}`, 
-      albSg, accountId, knowledge_base_role, collectionArn, OpenSearchCollection, s3Bucket, vpc, ec2Role, alb)
+      ec2Sg, albSg, accountId, knowledge_base_role, collectionArn, OpenSearchCollection, s3Bucket, vpc, ec2Role, alb)
   }
 }
 
 export class componentDeployment extends cdk.Stack {
   constructor(scope: Construct, id: string, 
+      ec2Sg: any,
       albSg: any, 
       accountId: any, 
       knowledge_base_role: any, 
