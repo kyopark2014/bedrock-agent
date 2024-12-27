@@ -480,7 +480,6 @@ EOF"`,
     });
 
     // EC2 instance
-    /*
     const appInstance = new ec2.Instance(this, `app-for-${projectName}`, {
       instanceName: `app-for-${projectName}`,
       instanceType: new ec2.InstanceType('t2.small'), // m5.large
@@ -523,6 +522,6 @@ EOF"`,
       targets,
       protocol: elbv2.ApplicationProtocol.HTTP,
       port: targetPort
-    });  */         
+    });           
   }
 }
