@@ -17,6 +17,7 @@ const vectorIndexName = projectName
 const knowledge_base_name = projectName;
 const parsingModelArn = `arn:aws:bedrock:${region}::foundation-model/anthropic.claude-3-haiku-20240307-v1:0`;
 const embeddingModelArn = `arn:aws:bedrock:${region}::foundation-model/amazon.titan-embed-text-v2:0`;
+const enableHybridSearch = 'true';
 
 export class CdkBedrockAgentStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -406,20 +407,20 @@ port=${targetPort}
 EOF"`,
       `runuser -l ec2-user -c 'cd && git clone https://github.com/kyopark2014/llm-streamlit'`,
       `runuser -l ec2-user -c 'pip install streamlit streamlit_chat'`,        
-      `runuser -l ec2-user -c 'pip install boto3 langchain_aws langchain langchain_community langgraph'`,
+      `runuser -l ec2-user -c 'pip install boto3 langchain_aws langchain langchain_community langgraph opensearch-py'`,
       `runuser -l ec2-user -c 'pip install beautifulsoup4 pytz tavily-python'`,
       `runuser -l ec2-user -c 'export projectName=${projectName}'`,
       `runuser -l ec2-user -c 'export accountId=${accountId}'`,      
       `runuser -l ec2-user -c 'export region=${region}'`,
       `runuser -l ec2-user -c 'export knowledge_base_name=${knowledge_base_name}'`,
       `runuser -l ec2-user -c 'export knowledge_base_role=${knowledge_base_role.roleArn}'`,
-      // `runuser -l ec2-user -c 'export collectionName=${collectionName}'`,
       `runuser -l ec2-user -c 'export collectionArn=${collectionArn}'`,
       `runuser -l ec2-user -c 'export vectorIndexName=${vectorIndexName}'`,
       `runuser -l ec2-user -c 'export opensearch_url=${opensearch_url}'`,
       `runuser -l ec2-user -c 'export parsingModelArn=${parsingModelArn}'`,
       `runuser -l ec2-user -c 'export embeddingModelArn=${embeddingModelArn}'`,
       `runuser -l ec2-user -c 'export s3_arn=${s3Bucket.bucketArn}'`,
+      `runuser -l ec2-user -c 'export enableHybridSearch=${enableHybridSearch}'`,
       'systemctl enable streamlit.service',
       'systemctl start streamlit'
     ];

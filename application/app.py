@@ -13,6 +13,9 @@ mode_descriptions = {
     "Agentic Workflow (Tool Use)": [
         "Agent를 이용해 다양한 툴을 사용할 수 있습니다. 여기에서는 날씨, 시간, 도서추천, 인터넷 검색을 제공합니다."
     ],
+    "RAG": [
+        "Bedrock Knowledge Base를 이용해 구현한 RAG로 필요한 정보를 검색합니다."
+    ],
     "번역하기": [
         "한국어와 영어에 대한 번역을 제공합니다. 한국어로 입력하면 영어로, 영어로 입력하면 한국어로 번역합니다."        
     ],
@@ -36,7 +39,7 @@ with st.sidebar:
     
     # radio selection
     mode = st.radio(
-        label="원하는 대화 형태를 선택하세요. ",options=["일상적인 대화", "Agentic Workflow (Tool Use)", "번역하기", "문법 검토하기"], index=0
+        label="원하는 대화 형태를 선택하세요. ",options=["일상적인 대화", "Agentic Workflow (Tool Use)", "RAG", "번역하기", "문법 검토하기"], index=0
     )   
     st.info(mode_descriptions[mode][0])
     # limit = st.slider(
@@ -118,6 +121,8 @@ if prompt := st.chat_input("메시지를 입력하세요."):
             msg = chat.general_conversation(prompt)
         elif mode == 'Agentic Workflow (Tool Use)':
             msg = chat.run_agent_executor2(prompt)
+        elif mode == 'RAG':
+            msg = chat.get_answer_using_knowledge_base(prompt)        
         elif mode == '번역하기':
             msg = chat.translate_text(prompt)
         elif mode == 'Grammer':
