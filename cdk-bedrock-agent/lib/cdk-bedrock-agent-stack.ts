@@ -406,8 +406,8 @@ export class CdkBedrockAgentStack extends cdk.Stack {
     // );    
     
     // deploy components
-    //new componentDeployment(scope, `component-deployment-of-${projectName}`, 
-    //  ec2Sg, albSg, accountId, knowledge_base_role, collectionArn, OpenSearchCollection, s3Bucket, vpc, ec2Role, alb)
+    new componentDeployment(scope, `component-deployment-of-${projectName}`, 
+      ec2Sg, albSg, accountId, knowledge_base_role, collectionArn, OpenSearchCollection, s3Bucket, vpc, ec2Role, alb)
   }
 }
 
