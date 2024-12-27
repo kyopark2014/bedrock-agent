@@ -33,7 +33,7 @@ from opensearchpy import OpenSearch, RequestsHttpConnection, AWSV4SignerAuth
 bedrock_region = "us-west-2"
 projectName = os.environ.get('projectName')
 if projectName is None:
-    projectName = "llm-streamlit"
+    projectName = "bedrock-agent"
     print('projectName: ', projectName)
 
 accountId = os.environ.get('accountId')
@@ -52,7 +52,10 @@ print('bucketName: ', bucketName)
 s3_prefix = 'docs'
 
 knowledge_base_name = os.environ.get('knowledge_base_name')
+if knowledge_base_name is None:
+    knowledge_base_name = projectName
 knowledge_base_role = os.environ.get('knowledge_base_role')
+
 collectionArn = os.environ.get('collectionArn')
 vectorIndexName = os.environ.get('vectorIndexName')
 opensearch_url = os.environ.get('opensearch_url')

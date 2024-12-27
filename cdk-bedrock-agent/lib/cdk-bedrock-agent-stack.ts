@@ -415,6 +415,27 @@ EOF"`,
     ];
     userData.addCommands(...commands);
 
+    new cdk.CfnOutput(this, `KnowledgeBaseRole-for-${projectName}`, {
+      value: knowledge_base_role.roleArn,
+      description: `knowledge_base_role-${projectName}`,
+      exportName: `knowledge_base_role-${projectName}`
+    });    
+    new cdk.CfnOutput(this, `CollectionArn-for-${projectName}`, {
+      value: collectionArn,
+      description: `CollectionArn-${projectName}`,
+      exportName: `CollectionArn-${projectName}`
+    });        
+    new cdk.CfnOutput(this, `parsingModelArn-for-${projectName}`, {
+      value: parsingModelArn,
+      description: `parsingModelArn-${projectName}`,
+      exportName: `parsingModelArn-${projectName}`
+    });   
+    new cdk.CfnOutput(this, `embeddingModelArn-for-${projectName}`, {
+      value: embeddingModelArn,
+      description: `embeddingModelArn-${projectName}`,
+      exportName: `embeddingModelArn-${projectName}`
+    });  
+
     // EC2 instance
     const appInstance = new ec2.Instance(this, `app-for-${projectName}`, {
       instanceName: `app-for-${projectName}`,
