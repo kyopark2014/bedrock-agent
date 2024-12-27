@@ -179,12 +179,18 @@ export class CdkBedrockAgentStack extends cdk.Stack {
             `arn:aws:iam::${accountId}:role/${knowledge_base_role.roleName}`,
             //`arn:aws:iam::${accountId}:role/role-lambda-chat-ws-for-${projectName}-${region}`,
             //`arn:aws:iam::${accountId}:role/administration`,
-            new iam.AccountPrincipal(this.account), 
+            //new iam.AccountPrincipal(this.account), 
           ], 
         },
       ]),
     });
     OpenSearchCollection.addDependency(dataAccessPolicy);
+
+    new cdk.CfnOutput(this, `AccountPrincipal-for-${projectName}`, {
+      value: String(new iam.AccountPrincipal(this.account)),
+      description: `AccountPrincipal-${projectName}`,
+      exportName: `AccountPrincipal-${projectName}`
+    });      
 
     // s3 
     const s3Bucket = new s3.Bucket(this, `storage-${projectName}`,{
