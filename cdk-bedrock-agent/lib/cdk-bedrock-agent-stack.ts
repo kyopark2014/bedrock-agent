@@ -107,7 +107,7 @@ export class CdkBedrockAgentStack extends cdk.Stack {
     const collectionArn = OpenSearchCollection.attrArn
     const opensearch_url = OpenSearchCollection.attrCollectionEndpoint
 
-    new cdk.CfnOutput(this, 'OpensearchCollectionEndpoint', {
+    new cdk.CfnOutput(this, `OpensearchCollectionEndpoint-${projectName}`, {
       value: opensearch_url,
       description: 'The endpoint of opensearch correction',
     });
@@ -407,7 +407,7 @@ export class CdkBedrockAgentStack extends cdk.Stack {
     ec2Sg.connections.allowFrom(albSg, ec2.Port.tcp(targetPort), 'allow traffic from alb') // alb -> ec2
 
     const userData = ec2.UserData.forLinux();
-
+/*
     const commands = [
       // 'yum install nginx -y',
       // 'service nginx start',
@@ -522,6 +522,6 @@ EOF"`,
       targets,
       protocol: elbv2.ApplicationProtocol.HTTP,
       port: targetPort
-    });           
+    });     */      
   }
 }
