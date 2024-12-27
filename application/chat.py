@@ -27,7 +27,6 @@ from typing import Any, List, Tuple, Dict, Optional, cast, Literal, Sequence, Un
 from typing_extensions import Annotated, TypedDict
 from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode
-from datetime import datetime
 
 bedrock_region = "us-west-2"
 projectName = os.environ.get('projectName')
