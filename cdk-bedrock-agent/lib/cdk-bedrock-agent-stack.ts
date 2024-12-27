@@ -293,6 +293,18 @@ export class CdkBedrockAgentStack extends cdk.Stack {
       }),
     );
 
+    // pass role
+    const passRoleResourceArn = knowledge_base_role.roleArn;
+    const passRolePolicy = new iam.PolicyStatement({  
+      resources: [passRoleResourceArn],      
+      actions: ['iam:PassRole'],
+    });      
+    ec2Role.attachInlinePolicy( // add pass role policy
+      new iam.Policy(this, `pass-role-for-${projectName}`, {
+      statements: [passRolePolicy],
+      }), 
+    );  
+
     // aoss
     const aossRolePolicy = new iam.PolicyStatement({  
       resources: ['*'],      
@@ -427,13 +439,13 @@ EOF"`,
     });        
     new cdk.CfnOutput(this, `parsingModelArn-for-${projectName}`, {
       value: parsingModelArn,
-      description: `parsingModelArn-${projectName}`,
-      exportName: `parsingModelArn-${projectName}`
+      description: `ParsingModelArn-${projectName}`,
+      exportName: `ParsingModelArn-${projectName}`
     });   
     new cdk.CfnOutput(this, `embeddingModelArn-for-${projectName}`, {
       value: embeddingModelArn,
-      description: `embeddingModelArn-${projectName}`,
-      exportName: `embeddingModelArn-${projectName}`
+      description: `EmbeddingModelArn-${projectName}`,
+      exportName: `EmbeddingModelArn-${projectName}`
     });  
 
     // EC2 instance
