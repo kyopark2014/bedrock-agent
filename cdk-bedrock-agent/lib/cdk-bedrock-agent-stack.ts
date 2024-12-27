@@ -436,7 +436,7 @@ EOF"`,
       `runuser -l ec2-user -c 'pip install streamlit streamlit_chat'`,        
       `runuser -l ec2-user -c 'pip install boto3 langchain_aws langchain langchain_community langgraph opensearch-py'`,
       `runuser -l ec2-user -c 'pip install beautifulsoup4 pytz tavily-python'`,
-      `runuser -l ec2-user -c 'pip install watchtower'`,  // debug      
+      // `runuser -l ec2-user -c 'pip install watchtower'`,  // debug      
       `runuser -l ec2-user -c 'export projectName=${projectName}'`,
       `runuser -l ec2-user -c 'export accountId=${accountId}'`,      
       `runuser -l ec2-user -c 'export region=${region}'`,

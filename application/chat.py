@@ -35,35 +35,28 @@ from multiprocessing import Process, Pipe
 from urllib import parse
 from pydantic.v1 import BaseModel, Field
 
-import watchtower, logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-logger.addHandler(watchtower.CloudWatchLogHandler())
-#logger.info("Hi")
-#logger.info(dict(foo="bar", details={}))
-
 bedrock_region = "us-west-2"
 projectName = os.environ.get('projectName')
 if projectName is None:
     projectName = "bedrock-agent"
     print('projectName: ', projectName)
-logger.info('projectName: '+projectName)
+# logger.info('projectName: '+projectName)
 
 accountId = os.environ.get('accountId')
 print('accountId: ', accountId)
-logger.info('accountId: '+accountId)
+# logger.info('accountId: '+accountId)
 
 region = os.environ.get('region')
 if region is None:
     region = "us-west-2"
 print('region: ', region)
-logger.info('region: '+region)
+# logger.info('region: '+region)
 
 bucketName = os.environ.get('bucketName')
 if bucketName is None:
     bucketName = f"storage-for-{projectName}-{accountId}-{region}" 
 print('bucketName: ', bucketName)
-logger.info('bucketName: '+bucketName)
+# logger.info('bucketName: '+bucketName)
 
 s3_prefix = 'docs'
 
@@ -71,20 +64,20 @@ knowledge_base_name = os.environ.get('knowledge_base_name')
 if knowledge_base_name is None:
     knowledge_base_name = projectName
 knowledge_base_role = os.environ.get('knowledge_base_role')
-logger.info('knowledge_base_role: '+knowledge_base_role)
+# logger.info('knowledge_base_role: '+knowledge_base_role)
 
 collectionArn = os.environ.get('collectionArn')
 vectorIndexName = os.environ.get('vectorIndexName')
 if vectorIndexName is None:
     vectorIndexName = projectName
-logger.info('vectorIndexName: '+vectorIndexName)
+# logger.info('vectorIndexName: '+vectorIndexName)
 
 opensearch_url = os.environ.get('opensearch_url')
-logger.info('opensearch_url (env): '+opensearch_url)
+# logger.info('opensearch_url (env): '+opensearch_url)
 opensearch_url = 'https://ietky7qch9eapazlufpi.us-west-2.aoss.amazonaws.com'
 if opensearch_url is None:
     raise Exception ("No OpenSearch URL")
-logger.info('opensearch_url: '+opensearch_url)
+# logger.info('opensearch_url: '+opensearch_url)
 
 credentials = boto3.Session().get_credentials()
 service = "aoss" 
@@ -92,7 +85,7 @@ awsauth = AWSV4SignerAuth(credentials, region, service)
 parsingModelArn = os.environ.get('parsingModelArn')
 embeddingModelArn = os.environ.get('embeddingModelArn')
 s3_arn = os.environ.get('s3_arn')
-logger.info('s3_arn: '+s3_arn)
+# logger.info('s3_arn: '+s3_arn)
 
 numberOfDocs = 4
 grade_state = "LLM" # LLM, PRIORITY_SEARCH, OTHERS
@@ -1386,3 +1379,4 @@ def extract_and_display_s3_images(text, s3_client):
             continue
 
     return images
+
