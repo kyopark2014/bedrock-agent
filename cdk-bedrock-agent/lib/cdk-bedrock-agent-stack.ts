@@ -105,10 +105,9 @@ export class CdkBedrockAgentStack extends cdk.Stack {
       type: 'VECTORSEARCH',
     });
     const collectionArn = OpenSearchCollection.attrArn
-    const opensearch_url = OpenSearchCollection.attrCollectionEndpoint
 
     new cdk.CfnOutput(this, `OpensearchCollectionEndpoint-${projectName}`, {
-      value: opensearch_url,
+      value: OpenSearchCollection.attrCollectionEndpoint,
       description: 'The endpoint of opensearch correction',
     });
 

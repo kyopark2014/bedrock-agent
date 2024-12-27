@@ -74,7 +74,7 @@ if vectorIndexName is None:
 
 opensearch_url = os.environ.get('opensearch_url')
 # logger.info('opensearch_url (env): '+opensearch_url)
-opensearch_url = 'https://ietky7qch9eapazlufpi.us-west-2.aoss.amazonaws.com'
+#opensearch_url = 'https://ietky7qch9eapazlufpi.us-west-2.aoss.amazonaws.com'
 if opensearch_url is None:
     raise Exception ("No OpenSearch URL")
 # logger.info('opensearch_url: '+opensearch_url)
