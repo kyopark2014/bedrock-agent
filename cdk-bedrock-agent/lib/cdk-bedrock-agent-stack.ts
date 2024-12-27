@@ -86,7 +86,7 @@ export class CdkBedrockAgentStack extends cdk.Stack {
 
     const secreatManagerPolicy = new iam.PolicyStatement({  
       resources: ['*'],
-      actions: ['secretsmanager:*'],
+      actions: ['secretsmanager:GetSecretValue'],
     });       
     ec2Role.attachInlinePolicy( // for isengard
       new iam.Policy(this, `secret-manager-policy-ec2-for-${projectName}`, {
