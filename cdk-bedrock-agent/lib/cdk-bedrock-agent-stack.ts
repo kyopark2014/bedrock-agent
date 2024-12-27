@@ -445,6 +445,11 @@ EOF"`,
       description: `EmbeddingModelArn-${projectName}`,
       exportName: `EmbeddingModelArn-${projectName}`
     });  
+    new cdk.CfnOutput(this, `s3Arn-for-${projectName}`, {
+      value: s3Bucket.bucketArn,
+      description: `s3Arn-${projectName}`,
+      exportName: `s3Arn-${projectName}`
+    });
 
     // EC2 instance
     const appInstance = new ec2.Instance(this, `app-for-${projectName}`, {
