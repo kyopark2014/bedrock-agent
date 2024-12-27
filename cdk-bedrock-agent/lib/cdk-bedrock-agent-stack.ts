@@ -403,10 +403,11 @@ export class CdkBedrockAgentStack extends cdk.Stack {
     //   ec2.Peer.anyIpv4(),
     //   ec2.Port.tcp(80),
     //   'HTTP',
-    // );
+    // );    
+    
     // deploy components
-    new componentDeployment(scope, `component-deployment-of-${projectName}`, 
-      ec2Sg, albSg, accountId, knowledge_base_role, collectionArn, OpenSearchCollection, s3Bucket, vpc, ec2Role, alb)
+    //new componentDeployment(scope, `component-deployment-of-${projectName}`, 
+    //  ec2Sg, albSg, accountId, knowledge_base_role, collectionArn, OpenSearchCollection, s3Bucket, vpc, ec2Role, alb)
   }
 }
 
