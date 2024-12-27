@@ -417,8 +417,8 @@ EOF"`,
 
     new cdk.CfnOutput(this, `KnowledgeBaseRole-for-${projectName}`, {
       value: knowledge_base_role.roleArn,
-      description: `knowledge_base_role-${projectName}`,
-      exportName: `knowledge_base_role-${projectName}`
+      description: `KnowledgeBaseRole-${projectName}`,
+      exportName: `KnowledgeBaseRole-${projectName}`
     });    
     new cdk.CfnOutput(this, `CollectionArn-for-${projectName}`, {
       value: collectionArn,
