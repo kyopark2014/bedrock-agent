@@ -66,6 +66,9 @@ if vectorIndexName is None:
     vectorIndexName = projectName
 
 opensearch_url = os.environ.get('opensearch_url')
+if opensearch_url is None:
+    raise Exception ("No OpenSearch URL")
+
 credentials = boto3.Session().get_credentials()
 service = "aoss" 
 awsauth = AWSV4SignerAuth(credentials, region, service)
