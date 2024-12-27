@@ -14,6 +14,7 @@ const accountId = process.env.CDK_DEFAULT_ACCOUNT;
 const targetPort = 8080;
 const bucketName = `storage-for-${projectName}-${accountId}-${region}`; 
 const vectorIndexName = projectName
+const knowledge_base_name = projectName;
 
 export class CdkBedrockAgentStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -290,6 +291,28 @@ export class CdkBedrockAgentStack extends cdk.Stack {
       }),
     );
 
+    // aoss
+    const aossRolePolicy = new iam.PolicyStatement({  
+      resources: ['*'],      
+      actions: ['aoss:*'],
+    }); 
+    ec2Role.attachInlinePolicy( 
+      new iam.Policy(this, `aoss-policy-for-${projectName}`, {
+        statements: [aossRolePolicy],
+      }),
+    ); 
+
+    // aoss
+    const getRolePolicy = new iam.PolicyStatement({  
+      resources: ['*'],      
+      actions: ['iam:GetRole'],
+    }); 
+    ec2Role.attachInlinePolicy( 
+      new iam.Policy(this, `getRole-policy-for-${projectName}`, {
+        statements: [getRolePolicy],
+      }),
+    ); 
+
     // vpc
     const vpc = new ec2.Vpc(this, `vpc-for-${projectName}`, {
       vpcName: `vpc-for-${projectName}`,
@@ -376,7 +399,11 @@ EOF"`,
       `runuser -l ec2-user -c 'export projectName=${projectName}'`,
       `runuser -l ec2-user -c 'export accountId=${accountId}'`,      
       `runuser -l ec2-user -c 'export region=${region}'`,
-      `runuser -l ec2-user -c 'export bucketName=${bucketName}'`,
+      `runuser -l ec2-user -c 'export knowledge_base_name=${knowledge_base_name}'`,
+      `runuser -l ec2-user -c 'export knowledge_base_role=${knowledge_base_role.roleArn}'`,
+      `runuser -l ec2-user -c 'export collectionName=${collectionName}'`,
+      `runuser -l ec2-user -c 'export collectionArn=${collectionArn}'`,
+      `runuser -l ec2-user -c 'export vectorIndexName=${vectorIndexName}'`,
       'systemctl enable streamlit.service',
       'systemctl start streamlit'
     ];
