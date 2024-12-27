@@ -403,31 +403,8 @@ export class CdkBedrockAgentStack extends cdk.Stack {
     //   ec2.Peer.anyIpv4(),
     //   ec2.Port.tcp(80),
     //   'HTTP',
-    // );    
-    
+    // );
     ec2Sg.connections.allowFrom(albSg, ec2.Port.tcp(targetPort), 'allow traffic from alb') // alb -> ec2
-    // deploy components
-    new componentDeployment(this, `component-deployment-of-${projectName}`, 
-      ec2Sg, albSg, accountId, knowledge_base_role, collectionArn, OpenSearchCollection, s3Bucket, vpc, ec2Role, alb)
-  }
-}
-
-export class componentDeployment extends cdk.Stack {
-  constructor(scope: Construct, id: string, 
-      ec2Sg: any,
-      albSg: any, 
-      accountId: any, 
-      knowledge_base_role: any, 
-      collectionArn: any, 
-      OpenSearchCollection: any,
-      s3Bucket: any,
-      vpc: any,
-      ec2Role: any,
-      alb: any,
-      props?: cdk.StackProps) {    
-    super(scope, id, props);
-
-    
 
     const userData = ec2.UserData.forLinux();
 
@@ -459,7 +436,7 @@ EOF"`,
       `runuser -l ec2-user -c 'pip install streamlit streamlit_chat'`,        
       `runuser -l ec2-user -c 'pip install boto3 langchain_aws langchain langchain_community langgraph opensearch-py'`,
       `runuser -l ec2-user -c 'pip install beautifulsoup4 pytz tavily-python'`,
-      `runuser -l ec2-user -c 'pip install watchtower'`,  // debugger      
+      `runuser -l ec2-user -c 'pip install watchtower'`,  // debug      
       `runuser -l ec2-user -c 'export projectName=${projectName}'`,
       `runuser -l ec2-user -c 'export accountId=${accountId}'`,      
       `runuser -l ec2-user -c 'export region=${region}'`,
@@ -546,6 +523,6 @@ EOF"`,
       targets,
       protocol: elbv2.ApplicationProtocol.HTTP,
       port: targetPort
-    });      
+    });           
   }
 }
