@@ -215,7 +215,7 @@ def initiate_knowledge_base():
             err_msg = traceback.format_exc()
             print('error message: ', err_msg)                
             #raise Exception ("Not able to create the index")
-            logger.info(err_msg)
+            # logger.info(err_msg)
             
     #########################
     # knowledge base
@@ -241,7 +241,7 @@ def initiate_knowledge_base():
     except Exception:
         err_msg = traceback.format_exc()
         print('error message: ', err_msg)
-        logger.info(err_msg)
+        # logger.info(err_msg)
                     
     if not knowledge_base_id:
         print('creating knowledge base...')        
@@ -288,7 +288,7 @@ def initiate_knowledge_base():
                     time.sleep(5)
                     print(f"retrying... ({atempt})")
                     #raise Exception ("Not able to create the knowledge base")      
-                    logger.info(err_msg) 
+                    # logger.info(err_msg) 
                 
     print(f"knowledge_base_name: {knowledge_base_name}, knowledge_base_id: {knowledge_base_id}")    
     
@@ -313,7 +313,7 @@ def initiate_knowledge_base():
     except Exception:
         err_msg = traceback.format_exc()
         print('error message: ', err_msg)
-        logger.info(err_msg)
+        # logger.info(err_msg)
         
     if not data_source_id:
         print('creating data source...')  
@@ -366,7 +366,7 @@ def initiate_knowledge_base():
             err_msg = traceback.format_exc()
             print('error message: ', err_msg)
             #raise Exception ("Not able to create the data source")
-            logger.info(err_msg)
+            # logger.info(err_msg)
     
     print(f"data_source_name: {data_source_name}, data_source_id: {data_source_id}")
             
@@ -459,7 +459,7 @@ def get_multi_region_chat(models, selected):
 def general_conversation(query):
     chat = get_chat()
 
-    logger.info('(general_conversation) query'+query)
+    # logger.info('(general_conversation) query'+query)
 
     system = (
         "당신의 이름은 서연이고, 질문에 대해 친절하게 답변하는 사려깊은 인공지능 도우미입니다."
@@ -495,10 +495,10 @@ def general_conversation(query):
     except Exception:
         err_msg = traceback.format_exc()
         print('error message: ', err_msg)        
-        logger.info(err_msg)
+        # logger.info(err_msg)
         raise Exception ("Not able to request to LLM: "+err_msg)
     
-    logger.info('(general_conversation) msg:'+msg)
+    # logger.info('(general_conversation) msg:'+msg)
         
     return msg
 
@@ -720,7 +720,7 @@ def query_using_RAG_context(chat, context, revised_question):
     except Exception:
         err_msg = traceback.format_exc()
         print('error message: ', err_msg)    
-        logger.info(err_msg)    
+        # logger.info(err_msg)    
             
         raise Exception ("Not able to request to LLM: "+err_msg)
 
@@ -865,7 +865,7 @@ def get_weather_info(city: str) -> str:
         except Exception:
             err_msg = traceback.format_exc()
             print('error message: ', err_msg)   
-            logger.info(err_msg)                 
+            # logger.info(err_msg)                 
             # raise Exception ("Not able to request to LLM")    
         
     print('weather_str: ', weather_str)                            
@@ -917,7 +917,7 @@ def search_by_tavily(keyword: str) -> str:
         except Exception:
             err_msg = traceback.format_exc()
             print('error message: ', err_msg)           
-            logger.info(err_msg)         
+            # logger.info(err_msg)         
             # raise Exception ("Not able to request to tavily")   
         
     return answer
@@ -1044,7 +1044,7 @@ def traslation(chat, text, input_language, output_language):
     except Exception:
         err_msg = traceback.format_exc()
         print('error message: ', err_msg)          
-        logger.info(err_msg)          
+        # logger.info(err_msg)          
         raise Exception ("Not able to request to LLM")
 
     return msg[msg.find('<result>')+8:len(msg)-9] # remove <result> tag
@@ -1276,7 +1276,7 @@ def translate_text(text):
     except Exception:
         err_msg = traceback.format_exc()
         print('error message: ', err_msg)       
-        logger.info(err_msg)             
+        # logger.info(err_msg)             
         raise Exception ("Not able to request to LLM")
 
     return msg[msg.find('<result>')+8:len(msg)-9] # remove <result> tag
@@ -1315,7 +1315,7 @@ def check_grammer(text):
     except Exception:
         err_msg = traceback.format_exc()
         print('error message: ', err_msg)        
-        logger.info(err_msg)            
+        # logger.info(err_msg)            
         raise Exception ("Not able to request to LLM")
     
     return msg
