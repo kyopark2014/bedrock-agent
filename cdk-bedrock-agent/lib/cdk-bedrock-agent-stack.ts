@@ -186,8 +186,9 @@ export class CdkBedrockAgentStack extends cdk.Stack {
     });
     OpenSearchCollection.addDependency(dataAccessPolicy);
 
+    const sts = new iam.AccountPrincipal(this.account)
     new cdk.CfnOutput(this, `AccountPrincipal-for-${projectName}`, {
-      value: String(new iam.AccountPrincipal(this.account)),
+      value: sts.arn,
       description: `AccountPrincipal-${projectName}`,
       exportName: `AccountPrincipal-${projectName}`
     });      
