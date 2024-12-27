@@ -359,6 +359,32 @@ export class CdkBedrockAgentStack extends cdk.Stack {
       }),
     ); 
 
+    // ALB SG
+    const albSg = new ec2.SecurityGroup(this, `alb-sg-for-${projectName}`, {
+      vpc: vpc,
+      allowAllOutbound: true,
+      securityGroupName: `alb-sg-for-${projectName}`,
+      description: 'security group for alb'
+    });
+    
+    // ALB
+    const alb = new elbv2.ApplicationLoadBalancer(this, `alb-for-${projectName}`, {
+      internetFacing: true,
+      vpc: vpc,
+      vpcSubnets: {
+        subnets: vpc.publicSubnets
+      },
+      securityGroup: albSg,
+      loadBalancerName: `alb-for-${projectName}`
+    });
+    alb.applyRemovalPolicy(cdk.RemovalPolicy.DESTROY); 
+
+    new cdk.CfnOutput(this, `albUrl-for-${projectName}`, {
+      value: `http://${alb.loadBalancerDnsName}/`,
+      description: `albUrl-${projectName}`,
+      exportName: `albUrl-${projectName}`
+    }); 
+
     // EC2 Security Group
     const ec2Sg = new ec2.SecurityGroup(this, `ec2-sg-for-${projectName}`,
       {
@@ -378,6 +404,7 @@ export class CdkBedrockAgentStack extends cdk.Stack {
     //   ec2.Port.tcp(80),
     //   'HTTP',
     // );
+    ec2Sg.connections.allowFrom(albSg, ec2.Port.tcp(targetPort), 'allow traffic from alb') // alb -> ec2
 
     const userData = ec2.UserData.forLinux();
 
@@ -453,6 +480,7 @@ EOF"`,
     });
 
     // EC2 instance
+    /*
     const appInstance = new ec2.Instance(this, `app-for-${projectName}`, {
       instanceName: `app-for-${projectName}`,
       instanceType: new ec2.InstanceType('t2.small'), // m5.large
@@ -484,27 +512,6 @@ EOF"`,
     const targets: elbv2_tg.InstanceTarget[] = new Array();
     targets.push(new elbv2_tg.InstanceTarget(appInstance)); 
 
-    // ALB SG
-    const albSg = new ec2.SecurityGroup(this, `alb-sg-for-${projectName}`, {
-      vpc: vpc,
-      allowAllOutbound: true,
-      securityGroupName: `alb-sg-for-${projectName}`,
-      description: 'security group for alb'
-    });
-    ec2Sg.connections.allowFrom(albSg, ec2.Port.tcp(targetPort), 'allow traffic from alb') // alb -> ec2
-    
-    // ALB
-    const alb = new elbv2.ApplicationLoadBalancer(this, `alb-for-${projectName}`, {
-      internetFacing: true,
-      vpc: vpc,
-      vpcSubnets: {
-        subnets: vpc.publicSubnets
-      },
-      securityGroup: albSg,
-      loadBalancerName: `alb-for-${projectName}`
-    });
-    alb.applyRemovalPolicy(cdk.RemovalPolicy.DESTROY); 
-
     // ALB Listener
     const listener = alb.addListener(`HttpListener-for-${projectName}`, {   
       port: 80,
@@ -516,12 +523,6 @@ EOF"`,
       targets,
       protocol: elbv2.ApplicationProtocol.HTTP,
       port: targetPort
-    }); 
-
-    new cdk.CfnOutput(this, `albUrl-for-${projectName}`, {
-      value: `http://${alb.loadBalancerDnsName}/`,
-      description: `albUrl-${projectName}`,
-      exportName: `albUrl-${projectName}`
-    });      
+    });  */         
   }
 }
