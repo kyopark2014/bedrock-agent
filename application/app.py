@@ -1,11 +1,6 @@
 import streamlit as st 
 import chat
 
-
-#st.sidebar.write('선택된 대화:', option)
-
-# Add file uploader to sidebar
-
 mode_descriptions = {
     "일상적인 대화": [
         "대화이력을 바탕으로 챗봇과 일장적인 대화를 편안히 즐길수 있습니다."
