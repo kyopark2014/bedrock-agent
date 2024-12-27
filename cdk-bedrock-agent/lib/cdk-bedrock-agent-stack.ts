@@ -15,6 +15,8 @@ const targetPort = 8080;
 const bucketName = `storage-for-${projectName}-${accountId}-${region}`; 
 const vectorIndexName = projectName
 const knowledge_base_name = projectName;
+const parsingModelArn = `arn:aws:bedrock:${region}::foundation-model/anthropic.claude-3-haiku-20240307-v1:0`;
+const embeddingModelArn = `arn:aws:bedrock:${region}::foundation-model/amazon.titan-embed-text-v2:0`;
 
 export class CdkBedrockAgentStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -401,9 +403,13 @@ EOF"`,
       `runuser -l ec2-user -c 'export region=${region}'`,
       `runuser -l ec2-user -c 'export knowledge_base_name=${knowledge_base_name}'`,
       `runuser -l ec2-user -c 'export knowledge_base_role=${knowledge_base_role.roleArn}'`,
-      `runuser -l ec2-user -c 'export collectionName=${collectionName}'`,
+      // `runuser -l ec2-user -c 'export collectionName=${collectionName}'`,
       `runuser -l ec2-user -c 'export collectionArn=${collectionArn}'`,
       `runuser -l ec2-user -c 'export vectorIndexName=${vectorIndexName}'`,
+      `runuser -l ec2-user -c 'export opensearch_url=${opensearch_url}'`,
+      `runuser -l ec2-user -c 'export parsingModelArn=${parsingModelArn}'`,
+      `runuser -l ec2-user -c 'export embeddingModelArn=${embeddingModelArn}'`,
+      `runuser -l ec2-user -c 'export s3_arn=${s3Bucket.bucketArn}'`,
       'systemctl enable streamlit.service',
       'systemctl start streamlit'
     ];

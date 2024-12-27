@@ -7,6 +7,7 @@ import requests
 import datetime
 import functools
 import uuid
+import time
 
 from io import BytesIO
 from PIL import Image
@@ -27,6 +28,7 @@ from typing import Any, List, Tuple, Dict, Optional, cast, Literal, Sequence, Un
 from typing_extensions import Annotated, TypedDict
 from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode
+from opensearchpy import OpenSearch, RequestsHttpConnection, AWSV4SignerAuth
 
 bedrock_region = "us-west-2"
 projectName = os.environ.get('projectName')
@@ -48,6 +50,39 @@ if bucketName is None:
 print('bucketName: ', bucketName)
 
 s3_prefix = 'docs'
+
+knowledge_base_name = os.environ.get('knowledge_base_name')
+knowledge_base_role = os.environ.get('knowledge_base_role')
+collectionArn = os.environ.get('collectionArn')
+vectorIndexName = os.environ.get('vectorIndexName')
+opensearch_url = os.environ.get('opensearch_url')
+credentials = boto3.Session().get_credentials()
+service = "aoss" 
+awsauth = AWSV4SignerAuth(credentials, region, service)
+parsingModelArn = os.environ.get('parsingModelArn')
+embeddingModelArn = os.environ.get('embeddingModelArn')
+s3_arn = os.environ.get('s3_arn')
+
+os_client = OpenSearch(
+    hosts = [{
+        'host': opensearch_url.replace("https://", ""), 
+        'port': 443
+    }],
+    http_auth=awsauth,
+    use_ssl = True,
+    verify_certs = True,
+    connection_class=RequestsHttpConnection,
+)
+
+def is_not_exist(index_name):    
+    print('index_name: ', index_name)
+        
+    if os_client.indices.exists(index_name):
+        print('use exist index: ', index_name)    
+        return False
+    else:
+        print('no index: ', index_name)
+        return True
 
 multi_region_models = [   # Nova Pro
     {   
@@ -72,6 +107,233 @@ AI_PROMPT = "\n\nAssistant:"
 
 userId = "demo"
 map_chain = dict() 
+
+knowledge_base_id = ""
+data_source_id = ""
+def initiate_knowledge_base():
+    global knowledge_base_id, data_source_id
+    #########################
+    # opensearch index
+    #########################
+    if(is_not_exist(vectorIndexName)):
+        print(f"creating opensearch index... {vectorIndexName}")        
+        body={ 
+            'settings':{
+                "index.knn": True,
+                "index.knn.algo_param.ef_search": 512,
+                'analysis': {
+                    'analyzer': {
+                        'my_analyzer': {
+                            'char_filter': ['html_strip'], 
+                            'tokenizer': 'nori',
+                            'filter': ['nori_number','lowercase','trim','my_nori_part_of_speech'],
+                            'type': 'custom'
+                        }
+                    },
+                    'tokenizer': {
+                        'nori': {
+                            'decompound_mode': 'mixed',
+                            'discard_punctuation': 'true',
+                            'type': 'nori_tokenizer'
+                        }
+                    },
+                    "filter": {
+                        "my_nori_part_of_speech": {
+                            "type": "nori_part_of_speech",
+                            "stoptags": [
+                                    "E", "IC", "J", "MAG", "MAJ",
+                                    "MM", "SP", "SSC", "SSO", "SC",
+                                    "SE", "XPN", "XSA", "XSN", "XSV",
+                                    "UNA", "NA", "VSV"
+                            ]
+                        }
+                    }
+                },
+            },
+            'mappings': {
+                'properties': {
+                    'vector_field': {
+                        'type': 'knn_vector',
+                        'dimension': 1024,
+                        'method': {
+                            "name": "hnsw",
+                            "engine": "faiss",
+                            "parameters": {
+                                "ef_construction": 512,
+                                "m": 16
+                            }
+                        }                  
+                    },
+                    "AMAZON_BEDROCK_METADATA": {"type": "text", "index": False},
+                    "AMAZON_BEDROCK_TEXT_CHUNK": {"type": "text"},
+                }
+            }
+        }
+
+        try: # create index
+            response = os_client.indices.create(
+                vectorIndexName,
+                body=body
+            )
+            print('opensearch index was created:', response)
+
+            # delay 3seconds
+            time.sleep(5)
+        except Exception:
+            err_msg = traceback.format_exc()
+            print('error message: ', err_msg)                
+            #raise Exception ("Not able to create the index")
+            
+    #########################
+    # knowledge base
+    #########################
+    print('knowledge_base_name: ', knowledge_base_name)
+    print('collectionArn: ', collectionArn)
+    print('vectorIndexName: ', vectorIndexName)
+    print('embeddingModelArn: ', embeddingModelArn)
+    print('knowledge_base_role: ', knowledge_base_role)
+    try: 
+        client = boto3.client('bedrock-agent')         
+        response = client.list_knowledge_bases(
+            maxResults=10
+        )
+        print('(list_knowledge_bases) response: ', response)
+        
+        if "knowledgeBaseSummaries" in response:
+            summaries = response["knowledgeBaseSummaries"]
+            for summary in summaries:
+                if summary["name"] == knowledge_base_name:
+                    knowledge_base_id = summary["knowledgeBaseId"]
+                    print('knowledge_base_id: ', knowledge_base_id)
+    except Exception:
+        err_msg = traceback.format_exc()
+        print('error message: ', err_msg)
+                    
+    if not knowledge_base_id:
+        print('creating knowledge base...')        
+        for atempt in range(3):
+            try:
+                response = client.create_knowledge_base(
+                    name=knowledge_base_name,
+                    description="Knowledge base based on OpenSearch",
+                    roleArn=knowledge_base_role,
+                    knowledgeBaseConfiguration={
+                        'type': 'VECTOR',
+                        'vectorKnowledgeBaseConfiguration': {
+                            'embeddingModelArn': embeddingModelArn,
+                            'embeddingModelConfiguration': {
+                                'bedrockEmbeddingModelConfiguration': {
+                                    'dimensions': 1024
+                                }
+                            }
+                        }
+                    },
+                    storageConfiguration={
+                        'type': 'OPENSEARCH_SERVERLESS',
+                        'opensearchServerlessConfiguration': {
+                            'collectionArn': collectionArn,
+                            'fieldMapping': {
+                                'metadataField': 'AMAZON_BEDROCK_METADATA',
+                                'textField': 'AMAZON_BEDROCK_TEXT_CHUNK',
+                                'vectorField': 'vector_field'
+                            },
+                            'vectorIndexName': vectorIndexName
+                        }
+                    }                
+                )   
+                print('(create_knowledge_base) response: ', response)
+            
+                if 'knowledgeBaseId' in response['knowledgeBase']:
+                    knowledge_base_id = response['knowledgeBase']['knowledgeBaseId']
+                    break
+                else:
+                    knowledge_base_id = ""    
+            except Exception:
+                    err_msg = traceback.format_exc()
+                    print('error message: ', err_msg)
+                    time.sleep(5)
+                    print(f"retrying... ({atempt})")
+                    #raise Exception ("Not able to create the knowledge base")       
+                
+    print(f"knowledge_base_name: {knowledge_base_name}, knowledge_base_id: {knowledge_base_id}")    
+    
+    #########################
+    # data source      
+    #########################
+    data_source_name = bucketName  
+    try: 
+        response = client.list_data_sources(
+            knowledgeBaseId=knowledge_base_id,
+            maxResults=10
+        )        
+        print('(list_data_sources) response: ', response)
+        
+        if 'dataSourceSummaries' in response:
+            for data_source in response['dataSourceSummaries']:
+                print('data_source: ', data_source)
+                if data_source['name'] == data_source_name:
+                    data_source_id = data_source['dataSourceId']
+                    print('data_source_id: ', data_source_id)
+                    break    
+    except Exception:
+        err_msg = traceback.format_exc()
+        print('error message: ', err_msg)
+        
+    if not data_source_id:
+        print('creating data source...')  
+        try:
+            response = client.create_data_source(
+                dataDeletionPolicy='DELETE',
+                dataSourceConfiguration={
+                    's3Configuration': {
+                        'bucketArn': s3_arn,
+                        'inclusionPrefixes': [ 
+                            s3_prefix+'/',
+                        ]
+                    },
+                    'type': 'S3'
+                },
+                description = f"S3 data source: {bucketName}",
+                knowledgeBaseId = knowledge_base_id,
+                name = data_source_name,
+                vectorIngestionConfiguration={
+                    'chunkingConfiguration': {
+                        'chunkingStrategy': 'HIERARCHICAL',
+                        'hierarchicalChunkingConfiguration': {
+                            'levelConfigurations': [
+                                {
+                                    'maxTokens': 1500
+                                },
+                                {
+                                    'maxTokens': 300
+                                }
+                            ],
+                            'overlapTokens': 60
+                        }
+                    },
+                    'parsingConfiguration': {
+                        'bedrockFoundationModelConfiguration': {
+                            'modelArn': parsingModelArn
+                        },
+                        'parsingStrategy': 'BEDROCK_FOUNDATION_MODEL'
+                    }
+                }
+            )
+            print('(create_data_source) response: ', response)
+            
+            if 'dataSource' in response:
+                if 'dataSourceId' in response['dataSource']:
+                    data_source_id = response['dataSource']['dataSourceId']
+                    print('data_source_id: ', data_source_id)
+                    
+        except Exception:
+            err_msg = traceback.format_exc()
+            print('error message: ', err_msg)
+            #raise Exception ("Not able to create the data source")
+    
+    print(f"data_source_name: {data_source_name}, data_source_id: {data_source_id}")
+            
+initiate_knowledge_base()
 
 if userId in map_chain:  
         # print('memory exist. reuse it!')
