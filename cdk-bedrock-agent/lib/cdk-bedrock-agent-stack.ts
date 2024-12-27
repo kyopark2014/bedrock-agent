@@ -145,12 +145,7 @@ export class CdkBedrockAgentStack extends cdk.Stack {
     });
     OpenSearchCollection.addDependency(netPolicy);
 
-    const sts = new iam.AccountPrincipal(this.account)
-    new cdk.CfnOutput(this, `AccountPrincipal-for-${projectName}`, {
-      value: sts.arn,
-      description: `AccountPrincipal-${projectName}`,
-      exportName: `AccountPrincipal-${projectName}`
-    });     
+    const account = new iam.AccountPrincipal(this.account)
     const dataAccessPolicyName = `data-${projectName}`
     const dataAccessPolicy = new opensearchserverless.CfnAccessPolicy(this, `opensearch-data-collection-policy-for-${projectName}`, {
       name: dataAccessPolicyName,
@@ -182,10 +177,8 @@ export class CdkBedrockAgentStack extends cdk.Stack {
             }
           ],
           Principal: [
-            `arn:aws:iam::${accountId}:role/${knowledge_base_role.roleName}`,
-            //`arn:aws:iam::${accountId}:role/role-lambda-chat-ws-for-${projectName}-${region}`,
-            //`arn:aws:iam::${accountId}:role/administration`,
-            sts.arn, 
+            //`arn:aws:iam::${accountId}:role/${knowledge_base_role.roleName}`,
+            account.arn
           ], 
         },
       ]),
