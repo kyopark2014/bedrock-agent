@@ -177,7 +177,6 @@ export class CdkBedrockAgentStack extends cdk.Stack {
             }
           ],
           Principal: [
-            //`arn:aws:iam::${accountId}:role/${knowledge_base_role.roleName}`,
             account.arn
           ], 
         },
