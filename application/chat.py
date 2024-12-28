@@ -87,7 +87,7 @@ if s3_arn is None:
     raise Exception ("No S3 ARN")
 
 parsingModelArn = f"arn:aws:bedrock:{region}::foundation-model/anthropic.claude-3-haiku-20240307-v1:0"
-embeddingModelArn = f"arn:aws:bedrock:${region}::foundation-model/amazon.titan-embed-text-v2:0"
+embeddingModelArn = f"arn:aws:bedrock:{region}::foundation-model/amazon.titan-embed-text-v2:0"
 
 knowledge_base_name = projectName
 
