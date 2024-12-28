@@ -421,13 +421,7 @@ export s3_arn=${s3Bucket.bucketArn}`
       exportName: `environment-${projectName}`
     });
 
-    const commands = [
-      // 'yum install nginx -y',
-      // 'service nginx start',
-      'yum install git python-pip -y',
-      'pip install pip --upgrade',            
-      `sh -c "cat <<EOF > /etc/systemd/system/streamlit.service
-[Unit]
+    const streamlit_service = `[Unit]
 Description=Streamlit
 After=network-online.target
 
@@ -438,10 +432,17 @@ Restart=always
 ExecStart=/home/ec2-user/.local/bin/streamlit run /home/ec2-user/${projectName}/application/app.py
 
 [Install]
-WantedBy=multi-user.target
-EOF"`,
-        `runuser -l ec2-user -c "mkdir -p /home/ec2-user/.streamlit"`,
-        `runuser -l ec2-user -c "cat <<EOF > /home/ec2-user/.streamlit/config.toml
+WantedBy=multi-user.target`
+
+    const commands = [
+      // 'yum install nginx -y',
+      // 'service nginx start',
+      'yum install git python-pip -y',
+      'pip install pip --upgrade',            
+      // `runuser -l ec2-user -c 'pip install watchtower'`,  // debug 
+      // `sh -c "cat <<EOF > /etc/systemd/system/streamlit.service\n${streamlit_service}EOF"`,
+      `runuser -l ec2-user -c "mkdir -p /home/ec2-user/.streamlit"`,
+      `runuser -l ec2-user -c "cat <<EOF > /home/ec2-user/.streamlit/config.toml
 [server]
 port=${targetPort}
 EOF"`,
@@ -452,14 +453,14 @@ EOF"`,
       'systemctl enable streamlit.service',
       'systemctl start streamlit'
     ];
-    // `runuser -l ec2-user -c 'pip install watchtower'`,  // debug 
+    
 
     userData.addCommands(...commands);
-    // new cdk.CfnOutput(this, `userDataCommand-for-${projectName}`, {
-    //   value: JSON.stringify(commands),
-    //   description: `userDataCommand-${projectName}`,
-    //   exportName: `userDataCommand-${projectName}`
-    // });    
+    new cdk.CfnOutput(this, `userDataCommand-for-${projectName}`, {
+      value: JSON.stringify(commands),
+      description: `userDataCommand-${projectName}`,
+      exportName: `userDataCommand-${projectName}`
+    });    
 
     new cdk.CfnOutput(this, `KnowledgeBaseRole-for-${projectName}`, {
       value: knowledge_base_role.roleArn,
