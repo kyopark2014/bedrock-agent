@@ -407,12 +407,14 @@ export class CdkBedrockAgentStack extends cdk.Stack {
 
     const userData = ec2.UserData.forLinux();
 
-    const environment = `runuser -l ec2-user -c 'export projectName=${projectName}
+    const environment = `'export projectName=${projectName}
 export accountId=${accountId}
+export region=${region}
 export knowledge_base_role=${knowledge_base_role.roleArn}    
 export collectionArn=${collectionArn}    
 export opensearch_url=${OpenSearchCollection.attrCollectionEndpoint}
 export s3_arn=${s3Bucket.bucketArn}'`
+    
     new cdk.CfnOutput(this, `environment-for-${projectName}`, {
       value: JSON.stringify(environment),
       description: `environment-${projectName}`,
@@ -444,26 +446,19 @@ EOF"`,
 port=${targetPort}
 EOF"`,
       `runuser -l ec2-user -c 'cd && git clone https://github.com/kyopark2014/${projectName}'`,
-      `runuser -l ec2-user -c 'pip install streamlit streamlit_chat'`,        
+      `runuser -l ec2-user -c 'pip install streamlit streamlit_chat beautifulsoup4 pytz tavily-python'`,        
       `runuser -l ec2-user -c 'pip install boto3 langchain_aws langchain langchain_community langgraph opensearch-py'`,
-      `runuser -l ec2-user -c 'pip install beautifulsoup4 pytz tavily-python'`,
       // `runuser -l ec2-user -c 'pip install watchtower'`,  // debug      
-      `runuser -l ec2-user -c 'export projectName=${projectName}'`,
-      `runuser -l ec2-user -c 'export accountId=${accountId}'`,      
-      `runuser -l ec2-user -c 'export region=${region}'`,
-      `runuser -l ec2-user -c 'export knowledge_base_role=${knowledge_base_role.roleArn}'`,
-      `runuser -l ec2-user -c 'export collectionArn=${collectionArn}'`,
-      `runuser -l ec2-user -c 'export opensearch_url=${OpenSearchCollection.attrCollectionEndpoint}'`,
-      `runuser -l ec2-user -c 'export s3_arn=${s3Bucket.bucketArn}'`,
+      `runuser -l ec2-user -c '${environment}`,
       'systemctl enable streamlit.service',
       'systemctl start streamlit'
     ];
     userData.addCommands(...commands);
-    // new cdk.CfnOutput(this, `userDataCommand-for-${projectName}`, {
-    //   value: JSON.stringify(commands),
-    //   description: `userDataCommand-${projectName}`,
-    //   exportName: `userDataCommand-${projectName}`
-    // });    
+    new cdk.CfnOutput(this, `userDataCommand-for-${projectName}`, {
+      value: JSON.stringify(commands),
+      description: `userDataCommand-${projectName}`,
+      exportName: `userDataCommand-${projectName}`
+    });    
 
     new cdk.CfnOutput(this, `KnowledgeBaseRole-for-${projectName}`, {
       value: knowledge_base_role.roleArn,
