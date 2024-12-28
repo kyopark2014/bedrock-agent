@@ -35,7 +35,7 @@ from multiprocessing import Process, Pipe
 from urllib import parse
 from pydantic.v1 import BaseModel, Field
 
-with open("application/config.json", "r", encoding="utf-8") as f:
+with open("/home/ec2-user/bedrock-agent/application/config.json", "r", encoding="utf-8") as f:
     config = json.load(f)
 print('config: ', config)
 
