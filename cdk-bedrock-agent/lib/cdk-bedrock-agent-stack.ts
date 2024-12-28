@@ -454,11 +454,11 @@ EOF"`,
       'systemctl start streamlit'
     ];
     userData.addCommands(...commands);
-    new cdk.CfnOutput(this, `userDataCommand-for-${projectName}`, {
-      value: JSON.stringify(commands),
-      description: `userDataCommand-${projectName}`,
-      exportName: `userDataCommand-${projectName}`
-    });    
+    // new cdk.CfnOutput(this, `userDataCommand-for-${projectName}`, {
+    //   value: JSON.stringify(commands),
+    //   description: `userDataCommand-${projectName}`,
+    //   exportName: `userDataCommand-${projectName}`
+    // });    
 
     new cdk.CfnOutput(this, `KnowledgeBaseRole-for-${projectName}`, {
       value: knowledge_base_role.roleArn,
