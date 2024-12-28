@@ -459,25 +459,9 @@ port=${targetPort}`
       'systemctl start streamlit'
     ];
     userData.addCommands(...commands);
-    
-    new cdk.CfnOutput(this, `KnowledgeBaseRole-for-${projectName}`, {
-      value: knowledge_base_role.roleArn,
-      description: `KnowledgeBaseRole-${projectName}`,
-      exportName: `KnowledgeBaseRole-${projectName}`
-    });    
-    new cdk.CfnOutput(this, `CollectionArn-for-${projectName}`, {
-      value: collectionArn,
-      description: `CollectionArn-${projectName}`,
-      exportName: `CollectionArn-${projectName}`
-    });        
-    new cdk.CfnOutput(this, `s3Arn-for-${projectName}`, {
-      value: s3Bucket.bucketArn,
-      description: `s3Arn-${projectName}`,
-      exportName: `s3Arn-${projectName}`
-    });
 
     // EC2 instance
- /*   const appInstance = new ec2.Instance(this, `app-for-${projectName}`, {
+    const appInstance = new ec2.Instance(this, `app-for-${projectName}`, {
       instanceName: `app-for-${projectName}`,
       instanceType: new ec2.InstanceType('t2.small'), // m5.large
       // instanceType: ec2.InstanceType.of(ec2.InstanceClass.T2, ec2.InstanceSize.SMALL),
@@ -519,6 +503,6 @@ port=${targetPort}`
       targets,
       protocol: elbv2.ApplicationProtocol.HTTP,
       port: targetPort
-    });        */   
+    });           
   }
 }
