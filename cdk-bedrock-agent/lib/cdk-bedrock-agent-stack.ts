@@ -451,8 +451,7 @@ port=${targetPort}`
       `runuser -l ec2-user -c "mkdir -p /home/ec2-user/.streamlit"`,
       `runuser -l ec2-user -c "cat <<EOF > /home/ec2-user/.streamlit/config.toml\n${config_toml}EOF"`,
       `sh -c "cat <<EOF > /etc/systemd/system/streamlit.service\n${streamlit_service}EOF"`,
-      `runuser -l ec2-user -c 'echo "${environment_variables}" >> /home/ec2-user/env.sh'`,
-      `runuser -l ec2-user -c "cat <<EOF > /home/ec2-user/env2.sh\n${environment_variables}\nEOF"`,
+      `runuser -l ec2-user -c "cat <<EOF > /home/ec2-user/.env\n${environment_variables}\nEOF"`,
       `runuser -l ec2-user -c 'cd && git clone https://github.com/kyopark2014/${projectName}'`,
       `runuser -l ec2-user -c 'pip install streamlit streamlit_chat beautifulsoup4 pytz tavily-python'`,        
       `runuser -l ec2-user -c 'pip install boto3 langchain_aws langchain langchain_community langgraph opensearch-py'`,                 
@@ -462,7 +461,7 @@ port=${targetPort}`
     userData.addCommands(...commands);
 
     // EC2 instance
-    const appInstance = new ec2.Instance(this, `app-for-${projectName}`, {
+/*    const appInstance = new ec2.Instance(this, `app-for-${projectName}`, {
       instanceName: `app-for-${projectName}`,
       instanceType: new ec2.InstanceType('t2.small'), // m5.large
       // instanceType: ec2.InstanceType.of(ec2.InstanceClass.T2, ec2.InstanceSize.SMALL),
@@ -504,6 +503,6 @@ port=${targetPort}`
       targets,
       protocol: elbv2.ApplicationProtocol.HTTP,
       port: targetPort
-    });           
+    });          */ 
   }
 }
