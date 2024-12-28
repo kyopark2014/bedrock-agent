@@ -35,68 +35,49 @@ from multiprocessing import Process, Pipe
 from urllib import parse
 from pydantic.v1 import BaseModel, Field
 
-debugMode = True
-if debugMode:
-    import watchtower, logging
-    logging.basicConfig(level=logging.INFO)
-    logger = logging.getLogger(__name__)
-    logger.addHandler(watchtower.CloudWatchLogHandler())
-    # logger.info("Hi")
-    # logger.info(dict(foo="bar", details={}))
+with open("application/config.json", "r", encoding="utf-8") as f:
+    config = json.load(f)
+print('config: ', config)
+
+for c in config:
+    print(f"{c}:{config[c]}")
+    os.environ[c] = config[c]
 
 bedrock_region = "us-west-2"
 projectName = os.environ.get('projectName')
 if projectName is None:
     projectName = "bedrock-agent"
     print('projectName: ', projectName)
-if debugMode:
-    logger.info('projectName: '+projectName)
 
 accountId = os.environ.get('accountId')
 print('accountId: ', accountId)
-if debugMode:
-    logger.info('accountId: '+accountId)
 
 region = os.environ.get('region')
 if region is None:
     region = "us-west-2"
 print('region: ', region)
-if debugMode:
-    logger.info('region: '+region)
 
 bucketName = os.environ.get('bucketName')
 if bucketName is None:
     bucketName = f"storage-for-{projectName}-{accountId}-{region}" 
 print('bucketName: ', bucketName)
-if debugMode:
-    logger.info('bucketName: '+bucketName)
 
 s3_prefix = 'docs'
 
 knowledge_base_role = os.environ.get('knowledge_base_role')
-if debugMode:
-    logger.info('knowledge_base_role: '+knowledge_base_role)
 
 collectionArn = os.environ.get('collectionArn')
 vectorIndexName = projectName
-if debugMode:
-    logger.info('vectorIndexName: '+vectorIndexName)
 
 opensearch_url = os.environ.get('opensearch_url')
-if debugMode:
-    logger.info('opensearch_url (env): '+opensearch_url)
 #opensearch_url = 'https://ietky7qch9eapazlufpi.us-west-2.aoss.amazonaws.com'
 if opensearch_url is None:
     raise Exception ("No OpenSearch URL")
-if debugMode:
-    logger.info('opensearch_url: '+opensearch_url)
 
 credentials = boto3.Session().get_credentials()
 service = "aoss" 
 awsauth = AWSV4SignerAuth(credentials, region, service)
 s3_arn = os.environ.get('s3_arn')
-if debugMode:
-    logger.info('s3_arn: '+s3_arn)
 
 parsingModelArn = f"arn:aws:bedrock:{region}::foundation-model/anthropic.claude-3-haiku-20240307-v1:0"
 embeddingModelArn = f"arn:aws:bedrock:${region}::foundation-model/amazon.titan-embed-text-v2:0"
@@ -231,8 +212,6 @@ def initiate_knowledge_base():
             err_msg = traceback.format_exc()
             print('error message: ', err_msg)                
             #raise Exception ("Not able to create the index")
-            if debugMode:
-                logger.info(err_msg)
             
     #########################
     # knowledge base
@@ -258,8 +237,6 @@ def initiate_knowledge_base():
     except Exception:
         err_msg = traceback.format_exc()
         print('error message: ', err_msg)
-        if debugMode:
-            logger.info(err_msg)
                     
     if not knowledge_base_id:
         print('creating knowledge base...')        
@@ -306,8 +283,6 @@ def initiate_knowledge_base():
                     time.sleep(5)
                     print(f"retrying... ({atempt})")
                     #raise Exception ("Not able to create the knowledge base")      
-                    if debugMode:
-                        logger.info(err_msg) 
                 
     print(f"knowledge_base_name: {knowledge_base_name}, knowledge_base_id: {knowledge_base_id}")    
     
@@ -332,8 +307,6 @@ def initiate_knowledge_base():
     except Exception:
         err_msg = traceback.format_exc()
         print('error message: ', err_msg)
-        if debugMode:
-            logger.info(err_msg)
         
     if not data_source_id:
         print('creating data source...')  
@@ -386,8 +359,6 @@ def initiate_knowledge_base():
             err_msg = traceback.format_exc()
             print('error message: ', err_msg)
             #raise Exception ("Not able to create the data source")
-            if debugMode:
-                logger.info(err_msg)
     
     print(f"data_source_name: {data_source_name}, data_source_id: {data_source_id}")
             
@@ -480,9 +451,6 @@ def get_multi_region_chat(models, selected):
 def general_conversation(query):
     chat = get_chat()
 
-    if debugMode:
-        logger.info('(general_conversation) query'+query)
-
     system = (
         "당신의 이름은 서연이고, 질문에 대해 친절하게 답변하는 사려깊은 인공지능 도우미입니다."
         "상황에 맞는 구체적인 세부 정보를 충분히 제공합니다." 
@@ -517,13 +485,8 @@ def general_conversation(query):
     except Exception:
         err_msg = traceback.format_exc()
         print('error message: ', err_msg)        
-        if debugMode:
-            logger.info(err_msg)
         raise Exception ("Not able to request to LLM: "+err_msg)
-    
-    if debugMode:
-        logger.info('(general_conversation) msg:'+msg)
-        
+            
     return msg
 
 def print_doc(i, doc):
@@ -744,8 +707,6 @@ def query_using_RAG_context(chat, context, revised_question):
     except Exception:
         err_msg = traceback.format_exc()
         print('error message: ', err_msg)    
-        if debugMode:
-            logger.info(err_msg)                
         raise Exception ("Not able to request to LLM: "+err_msg)
 
     return msg
@@ -889,8 +850,6 @@ def get_weather_info(city: str) -> str:
         except Exception:
             err_msg = traceback.format_exc()
             print('error message: ', err_msg)   
-            if debugMode:
-                logger.info(err_msg)                 
             # raise Exception ("Not able to request to LLM")    
         
     print('weather_str: ', weather_str)                            
@@ -942,8 +901,6 @@ def search_by_tavily(keyword: str) -> str:
         except Exception:
             err_msg = traceback.format_exc()
             print('error message: ', err_msg)           
-            if debugMode:
-                logger.info(err_msg)         
             # raise Exception ("Not able to request to tavily")   
         
     return answer
@@ -1070,8 +1027,6 @@ def traslation(chat, text, input_language, output_language):
     except Exception:
         err_msg = traceback.format_exc()
         print('error message: ', err_msg)          
-        if debugMode:
-            logger.info(err_msg)          
         raise Exception ("Not able to request to LLM")
 
     return msg[msg.find('<result>')+8:len(msg)-9] # remove <result> tag
@@ -1303,8 +1258,6 @@ def translate_text(text):
     except Exception:
         err_msg = traceback.format_exc()
         print('error message: ', err_msg)       
-        if debugMode:
-            logger.info(err_msg)             
         raise Exception ("Not able to request to LLM")
 
     return msg[msg.find('<result>')+8:len(msg)-9] # remove <result> tag
@@ -1343,8 +1296,6 @@ def check_grammer(text):
     except Exception:
         err_msg = traceback.format_exc()
         print('error message: ', err_msg)        
-        if debugMode:
-            logger.info(err_msg)            
         raise Exception ("Not able to request to LLM")
     
     return msg
