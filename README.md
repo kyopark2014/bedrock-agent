@@ -1,4 +1,4 @@
-# Bedrock Agent
+# Bedrock Agent
 
 여기에서는 Knowledge Base로 RAG를 구성하고 이를 바탕으로 bedrock agent의 사용해 봅니다.
 
