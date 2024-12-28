@@ -39,45 +39,43 @@ with open("/home/ec2-user/bedrock-agent/application/config.json", "r", encoding=
     config = json.load(f)
 print('config: ', config)
 
-for c in config:
-    print(f"{c}:{config[c]}")
-    os.environ[c] = config[c]
-
 bedrock_region = "us-west-2"
-projectName = os.environ.get('projectName')
-if projectName is None:
-    projectName = "bedrock-agent"
-    print('projectName: ', projectName)
+projectName = config["projectName"] if "projectName" in config else "bedrock-agent"
 
-accountId = os.environ.get('accountId')
-print('accountId: ', accountId)
+accountId = config["accountId"] if "accountId" in config else None
+if accountId is None:
+    raise Exception ("No accountId")
 
-region = os.environ.get('region')
-if region is None:
-    region = "us-west-2"
+region = config["region"] if "region" in config else "us-west-2"
 print('region: ', region)
 
-bucketName = os.environ.get('bucketName')
-if bucketName is None:
-    bucketName = f"storage-for-{projectName}-{accountId}-{region}" 
+
+bucketName = config["bucketName"] if "bucketName" in config else f"storage-for-{projectName}-{accountId}-{region}" 
 print('bucketName: ', bucketName)
 
 s3_prefix = 'docs'
 
-knowledge_base_role = os.environ.get('knowledge_base_role')
+knowledge_base_role = config["knowledge_base_role"] if "knowledge_base_role" in config else None
+if knowledge_base_role is None:
+    raise Exception ("No Knowledge Base Role")
 
-collectionArn = os.environ.get('collectionArn')
+collectionArn = config["collectionArn"] if "collectionArn" in config else None
+if collectionArn is None:
+    raise Exception ("No collectionArn")
+
 vectorIndexName = projectName
 
-opensearch_url = os.environ.get('opensearch_url')
-#opensearch_url = 'https://ietky7qch9eapazlufpi.us-west-2.aoss.amazonaws.com'
+opensearch_url = config["opensearch_url"] if "opensearch_url" in config else None
 if opensearch_url is None:
     raise Exception ("No OpenSearch URL")
 
 credentials = boto3.Session().get_credentials()
 service = "aoss" 
 awsauth = AWSV4SignerAuth(credentials, region, service)
-s3_arn = os.environ.get('s3_arn')
+
+s3_arn = config["s3_arn"] if "s3_arn" in config else None
+if s3_arn is None:
+    raise Exception ("No S3 ARN")
 
 parsingModelArn = f"arn:aws:bedrock:{region}::foundation-model/anthropic.claude-3-haiku-20240307-v1:0"
 embeddingModelArn = f"arn:aws:bedrock:${region}::foundation-model/amazon.titan-embed-text-v2:0"
