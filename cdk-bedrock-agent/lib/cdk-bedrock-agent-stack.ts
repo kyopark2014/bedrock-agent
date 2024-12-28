@@ -407,13 +407,13 @@ export class CdkBedrockAgentStack extends cdk.Stack {
 
     const userData = ec2.UserData.forLinux();
 
-    const environment = `'export projectName=${projectName}
+    const environment = `export projectName=${projectName}
 export accountId=${accountId}
 export region=${region}
 export knowledge_base_role=${knowledge_base_role.roleArn}    
 export collectionArn=${collectionArn}    
 export opensearch_url=${OpenSearchCollection.attrCollectionEndpoint}
-export s3_arn=${s3Bucket.bucketArn}'`
+export s3_arn=${s3Bucket.bucketArn}`
     
     new cdk.CfnOutput(this, `environment-for-${projectName}`, {
       value: JSON.stringify(environment),
@@ -447,12 +447,13 @@ port=${targetPort}
 EOF"`,
       `runuser -l ec2-user -c 'cd && git clone https://github.com/kyopark2014/${projectName}'`,
       `runuser -l ec2-user -c 'pip install streamlit streamlit_chat beautifulsoup4 pytz tavily-python'`,        
-      `runuser -l ec2-user -c 'pip install boto3 langchain_aws langchain langchain_community langgraph opensearch-py'`,
-      // `runuser -l ec2-user -c 'pip install watchtower'`,  // debug      
+      `runuser -l ec2-user -c 'pip install boto3 langchain_aws langchain langchain_community langgraph opensearch-py'`,           
       `runuser -l ec2-user -c '${environment}`,
       'systemctl enable streamlit.service',
       'systemctl start streamlit'
     ];
+    // `runuser -l ec2-user -c 'pip install watchtower'`,  // debug 
+
     userData.addCommands(...commands);
     // new cdk.CfnOutput(this, `userDataCommand-for-${projectName}`, {
     //   value: JSON.stringify(commands),
