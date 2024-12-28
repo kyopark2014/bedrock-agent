@@ -447,19 +447,32 @@ port=${targetPort}`
       'pip install pip --upgrade',            
       `runuser -l ec2-user -c 'pip install watchtower'`,  // debug 
       `sh -c "cat <<EOF > /etc/systemd/system/streamlit.service\n${streamlit_service}EOF"`,
-      `runuser -l ec2-user -c '${environment_variables}'`,
+      // `runuser -l ec2-user -c '${environment_variables}'`,
       `runuser -l ec2-user -c "mkdir -p /home/ec2-user/.streamlit"`,
       `runuser -l ec2-user -c "cat <<EOF > /home/ec2-user/.streamlit/config.toml\n${config_toml}EOF"`,
-      `sh -c "cat <<EOF > /etc/systemd/system/streamlit.service\n${streamlit_service}EOF"`,
-      `runuser -l ec2-user -c 'echo "${environment_variables}" >> /home/ec2-user/env.sh'`,
       `runuser -l ec2-user -c 'cd && git clone https://github.com/kyopark2014/${projectName}'`,
       `runuser -l ec2-user -c 'pip install streamlit streamlit_chat beautifulsoup4 pytz tavily-python'`,        
       `runuser -l ec2-user -c 'pip install boto3 langchain_aws langchain langchain_community langgraph opensearch-py'`,                 
       'systemctl enable streamlit.service',
       'systemctl start streamlit'
     ];
-    userData.addCommands(...commands);
     
+    new cdk.CfnOutput(this, `KnowledgeBaseRole-for-${projectName}`, {
+      value: knowledge_base_role.roleArn,
+      description: `KnowledgeBaseRole-${projectName}`,
+      exportName: `KnowledgeBaseRole-${projectName}`
+    });    
+    new cdk.CfnOutput(this, `CollectionArn-for-${projectName}`, {
+      value: collectionArn,
+      description: `CollectionArn-${projectName}`,
+      exportName: `CollectionArn-${projectName}`
+    });        
+    new cdk.CfnOutput(this, `s3Arn-for-${projectName}`, {
+      value: s3Bucket.bucketArn,
+      description: `s3Arn-${projectName}`,
+      exportName: `s3Arn-${projectName}`
+    });
+
     // EC2 instance
     const appInstance = new ec2.Instance(this, `app-for-${projectName}`, {
       instanceName: `app-for-${projectName}`,
