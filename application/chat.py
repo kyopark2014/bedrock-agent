@@ -41,8 +41,8 @@ if debugMode:
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger(__name__)
     logger.addHandler(watchtower.CloudWatchLogHandler())
-    logger.info("Hi")
-    logger.info(dict(foo="bar", details={}))
+    # logger.info("Hi")
+    # logger.info(dict(foo="bar", details={}))
 
 bedrock_region = "us-west-2"
 projectName = os.environ.get('projectName')

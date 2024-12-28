@@ -450,6 +450,8 @@ port=${targetPort}`
       `runuser -l ec2-user -c '${environment_variables}'`,
       `runuser -l ec2-user -c "mkdir -p /home/ec2-user/.streamlit"`,
       `runuser -l ec2-user -c "cat <<EOF > /home/ec2-user/.streamlit/config.toml\n${config_toml}EOF"`,
+      `sh -c "cat <<EOF > /etc/systemd/system/streamlit.service\n${streamlit_service}EOF"`,
+      `runuser -l ec2-user -c 'echo "${environment_variables}" >> /home/ec2-user/env.sh'`,
       `runuser -l ec2-user -c 'cd && git clone https://github.com/kyopark2014/${projectName}'`,
       `runuser -l ec2-user -c 'pip install streamlit streamlit_chat beautifulsoup4 pytz tavily-python'`,        
       `runuser -l ec2-user -c 'pip install boto3 langchain_aws langchain langchain_community langgraph opensearch-py'`,                 
