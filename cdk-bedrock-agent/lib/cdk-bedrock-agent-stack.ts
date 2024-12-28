@@ -35,7 +35,8 @@ export class CdkBedrockAgentStack extends cdk.Stack {
         `arn:aws:bedrock:${region}::foundation-model/anthropic.claude-3-haiku-20240307-v1:0`,
         `arn:aws:bedrock:${region}::foundation-model/anthropic.claude-3-sonnet-20240229-v1:0`,
         `arn:aws:bedrock:${region}::foundation-model/amazon.titan-embed-text-v1`,
-        `arn:aws:bedrock:${region}::foundation-model/amazon.titan-embed-text-v2:0`
+        `arn:aws:bedrock:${region}::foundation-model/amazon.titan-embed-text-v2:0`,
+        `arn:aws:bedrock:${region}::foundation-model/amazon.nova-pro-v1:0`
       ],
       // resources: ['*'],
       actions: [
@@ -458,11 +459,11 @@ EOF"`,
       'systemctl start streamlit'
     ];
     userData.addCommands(...commands);
-    new cdk.CfnOutput(this, `userDataCommand-for-${projectName}`, {
-      value: JSON.stringify(commands),
-      description: `userDataCommand-${projectName}`,
-      exportName: `userDataCommand-${projectName}`
-    });    
+    // new cdk.CfnOutput(this, `userDataCommand-for-${projectName}`, {
+    //   value: JSON.stringify(commands),
+    //   description: `userDataCommand-${projectName}`,
+    //   exportName: `userDataCommand-${projectName}`
+    // });    
 
     new cdk.CfnOutput(this, `KnowledgeBaseRole-for-${projectName}`, {
       value: knowledge_base_role.roleArn,
