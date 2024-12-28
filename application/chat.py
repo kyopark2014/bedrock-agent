@@ -35,9 +35,18 @@ from multiprocessing import Process, Pipe
 from urllib import parse
 from pydantic.v1 import BaseModel, Field
 
-with open("/home/ec2-user/bedrock-agent/application/config.json", "r", encoding="utf-8") as f:
-    config = json.load(f)
-print('config: ', config)
+try:
+    with open("/home/ec2-user/config.json", "r", encoding="utf-8") as f:
+        config = json.load(f)
+    print('config: ', config)
+except Exception:
+    print("use local configuration")
+    with open("application/config.json", "r", encoding="utf-8") as f:
+        config = json.load(f)
+    print('config: ', config)
+
+    # err_msg = traceback.format_exc()
+    #print('error message: ', err_msg)                
 
 bedrock_region = "us-west-2"
 projectName = config["projectName"] if "projectName" in config else "bedrock-agent"
