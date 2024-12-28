@@ -450,7 +450,6 @@ EOF"`,
       `runuser -l ec2-user -c 'pip install streamlit streamlit_chat beautifulsoup4 pytz tavily-python'`,        
       `runuser -l ec2-user -c 'pip install boto3 langchain_aws langchain langchain_community langgraph opensearch-py'`,
       // `runuser -l ec2-user -c 'pip install watchtower'`,  // debug      
-      `runuser -l ec2-user -c '${environment}`,
       'systemctl enable streamlit.service',
       'systemctl start streamlit'
     ];
@@ -458,7 +457,7 @@ EOF"`,
     userData.addCommands(...commands);
 
     // EC2 instance
-  /*  const appInstance = new ec2.Instance(this, `app-for-${projectName}`, {
+    const appInstance = new ec2.Instance(this, `app-for-${projectName}`, {
       instanceName: `app-for-${projectName}`,
       instanceType: new ec2.InstanceType('t2.small'), // m5.large
       // instanceType: ec2.InstanceType.of(ec2.InstanceClass.T2, ec2.InstanceSize.SMALL),
@@ -500,6 +499,6 @@ EOF"`,
       targets,
       protocol: elbv2.ApplicationProtocol.HTTP,
       port: targetPort
-    });      */     
+    });      
   }
 }
