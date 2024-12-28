@@ -407,7 +407,8 @@ export class CdkBedrockAgentStack extends cdk.Stack {
 
     const userData = ec2.UserData.forLinux();
 
-    const environment = `export projectName=${projectName}
+    const environment = `
+export projectName=${projectName}
 export accountId=${accountId}
 export region=${region}
 export knowledge_base_role=${knowledge_base_role.roleArn}    
@@ -416,7 +417,7 @@ export opensearch_url=${OpenSearchCollection.attrCollectionEndpoint}
 export s3_arn=${s3Bucket.bucketArn}`
     
     new cdk.CfnOutput(this, `environment-for-${projectName}`, {
-      value: JSON.stringify(environment),
+      value: environment,
       description: `environment-${projectName}`,
       exportName: `environment-${projectName}`
     });
@@ -455,30 +456,9 @@ EOF"`,
     ];
     
     userData.addCommands(...commands);
-    // new cdk.CfnOutput(this, `userDataCommand-for-${projectName}`, {
-    //   value: JSON.stringify(commands),
-    //   description: `userDataCommand-${projectName}`,
-    //   exportName: `userDataCommand-${projectName}`
-    // });    
-
-    new cdk.CfnOutput(this, `KnowledgeBaseRole-for-${projectName}`, {
-      value: knowledge_base_role.roleArn,
-      description: `KnowledgeBaseRole-${projectName}`,
-      exportName: `KnowledgeBaseRole-${projectName}`
-    });    
-    new cdk.CfnOutput(this, `CollectionArn-for-${projectName}`, {
-      value: collectionArn,
-      description: `CollectionArn-${projectName}`,
-      exportName: `CollectionArn-${projectName}`
-    });        
-    new cdk.CfnOutput(this, `s3Arn-for-${projectName}`, {
-      value: s3Bucket.bucketArn,
-      description: `s3Arn-${projectName}`,
-      exportName: `s3Arn-${projectName}`
-    });
 
     // EC2 instance
-    const appInstance = new ec2.Instance(this, `app-for-${projectName}`, {
+  /*  const appInstance = new ec2.Instance(this, `app-for-${projectName}`, {
       instanceName: `app-for-${projectName}`,
       instanceType: new ec2.InstanceType('t2.small'), // m5.large
       // instanceType: ec2.InstanceType.of(ec2.InstanceClass.T2, ec2.InstanceSize.SMALL),
@@ -520,6 +500,6 @@ EOF"`,
       targets,
       protocol: elbv2.ApplicationProtocol.HTTP,
       port: targetPort
-    });           
+    });      */     
   }
 }
