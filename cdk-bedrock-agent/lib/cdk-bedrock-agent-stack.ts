@@ -15,8 +15,7 @@ const targetPort = 8080;
 const bucketName = `storage-for-${projectName}-${accountId}-${region}`; 
 const vectorIndexName = projectName
 const knowledge_base_name = projectName;
-const parsingModelArn = `arn:aws:bedrock:${region}::foundation-model/anthropic.claude-3-haiku-20240307-v1:0`;
-const embeddingModelArn = `arn:aws:bedrock:${region}::foundation-model/amazon.titan-embed-text-v2:0`;
+
 const enableHybridSearch = 'true';
 
 export class CdkBedrockAgentStack extends cdk.Stack {
@@ -407,6 +406,18 @@ export class CdkBedrockAgentStack extends cdk.Stack {
 
     const userData = ec2.UserData.forLinux();
 
+    const environment = `runuser -l ec2-user -c 'export projectName=${projectName}
+export accountId=${accountId}
+export knowledge_base_role=${knowledge_base_role.roleArn}    
+export collectionArn=${collectionArn}    
+export opensearch_url=${OpenSearchCollection.attrCollectionEndpoint}
+export s3_arn=${s3Bucket.bucketArn}'`
+    new cdk.CfnOutput(this, `environment-for-${projectName}`, {
+      value: JSON.stringify(environment),
+      description: `environment-${projectName}`,
+      exportName: `environment-${projectName}`
+    });
+
     const commands = [
       // 'yum install nginx -y',
       // 'service nginx start',
@@ -439,15 +450,10 @@ EOF"`,
       `runuser -l ec2-user -c 'export projectName=${projectName}'`,
       `runuser -l ec2-user -c 'export accountId=${accountId}'`,      
       `runuser -l ec2-user -c 'export region=${region}'`,
-      `runuser -l ec2-user -c 'export knowledge_base_name=${knowledge_base_name}'`,
       `runuser -l ec2-user -c 'export knowledge_base_role=${knowledge_base_role.roleArn}'`,
       `runuser -l ec2-user -c 'export collectionArn=${collectionArn}'`,
-      `runuser -l ec2-user -c 'export vectorIndexName=${vectorIndexName}'`,
       `runuser -l ec2-user -c 'export opensearch_url=${OpenSearchCollection.attrCollectionEndpoint}'`,
-      `runuser -l ec2-user -c 'export parsingModelArn=${parsingModelArn}'`,
-      `runuser -l ec2-user -c 'export embeddingModelArn=${embeddingModelArn}'`,
       `runuser -l ec2-user -c 'export s3_arn=${s3Bucket.bucketArn}'`,
-      `runuser -l ec2-user -c 'export enableHybridSearch=${enableHybridSearch}'`,
       'systemctl enable streamlit.service',
       'systemctl start streamlit'
     ];

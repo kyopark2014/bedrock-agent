@@ -60,16 +60,11 @@ print('bucketName: ', bucketName)
 
 s3_prefix = 'docs'
 
-knowledge_base_name = os.environ.get('knowledge_base_name')
-if knowledge_base_name is None:
-    knowledge_base_name = projectName
 knowledge_base_role = os.environ.get('knowledge_base_role')
 # logger.info('knowledge_base_role: '+knowledge_base_role)
 
 collectionArn = os.environ.get('collectionArn')
-vectorIndexName = os.environ.get('vectorIndexName')
-if vectorIndexName is None:
-    vectorIndexName = projectName
+vectorIndexName = projectName
 # logger.info('vectorIndexName: '+vectorIndexName)
 
 opensearch_url = os.environ.get('opensearch_url')
@@ -82,10 +77,13 @@ if opensearch_url is None:
 credentials = boto3.Session().get_credentials()
 service = "aoss" 
 awsauth = AWSV4SignerAuth(credentials, region, service)
-parsingModelArn = os.environ.get('parsingModelArn')
-embeddingModelArn = os.environ.get('embeddingModelArn')
 s3_arn = os.environ.get('s3_arn')
 # logger.info('s3_arn: '+s3_arn)
+
+parsingModelArn = f"arn:aws:bedrock:{region}::foundation-model/anthropic.claude-3-haiku-20240307-v1:0"
+embeddingModelArn = f"arn:aws:bedrock:${region}::foundation-model/amazon.titan-embed-text-v2:0"
+
+knowledge_base_name = projectName
 
 numberOfDocs = 4
 grade_state = "LLM" # LLM, PRIORITY_SEARCH, OTHERS
