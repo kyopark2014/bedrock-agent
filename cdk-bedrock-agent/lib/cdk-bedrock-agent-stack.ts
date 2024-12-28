@@ -416,7 +416,7 @@ export opensearch_url=${OpenSearchCollection.attrCollectionEndpoint}
 export s3_arn=${s3Bucket.bucketArn}`
     
     new cdk.CfnOutput(this, `environment-for-${projectName}`, {
-      value: JSON.stringify(environment),
+      value: environment,
       description: `environment-${projectName}`,
       exportName: `environment-${projectName}`
     });
@@ -434,30 +434,29 @@ ExecStart=/home/ec2-user/.local/bin/streamlit run /home/ec2-user/${projectName}/
 [Install]
 WantedBy=multi-user.target`
 
+    const config_toml = `[server]
+port=${targetPort}`
+
     const commands = [
       // 'yum install nginx -y',
       // 'service nginx start',
       'yum install git python-pip -y',
       'pip install pip --upgrade',            
-      // `runuser -l ec2-user -c 'pip install watchtower'`,  // debug 
-      // `sh -c "cat <<EOF > /etc/systemd/system/streamlit.service\n${streamlit_service}EOF"`,
+      `runuser -l ec2-user -c 'pip install watchtower'`,  // debug 
+      `sh -c "cat <<EOF > /etc/systemd/system/streamlit.service\n${streamlit_service}EOF"`,
       `runuser -l ec2-user -c "mkdir -p /home/ec2-user/.streamlit"`,
-      `runuser -l ec2-user -c "cat <<EOF > /home/ec2-user/.streamlit/config.toml
-[server]
-port=${targetPort}
-EOF"`,
+      `runuser -l ec2-user -c "cat <<EOF > /home/ec2-user/.streamlit/config.toml\n${config_toml}EOF"`,
       `runuser -l ec2-user -c 'cd && git clone https://github.com/kyopark2014/${projectName}'`,
       `runuser -l ec2-user -c 'pip install streamlit streamlit_chat beautifulsoup4 pytz tavily-python'`,        
       `runuser -l ec2-user -c 'pip install boto3 langchain_aws langchain langchain_community langgraph opensearch-py'`,           
-      `runuser -l ec2-user -c '${environment}`,
+      `runuser -l ec2-user -c '${environment}'`,
       'systemctl enable streamlit.service',
       'systemctl start streamlit'
     ];
     
-
     userData.addCommands(...commands);
     new cdk.CfnOutput(this, `userDataCommand-for-${projectName}`, {
-      value: JSON.stringify(commands),
+      value: `runuser -l ec2-user -c '${environment}'`,
       description: `userDataCommand-${projectName}`,
       exportName: `userDataCommand-${projectName}`
     });    
