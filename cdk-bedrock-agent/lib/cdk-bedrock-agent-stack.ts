@@ -474,16 +474,6 @@ EOF"`,
       description: `CollectionArn-${projectName}`,
       exportName: `CollectionArn-${projectName}`
     });        
-    new cdk.CfnOutput(this, `parsingModelArn-for-${projectName}`, {
-      value: parsingModelArn,
-      description: `ParsingModelArn-${projectName}`,
-      exportName: `ParsingModelArn-${projectName}`
-    });   
-    new cdk.CfnOutput(this, `embeddingModelArn-for-${projectName}`, {
-      value: embeddingModelArn,
-      description: `EmbeddingModelArn-${projectName}`,
-      exportName: `EmbeddingModelArn-${projectName}`
-    });  
     new cdk.CfnOutput(this, `s3Arn-for-${projectName}`, {
       value: s3Bucket.bucketArn,
       description: `s3Arn-${projectName}`,
