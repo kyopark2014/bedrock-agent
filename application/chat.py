@@ -36,7 +36,7 @@ from urllib import parse
 from pydantic.v1 import BaseModel, Field
 
 try:
-    with open("/home/ec2-user/config.json", "r", encoding="utf-8") as f:
+    with open("/home/config.json", "r", encoding="utf-8") as f:
         config = json.load(f)
     print('config: ', config)
 except Exception:
