@@ -458,6 +458,7 @@ port=${targetPort}`
       'systemctl enable streamlit.service',
       'systemctl start streamlit'
     ];
+    userData.addCommands(...commands);
     
     new cdk.CfnOutput(this, `KnowledgeBaseRole-for-${projectName}`, {
       value: knowledge_base_role.roleArn,
