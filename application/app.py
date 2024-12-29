@@ -11,6 +11,12 @@ mode_descriptions = {
     "RAG": [
         "Bedrock Knowledge Base를 이용해 구현한 RAG로 필요한 정보를 검색합니다."
     ],
+    "Flow": [
+        "Bedrock Flow를 이용하여 Workflow를 구현합니다."
+    ],
+    "Agent": [
+        "Bedrock Agent를 이용하여 RAG를 포함한 Workflow를 구현합니다."
+    ],
     "번역하기": [
         "한국어와 영어에 대한 번역을 제공합니다. 한국어로 입력하면 영어로, 영어로 입력하면 한국어로 번역합니다."        
     ],
@@ -141,7 +147,38 @@ if prompt := st.chat_input("메시지를 입력하세요."):
                 chat.save_chat_history(prompt, response)
 
         elif mode == 'RAG':
-            msg = chat.get_answer_using_knowledge_base(prompt)        
+            with st.status("thinking...", expanded=True, state="running") as status:
+                response = chat.get_answer_using_knowledge_base(prompt)        
+                st.write(response)
+                print('response: ', response)
+
+                st.session_state.messages.append({"role": "assistant", "content": response})
+                st.rerun()
+
+                chat.save_chat_history(prompt, response)
+
+        elif mode == 'Flow':
+            with st.status("thinking...", expanded=True, state="running") as status:
+                response = chat.run_flow(prompt)        
+                st.write(response)
+                print('response: ', response)
+
+                st.session_state.messages.append({"role": "assistant", "content": response})
+                st.rerun()
+
+                chat.save_chat_history(prompt, response)
+        
+        elif mode == 'Agent':
+            with st.status("thinking...", expanded=True, state="running") as status:
+                response = chat.run_bedrock_agent(prompt)        
+                st.write(response)
+                print('response: ', response)
+
+                st.session_state.messages.append({"role": "assistant", "content": response})
+                st.rerun()
+
+                chat.save_chat_history(prompt, response)
+        
         elif mode == '번역하기':
             response = chat.translate_text(prompt)
             st.write(response)

@@ -46,9 +46,6 @@ except Exception:
         config = json.load(f)
     print('config: ', config)
 
-    # err_msg = traceback.format_exc()
-    #print('error message: ', err_msg)                
-
 bedrock_region = "us-west-2"
 projectName = config["projectName"] if "projectName" in config else "bedrock-agent"
 
@@ -90,6 +87,10 @@ parsingModelArn = f"arn:aws:bedrock:{region}::foundation-model/anthropic.claude-
 embeddingModelArn = f"arn:aws:bedrock:{region}::foundation-model/amazon.titan-embed-text-v2:0"
 
 knowledge_base_name = projectName
+
+prompt_flow_name = 'aws-bot'
+rag_prompt_flow_name = 'rag-prompt-flow'
+knowledge_base_name = 'aws-rag'
 
 numberOfDocs = 4
 MSG_LENGTH = 100    
@@ -230,7 +231,11 @@ def initiate_knowledge_base():
     print('embeddingModelArn: ', embeddingModelArn)
     print('knowledge_base_role: ', knowledge_base_role)
     try: 
-        client = boto3.client('bedrock-agent')         
+        client = boto3.client(
+            service_name='bedrock-agent',
+            region_name=bedrock_region
+        )   
+
         response = client.list_knowledge_bases(
             maxResults=10
         )
@@ -761,7 +766,101 @@ def get_answer_using_knowledge_base(text):
         reference_docs += filtered_docs 
             
     return msg
+
+def run_flow(text):
+    global reference_docs
+
+    chat = get_chat()
     
+    msg = reference = ""
+    top_k = numberOfDocs
+    relevant_docs = []
+    if knowledge_base_id:    
+        retriever = AmazonKnowledgeBasesRetriever(
+            knowledge_base_id=knowledge_base_id, 
+            retrieval_config={"vectorSearchConfiguration": {
+                "numberOfResults": top_k,
+                "overrideSearchType": "HYBRID"   # SEMANTIC
+            }},
+        )
+        
+        docs = retriever.invoke(text)
+        # print('docs: ', docs)
+        print('--> docs from knowledge base')
+        for i, doc in enumerate(docs):
+            print_doc(i, doc)
+        
+        relevant_docs = get_docs_from_knowledge_base(docs)
+        
+    # grading   
+    filtered_docs = grade_documents(text, relevant_docs)    
+    
+    filtered_docs = check_duplication(filtered_docs) # duplication checker
+            
+    relevant_context = ""
+    for i, document in enumerate(filtered_docs):
+        print(f"{i}: {document}")
+        if document.page_content:
+            content = document.page_content
+            
+        relevant_context = relevant_context + content + "\n\n"
+        
+    print('relevant_context: ', relevant_context)
+
+    msg = query_using_RAG_context(chat, relevant_context, text)
+    
+    if len(filtered_docs):
+        reference_docs += filtered_docs 
+            
+    return msg
+
+def run_bedrock_agent(text):
+    global reference_docs
+
+    chat = get_chat()
+    
+    msg = reference = ""
+    top_k = numberOfDocs
+    relevant_docs = []
+    if knowledge_base_id:    
+        retriever = AmazonKnowledgeBasesRetriever(
+            knowledge_base_id=knowledge_base_id, 
+            retrieval_config={"vectorSearchConfiguration": {
+                "numberOfResults": top_k,
+                "overrideSearchType": "HYBRID"   # SEMANTIC
+            }},
+        )
+        
+        docs = retriever.invoke(text)
+        # print('docs: ', docs)
+        print('--> docs from knowledge base')
+        for i, doc in enumerate(docs):
+            print_doc(i, doc)
+        
+        relevant_docs = get_docs_from_knowledge_base(docs)
+        
+    # grading   
+    filtered_docs = grade_documents(text, relevant_docs)    
+    
+    filtered_docs = check_duplication(filtered_docs) # duplication checker
+            
+    relevant_context = ""
+    for i, document in enumerate(filtered_docs):
+        print(f"{i}: {document}")
+        if document.page_content:
+            content = document.page_content
+            
+        relevant_context = relevant_context + content + "\n\n"
+        
+    print('relevant_context: ', relevant_context)
+
+    msg = query_using_RAG_context(chat, relevant_context, text)
+    
+    if len(filtered_docs):
+        reference_docs += filtered_docs 
+            
+    return msg
+
 def save_chat_history(text, msg):
     memory_chain.chat_memory.add_user_message(text)
     if len(msg) > MSG_LENGTH:
@@ -1480,3 +1579,294 @@ def extract_text(img_base64):
         msg = "텍스트를 추출하지 못하였습니다."    
     
     return msg
+
+####################### Prompt Flow #######################
+# Prompt Flow
+###########################################################  
+    
+flow_arn = None
+flow_alias_identifier = None
+def run_flow(text, connectionId, requestId):    
+    print('prompt_flow_name: ', prompt_flow_name)
+    
+    client = boto3.client(
+        service_name='bedrock-agent',
+        region_name=bedrock_region
+    )   
+    
+    global flow_arn, flow_alias_identifier
+    
+    if not flow_arn:
+        response = client.list_flows(
+            maxResults=10
+        )
+        print('response: ', response)
+        
+        for flow in response["flowSummaries"]:
+            print('flow: ', flow)
+            if flow["name"] == prompt_flow_name:
+                flow_arn = flow["arn"]
+                print('flow_arn: ', flow_arn)
+                break
+
+    msg = ""
+    if flow_arn:
+        if not flow_alias_identifier:
+            # get flow alias arn
+            response_flow_aliases = client.list_flow_aliases(
+                flowIdentifier=flow_arn
+            )
+            print('response_flow_aliases: ', response_flow_aliases)
+            
+            flowAlias = response_flow_aliases["flowAliasSummaries"]
+            for alias in flowAlias:
+                print('alias: ', alias)
+                if alias['name'] == "latest_version":  # the name of prompt flow alias
+                    flow_alias_identifier = alias['arn']
+                    print('flowAliasIdentifier: ', flow_alias_identifier)
+                    break
+        
+        # invoke_flow        
+        client_runtime = boto3.client(
+            service_name='bedrock-agent-runtime',
+            region_name=bedrock_region
+        )
+
+        response = client_runtime.invoke_flow(
+            flowIdentifier=flow_arn,
+            flowAliasIdentifier=flow_alias_identifier,
+            inputs=[
+                {
+                    "content": {
+                        "document": text,
+                    },
+                    "nodeName": "FlowInputNode",
+                    "nodeOutputName": "document"
+                }
+            ]
+        )
+        print('response of invoke_flow(): ', response)
+        
+        response_stream = response['responseStream']
+        try:
+            result = {}
+            for event in response_stream:
+                print('event: ', event)
+                result.update(event)
+            print('result: ', result)
+
+            if result['flowCompletionEvent']['completionReason'] == 'SUCCESS':
+                print("Prompt flow invocation was successful! The output of the prompt flow is as follows:\n")
+                # msg = result['flowOutputEvent']['content']['document']
+                
+                msg = result['flowOutputEvent']['content']['document']
+                print('msg: ', msg)
+            else:
+                print("The prompt flow invocation completed because of the following reason:", result['flowCompletionEvent']['completionReason'])
+        except Exception as e:
+            raise Exception("unexpected event.",e)
+
+    return msg
+
+rag_flow_arn = None
+rag_flow_alias_identifier = None
+def run_RAG_prompt_flow(text, connectionId, requestId):
+    global rag_flow_arn, rag_flow_alias_identifier
+    
+    print('rag_prompt_flow_name: ', rag_prompt_flow_name) 
+    print('rag_flow_arn: ', rag_flow_arn)
+    print('rag_flow_alias_identifier: ', rag_flow_alias_identifier)
+    
+    client = boto3.client(
+        service_name='bedrock-agent',
+        region_name=bedrock_region
+    )
+    if not rag_flow_arn:
+        response = client.list_flows(
+            maxResults=10
+        )
+        print('response: ', response)
+         
+        for flow in response["flowSummaries"]:
+            if flow["name"] == rag_prompt_flow_name:
+                rag_flow_arn = flow["arn"]
+                print('rag_flow_arn: ', rag_flow_arn)
+                break
+    
+    if not rag_flow_alias_identifier and rag_flow_arn:
+        # get flow alias arn
+        response_flow_aliases = client.list_flow_aliases(
+            flowIdentifier=rag_flow_arn
+        )
+        print('response_flow_aliases: ', response_flow_aliases)
+        rag_flow_alias_identifier = ""
+        flowAlias = response_flow_aliases["flowAliasSummaries"]
+        for alias in flowAlias:
+            print('alias: ', alias)
+            if alias['name'] == "latest_version":  # the name of prompt flow alias
+                rag_flow_alias_identifier = alias['arn']
+                print('flowAliasIdentifier: ', rag_flow_alias_identifier)
+                break
+    
+    # invoke_flow
+    client_runtime = boto3.client(
+        service_name='bedrock-agent-runtime',
+        region_name=bedrock_region
+    )
+    response = client_runtime.invoke_flow(
+        flowIdentifier=rag_flow_arn,
+        flowAliasIdentifier=rag_flow_alias_identifier,
+        inputs=[
+            {
+                "content": {
+                    "document": text,
+                },
+                "nodeName": "FlowInputNode",
+                "nodeOutputName": "document"
+            }
+        ]
+    )
+    print('response of invoke_flow(): ', response)
+    
+    response_stream = response['responseStream']
+    try:
+        result = {}
+        for event in response_stream:
+            print('event: ', event)
+            result.update(event)
+        print('result: ', result)
+
+        if result['flowCompletionEvent']['completionReason'] == 'SUCCESS':
+            print("Prompt flow invocation was successful! The output of the prompt flow is as follows:\n")
+            # msg = result['flowOutputEvent']['content']['document']
+            
+            msg = result['flowOutputEvent']['content']['document']
+            print('msg: ', msg)
+        else:
+            print("The prompt flow invocation completed because of the following reason:", result['flowCompletionEvent']['completionReason'])
+    except Exception as e:
+        raise Exception("unexpected event.",e)
+
+    return msg
+
+####################### Bedrock Agent #######################
+# Bedrock Agent
+#############################################################
+
+agent_id = agent_alias_id = None
+sessionId = dict() 
+def run_bedrock_agent(text, connectionId, requestId, userId, sessionState):
+    global agent_id, agent_alias_id
+    print('agent_id: ', agent_id)
+    print('agent_alias_id: ', agent_alias_id)
+    
+    client = boto3.client(service_name='bedrock-agent')  
+    if not agent_id:
+        response_agent = client.list_agents(
+            maxResults=10
+        )
+        print('response of list_agents(): ', response_agent)
+        
+        for summary in response_agent["agentSummaries"]:
+            if summary["agentName"] == "tool-executor":
+                agent_id = summary["agentId"]
+                print('agent_id: ', agent_id)
+                break
+    
+    if not agent_alias_id and agent_id:
+        response_agent_alias = client.list_agent_aliases(
+            agentId = agent_id,
+            maxResults=10
+        )
+        print('response of list_agent_aliases(): ', response_agent_alias)   
+        
+        for summary in response_agent_alias["agentAliasSummaries"]:
+            if summary["agentAliasName"] == "latest_version":
+                agent_alias_id = summary["agentAliasId"]
+                print('agent_alias_id: ', agent_alias_id) 
+                break
+    
+    global sessionId
+    if not userId in sessionId:
+        sessionId[userId] = str(uuid.uuid4())
+        
+    msg = msg_contents = ""
+    if agent_alias_id and agent_id:
+        client_runtime = boto3.client('bedrock-agent-runtime')
+        try:
+            if sessionState:
+                response = client_runtime.invoke_agent( 
+                    agentAliasId=agent_alias_id,
+                    agentId=agent_id,
+                    inputText=text, 
+                    sessionId=sessionId[userId], 
+                    memoryId='memory-'+userId,
+                    sessionState=sessionState
+                )
+            else:
+                response = client_runtime.invoke_agent( 
+                    agentAliasId=agent_alias_id,
+                    agentId=agent_id,
+                    inputText=text, 
+                    sessionId=sessionId[userId], 
+                    memoryId='memory-'+userId
+                )
+            print('response of invoke_agent(): ', response)
+            
+            response_stream = response['completion']
+            
+            for event in response_stream:
+                chunk = event.get('chunk')
+                if chunk:
+                    msg += chunk.get('bytes').decode()
+                    print('event: ', chunk.get('bytes').decode())
+                        
+                    result = {
+                        'request_id': requestId,
+                        'msg': msg,
+                        'status': 'proceeding'
+                    }
+                    #print('result: ', json.dumps(result))
+                    msg = result
+                    print('msg: ', msg)
+                    
+                # files generated by code interpreter
+                if 'files' in event:
+                    files = event['files']['files']
+                    for file in files:
+                        objectName = file['name']
+                        print('objectName: ', objectName)
+                        contentType = file['type']
+                        print('contentType: ', contentType)
+                        bytes_data = file['bytes']
+                                                
+                        pixels = BytesIO(bytes_data)
+                        pixels.seek(0, 0)
+                                    
+                        img_key = 'agent/contents/'+objectName
+                        
+                        s3_client = boto3.client('s3')  
+                        response = s3_client.put_object(
+                            Bucket=bucketName,
+                            Key=img_key,
+                            ContentType=contentType,
+                            Body=pixels
+                        )
+                        print('response: ', response)
+                        
+                        url = path+'agent/contents/'+parse.quote(objectName)
+                        print('url: ', url)
+                        
+                        if contentType == 'application/json':
+                            msg_contents = f"\n\n<a href={url} target=_blank>{objectName}</a>"
+                        elif contentType == 'application/csv':
+                            msg_contents = f"\n\n<a href={url} target=_blank>{objectName}</a>"
+                        else:
+                            width = 600            
+                            msg_contents = f'\n\n<img src=\"{url}\" alt=\"{objectName}\" width=\"{width}\">'
+                            print('msg_contents: ', msg_contents)
+                                                            
+        except Exception as e:
+            raise Exception("unexpected event.",e)
+        
+    return msg+msg_contents
