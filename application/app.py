@@ -43,7 +43,7 @@ with st.sidebar:
     
     # radio selection
     mode = st.radio(
-        label="원하는 대화 형태를 선택하세요. ",options=["일상적인 대화", "Agentic Workflow (Tool Use)", "RAG", "번역하기", "문법 검토하기"], index=0
+        label="원하는 대화 형태를 선택하세요. ",options=["일상적인 대화", "Agentic Workflow (Tool Use)", "RAG", "Flow", "Agent", "번역하기", "문법 검토하기", '이미지 분석'], index=0
     )   
     st.info(mode_descriptions[mode][0])
     # limit = st.slider(
@@ -56,7 +56,7 @@ with st.sidebar:
     # selectionbox
     # option = st.selectbox(
     #     '🖊️ 대화 형태를 선택하세요. ',
-    #     ('일상적인 대화', 'Agentic Workflow (Tool Use)', '번역하기', '문법 검토하기')
+    #     ('일상적인 대화', 'Agentic Workflow (Tool Use)', 'Flow', 'Agent', '번역하기', '문법 검토하기', '이미지 분석')
     # )
 
     print('mode: ', mode)
@@ -105,7 +105,7 @@ if clear_button or "messages" not in st.session_state:
     chat.clear_chat_history()
 file_name = ""
 # Preview the uploaded image in the sidebar
-if uploaded_file is not None and clear_button == False:
+if uploaded_file and clear_button==False and mode == '이미지 분석':
     st.image(uploaded_file, caption="이미지 미리보기", use_container_width=True)
 
     file_name = uploaded_file.name

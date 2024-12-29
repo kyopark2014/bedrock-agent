@@ -35,6 +35,7 @@ from langchain_aws import AmazonKnowledgeBasesRetriever
 from multiprocessing import Process, Pipe
 from urllib import parse
 from pydantic.v1 import BaseModel, Field
+from langchain_core.output_parsers import StrOutputParser
 
 try:
     with open("/home/config.json", "r", encoding="utf-8") as f:
