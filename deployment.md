@@ -162,7 +162,7 @@ sudo systemctl status streamlit -l
 - Streamlit의 환경설정 내용 확인
 
 ```text
-sudo runuser -l ec2-user -c "/home/ec2-user/.local/bin/streamlit config show”
+sudo runuser -l ec2-user -c "/home/ec2-user/.local/bin/streamlit config show"
 ```
 
 - Streamlit의 service 설정을 바꾸고 재실행하는 경우
