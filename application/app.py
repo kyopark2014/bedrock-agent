@@ -3,7 +3,7 @@ import chat
 
 mode_descriptions = {
     "일상적인 대화": [
-        "대화이력을 바탕으로 챗봇과 일장적인 대화를 편안히 즐길수 있습니다."
+        "대화이력을 바탕으로 챗봇과 일상의 대화를 편안히 즐길수 있습니다."
     ],
     "Agentic Workflow (Tool Use)": [
         "Agent를 이용해 다양한 툴을 사용할 수 있습니다. 여기에서는 날씨, 시간, 도서추천, 인터넷 검색을 제공합니다."
@@ -17,6 +17,9 @@ mode_descriptions = {
     "문법 검토하기": [
         "영어와 한국어 문법의 문제점을 설명하고, 수정된 결과를 함께 제공합니다."
     ],
+    "이미지 분석": [
+        "이미지를 업로드하면 이미지의 내용을 요약할 수 있습니다."
+    ]
 }
 
 with st.sidebar:
@@ -94,12 +97,13 @@ if clear_button or "messages" not in st.session_state:
     st.rerun()
 
     chat.clear_chat_history()
-
+file_name = ""
 # Preview the uploaded image in the sidebar
 if uploaded_file is not None and clear_button == False:
     st.image(uploaded_file, caption="이미지 미리보기", use_container_width=True)
 
-    image_url = chat.upload_to_s3(uploaded_file.getvalue(), uploaded_file.name)
+    file_name = uploaded_file.name
+    image_url = chat.upload_to_s3(uploaded_file.getvalue(), file_name)
     print('image_url: ', image_url)
         
 # Always show the chat input
@@ -108,28 +112,80 @@ if prompt := st.chat_input("메시지를 입력하세요."):
         st.markdown(prompt)
 
     st.session_state.messages.append({"role": "user", "content": prompt})  # add user message to chat history
-
     prompt = prompt.replace('"', "").replace("'", "")
 
     with st.chat_message("assistant"):
         if mode == '일상적인 대화':
-            msg = chat.general_conversation(prompt)
+            stream = chat.general_conversation(prompt)            
+            response = st.write_stream(stream)
+            print('response: ', response)
+            st.session_state.messages.append({"role": "assistant", "content": response})
+            st.rerun()
+
+            chat.save_chat_history(prompt, response)
+
         elif mode == 'Agentic Workflow (Tool Use)':
-            msg = chat.run_agent_executor2(prompt)
+            with st.status("thinking...", expanded=True, state="running") as status:
+                response = chat.run_agent_executor2(prompt)
+                st.write(response)
+                print('response: ', response)
+
+                if response.find('<thinking>') != -1:
+                    print('Remove <thinking> tag.')
+                    response = response[response.find('</thinking>')+12:]
+                    print('response without tag: ', response)
+
+                st.session_state.messages.append({"role": "assistant", "content": response})
+                st.rerun()
+
+                chat.save_chat_history(prompt, response)
+
         elif mode == 'RAG':
             msg = chat.get_answer_using_knowledge_base(prompt)        
         elif mode == '번역하기':
-            msg = chat.translate_text(prompt)
-        elif mode == 'Grammer':
-            msg = chat.check_grammer(prompt)
+            response = chat.translate_text(prompt)
+            st.write(response)
+
+            st.session_state.messages.append({"role": "assistant", "content": response})
+            chat.save_chat_history(prompt, response)
+
+        elif mode == '문법 검토하기':
+            response = chat.check_grammer(prompt)
+            st.write(response)
+
+            st.session_state.messages.append({"role": "assistant", "content": response})
+            chat.save_chat_history(prompt, response)
+
+        elif mode == '이미지 분석':
+            if uploaded_file is None or uploaded_file == "":
+                st.error("파일을 먼저 업로드하세요.")
+                st.stop()
+
+            else:                
+                with st.status("thinking...", expanded=True, state="running") as status:
+                    summary, img_base64 = chat.summary_image(file_name, prompt)
+                    st.write(summary)
+                    print('summary: ', summary)
+                    st.session_state.messages.append({"role": "assistant", "content": summary})
+
+                    chat.save_chat_history(prompt, summary)
+
+                    text = chat.extract_text(img_base64)
+                    st.write(text)
+                    st.session_state.messages.append({"role": "assistant", "content": text})
+
+                    st.rerun()
+
+                    chat.save_chat_history(prompt, text)
+
         else:
-            msg = chat.general_conversation(prompt)
-        print('msg: ', msg)
+            stream = chat.general_conversation(prompt)
+
+            response = st.write_stream(stream)
+            print('response: ', response)
+
+            st.session_state.messages.append({"role": "assistant", "content": response})
+            chat.save_chat_history(prompt, response)
         
-        st.write(msg)
-        
-        st.session_state.messages.append(
-            {"role": "assistant", "content": msg}
-        )
-        chat.save_chat_history(prompt, msg)
+
 

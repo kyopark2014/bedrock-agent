@@ -9,6 +9,7 @@ import functools
 import uuid
 import time
 import logging
+import base64
 
 from io import BytesIO
 from PIL import Image
@@ -58,7 +59,6 @@ if accountId is None:
 region = config["region"] if "region" in config else "us-west-2"
 print('region: ', region)
 
-
 bucketName = config["bucketName"] if "bucketName" in config else f"storage-for-{projectName}-{accountId}-{region}" 
 print('bucketName: ', bucketName)
 
@@ -92,6 +92,7 @@ embeddingModelArn = f"arn:aws:bedrock:{region}::foundation-model/amazon.titan-em
 knowledge_base_name = projectName
 
 numberOfDocs = 4
+MSG_LENGTH = 100    
 grade_state = "LLM" # LLM, PRIORITY_SEARCH, OTHERS
 multi_region = 'disable'
 minDocSimilarity = 400
@@ -475,26 +476,22 @@ def general_conversation(query):
                 
     history = memory_chain.load_memory_variables({})["chat_history"]
 
-    chain = prompt | chat    
+    chain = prompt | chat | StrOutputParser()
     try: 
-        stream = chain.invoke(
+        stream = chain.stream(
             {
                 "history": history,
                 "input": query,
             }
         )  
-        
-        msg = ""
-        if stream.content:
-            for event in stream.content:
-                msg = msg + event
-
+        print('stream: ', stream)
+            
     except Exception:
         err_msg = traceback.format_exc()
         print('error message: ', err_msg)        
         raise Exception ("Not able to request to LLM: "+err_msg)
-            
-    return msg
+        
+    return stream
 
 def print_doc(i, doc):
     if len(doc.page_content)>=100:
@@ -767,7 +764,10 @@ def get_answer_using_knowledge_base(text):
     
 def save_chat_history(text, msg):
     memory_chain.chat_memory.add_user_message(text)
-    memory_chain.chat_memory.add_ai_message(msg)
+    if len(msg) > MSG_LENGTH:
+        memory_chain.chat_memory.add_ai_message(msg[:MSG_LENGTH])                          
+    else:
+        memory_chain.chat_memory.add_ai_message(msg) 
 
 @tool 
 def get_book_list(keyword: str) -> str:
@@ -1367,3 +1367,116 @@ def extract_and_display_s3_images(text, s3_client):
 
     return images
 
+def summary_image(object_name, prompt):
+    # load image
+    s3_client = boto3.client(
+        service_name='s3',
+        region_name=bedrock_region
+    )
+                    
+    image_obj = s3_client.get_object(Bucket=bucketName, Key=s3_prefix+'/'+object_name)
+    # print('image_obj: ', image_obj)
+    
+    image_content = image_obj['Body'].read()
+    img = Image.open(BytesIO(image_content))
+    
+    width, height = img.size 
+    print(f"width: {width}, height: {height}, size: {width*height}")
+    
+    isResized = False
+    while(width*height > 5242880):                    
+        width = int(width/2)
+        height = int(height/2)
+        isResized = True
+        print(f"width: {width}, height: {height}, size: {width*height}")
+    
+    if isResized:
+        img = img.resize((width, height))
+    
+    buffer = BytesIO()
+    img.save(buffer, format="PNG")
+    img_base64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
+    
+    if prompt == "":
+        command = "이미지에 포함된 내용을 요약해 주세요."
+    else:
+        command = prompt
+    
+    # verify the image
+    msg = use_multimodal(img_base64, command)
+
+    return msg, img_base64
+
+def use_multimodal(img_base64, query):    
+    multimodal = get_chat()
+    
+    if query == "":
+        query = "그림에 대해 상세히 설명해줘."
+    
+    messages = [
+        SystemMessage(content="답변은 500자 이내의 한국어로 설명해주세요."),
+        HumanMessage(
+            content=[
+                {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:image/png;base64,{img_base64}", 
+                    },
+                },
+                {
+                    "type": "text", "text": query
+                },
+            ]
+        )
+    ]
+    
+    try: 
+        result = multimodal.invoke(messages)
+        
+        summary = result.content
+        print('result of code summarization: ', summary)
+    except Exception:
+        err_msg = traceback.format_exc()
+        print('error message: ', err_msg)                    
+        raise Exception ("Not able to request to LLM")
+    
+    return summary
+
+def extract_text(img_base64):    
+    multimodal = get_chat()
+    query = "그림의 텍스트와 표를 Markdown Format으로 추출합니다."
+    
+    messages = [
+        HumanMessage(
+            content=[
+                {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:image/png;base64,{img_base64}", 
+                    },
+                },
+                {
+                    "type": "text", "text": query
+                },
+            ]
+        )
+    ]
+    
+    try: 
+        result = multimodal.invoke(messages)
+        
+        extracted_text = result.content
+        print('result of text extraction from an image: ', extracted_text)
+    except Exception:
+        err_msg = traceback.format_exc()
+        print('error message: ', err_msg)                    
+        raise Exception ("Not able to request to LLM")
+    
+    #extracted_text = text[text.find('<result>')+8:text.find('</result>')] # remove <result> tag
+    print('extracted_text: ', extracted_text)
+    if len(extracted_text)>10:
+        msg = f"{extracted_text}\n"    
+    else:
+        msg = "텍스트를 추출하지 못하였습니다."    
+    
+    return msg
