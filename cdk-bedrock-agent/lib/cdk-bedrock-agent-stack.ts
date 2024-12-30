@@ -515,8 +515,8 @@ EOF"`,
     //   priority: 5,
     // });
     listener.addAction(`DefaultAction-for-${projectName}`, {
-      action: elbv2.ListenerAction.fixedResponse(404, {
-        contentType: "text/html",
+      action: elbv2.ListenerAction.fixedResponse(403, {
+        contentType: "text/plain",
         messageBody: 'Access denied',
       }),
     });
