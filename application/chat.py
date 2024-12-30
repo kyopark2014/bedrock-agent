@@ -37,15 +37,22 @@ from urllib import parse
 from pydantic.v1 import BaseModel, Field
 from langchain_core.output_parsers import StrOutputParser
 
+import watchtower, logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+logger.addHandler(watchtower.CloudWatchLogHandler())
+
 try:
     with open("/home/config.json", "r", encoding="utf-8") as f:
         config = json.load(f)
-    print('config: ', config)
+        #print('config: ', config)
+        logger.info('config: '+config)
 except Exception:
     print("use local configuration")
     with open("application/config.json", "r", encoding="utf-8") as f:
         config = json.load(f)
-    print('config: ', config)
+        print('config: ', config)
+        logger.info('config: '+json.dumps(config))
 
 bedrock_region = "us-west-2"
 projectName = config["projectName"] if "projectName" in config else "bedrock-agent"

@@ -7,6 +7,8 @@ import * as elbv2_tg from 'aws-cdk-lib/aws-elasticloadbalancingv2-targets'
 import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as opensearchserverless from 'aws-cdk-lib/aws-opensearchserverless';
+import * as cloudFront from 'aws-cdk-lib/aws-cloudfront';
+import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
 
 const projectName = `bedrock-agent`; 
 const region = process.env.CDK_DEFAULT_REGION;    
@@ -499,6 +501,56 @@ EOF"`,
       targets,
       protocol: elbv2.ApplicationProtocol.HTTP,
       port: targetPort
-    });      
+    });    
+    
+    const CUSTOM_HEADER_NAME = "X-Custom-Header"
+    const CUSTOM_HEADER_VALUE = `${projectName}_12dab15e4s31`    
+    const origin = new origins.LoadBalancerV2Origin(alb, {
+      protocolPolicy: cloudFront.OriginProtocolPolicy.HTTP_ONLY,
+      httpPort: targetPort,
+      // customHeaders: { [CUSTOM_HEADER_NAME] : CUSTOM_HEADER_VALUE },
+      originShieldEnabled: false,
+      // originSslProtocols: [cloudFront.OriginSslPolicy.TLS_V1_2],
+    });
+      //       protocolPolicy: cloudFront.OriginProtocolPolicy.HTTP_ONLY,
+      //       httpPort: 80,
+      //       originPath: "/",
+      //       customHeaders: { [custom_header_name] : custom_header_value }
+      //     }),
+    
+    // # Add ALB as CloudFront Origin
+    // origin = origins.LoadBalancerV2Origin(
+    //         alb,
+    //         custom_headers={CUSTOM_HEADER_NAME: Config.CUSTOM_HEADER_VALUE},
+    //         origin_shield_enabled=False,
+    //         protocol_policy=cloudfront.OriginProtocolPolicy.HTTP_ONLY,
+    //     )
+
+    const distribution = new cloudFront.Distribution(this, `cloudfront-for-${projectName}`, {
+      comment: "CloudFront distribution for Streamlit frontend application",
+      defaultBehavior: {
+        origin: origin,
+        allowedMethods: cloudFront.AllowedMethods.ALLOW_ALL,
+        cachePolicy: cloudFront.CachePolicy.CACHING_DISABLED,
+        originRequestPolicy: cloudFront.OriginRequestPolicy.ALL_VIEWER,
+        viewerProtocolPolicy: cloudFront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+      },
+      priceClass: cloudFront.PriceClass.PRICE_CLASS_200
+    }); 
+    new cdk.CfnOutput(this, `distributionDomainName-for-${projectName}`, {
+      value: distribution.domainName,
+      description: 'The domain name of the Distribution',
+    });
+
+    // cloudfront_distribution = cloudFront.Distribution(this, 
+    //   `cloudfront-for-${projectName}`, 
+    //   default_behavior=cloudfront.BehaviorOptions(
+    //       origin=origin,
+    //       viewer_protocol_policy=cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+    //       allowed_methods=cloudfront.AllowedMethods.ALLOW_ALL,
+    //       cache_policy=cloudfront.CachePolicy.CACHING_DISABLED,
+    //       origin_request_policy=cloudfront.OriginRequestPolicy.ALL_VIEWER,
+    //   )
+    // )
   }
 }
