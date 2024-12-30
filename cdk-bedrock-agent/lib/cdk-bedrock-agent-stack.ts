@@ -506,7 +506,7 @@ EOF"`,
       protocol: elbv2.ApplicationProtocol.HTTP,
       //conditions: [elbv2.ListenerCondition.httpHeader(CUSTOM_HEADER_NAME, [CUSTOM_HEADER_VALUE])],
       port: targetPort,
-      priority: 1
+      // priority: 1
     });
     
     // listener.addAction(`RedirectHttpListener-for-${projectName}`, {
@@ -540,7 +540,7 @@ EOF"`,
       priceClass: cloudFront.PriceClass.PRICE_CLASS_200
     }); 
     new cdk.CfnOutput(this, `distributionDomainName-for-${projectName}`, {
-      value: distribution.domainName,
+      value: 'https://'+distribution.domainName,
       description: 'The domain name of the Distribution'
     });
   }
