@@ -509,7 +509,7 @@ EOF"`,
     const origin = new origins.LoadBalancerV2Origin(alb, {
       protocolPolicy: cloudFront.OriginProtocolPolicy.HTTP_ONLY,
       httpPort: targetPort,
-      // customHeaders: { [CUSTOM_HEADER_NAME] : CUSTOM_HEADER_VALUE },
+      customHeaders: { [CUSTOM_HEADER_NAME] : CUSTOM_HEADER_VALUE },
       originShieldEnabled: false,
     });
 
