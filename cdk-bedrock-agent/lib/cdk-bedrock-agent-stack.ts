@@ -504,7 +504,7 @@ EOF"`,
       targetGroupName: `TG-for-${projectName}`,
       targets: targets,
       protocol: elbv2.ApplicationProtocol.HTTP,
-      conditions: [elbv2.ListenerCondition.httpHeader(CUSTOM_HEADER_NAME, [CUSTOM_HEADER_VALUE])],
+      //conditions: [elbv2.ListenerCondition.httpHeader(CUSTOM_HEADER_NAME, [CUSTOM_HEADER_VALUE])],
       port: targetPort,
       priority: 1
     });
@@ -521,10 +521,10 @@ EOF"`,
       }),
     });
     
-    const origin = new origins.LoadBalancerV2Origin(alb, {
+    const origin = new origins.LoadBalancerV2Origin(alb, {      
       protocolPolicy: cloudFront.OriginProtocolPolicy.HTTP_ONLY,
       httpPort: targetPort,
-      customHeaders: { [CUSTOM_HEADER_NAME] : CUSTOM_HEADER_VALUE },
+      //customHeaders: { [CUSTOM_HEADER_NAME] : CUSTOM_HEADER_VALUE },
       originShieldEnabled: false,
     });
 
