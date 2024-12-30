@@ -500,9 +500,12 @@ EOF"`,
     const CUSTOM_HEADER_NAME = "X-Custom-Header"
     const CUSTOM_HEADER_VALUE = `${projectName}_12dab15e4s31`
     listener.addTargets(`WebEc2Target-for-${projectName}`, {
-      targets,
+      targets: targets,
       protocol: elbv2.ApplicationProtocol.HTTP,
-      conditions: [elbv2.ListenerCondition.httpHeader(CUSTOM_HEADER_NAME, [CUSTOM_HEADER_VALUE])],
+      conditions: [
+        elbv2.ListenerCondition.httpHeader(
+          CUSTOM_HEADER_NAME, 
+          [CUSTOM_HEADER_VALUE])],
       port: targetPort
     });
     
