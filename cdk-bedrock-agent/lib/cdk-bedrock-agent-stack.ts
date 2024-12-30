@@ -507,7 +507,8 @@ EOF"`,
         elbv2.ListenerCondition.httpHeader(
           CUSTOM_HEADER_NAME, 
           [CUSTOM_HEADER_VALUE])],
-      port: targetPort
+      port: targetPort,
+      priority: 1
     });
     
     const origin = new origins.LoadBalancerV2Origin(alb, {
