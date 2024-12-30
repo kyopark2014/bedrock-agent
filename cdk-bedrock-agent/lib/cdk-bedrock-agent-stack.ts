@@ -504,10 +504,7 @@ EOF"`,
       targetGroupName: `TG-for-${projectName}`,
       targets: targets,
       protocol: elbv2.ApplicationProtocol.HTTP,
-      conditions: [
-        elbv2.ListenerCondition.httpHeader(
-          CUSTOM_HEADER_NAME, 
-          [CUSTOM_HEADER_VALUE])],
+      conditions: [elbv2.ListenerCondition.httpHeader(CUSTOM_HEADER_NAME, [CUSTOM_HEADER_VALUE])],
       port: targetPort,
       priority: 1
     });
@@ -518,8 +515,8 @@ EOF"`,
     //   priority: 5,
     // });
     listener.addAction(`DefaultAction-for-${projectName}`, {
-      action: elbv2.ListenerAction.fixedResponse(403, {
-        contentType: "text/plan",
+      action: elbv2.ListenerAction.fixedResponse(404, {
+        contentType: "text/html",
         messageBody: 'Access denied',
       }),
     });
