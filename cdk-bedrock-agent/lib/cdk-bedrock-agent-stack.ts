@@ -493,7 +493,8 @@ EOF"`,
     // ALB Listener
     const listener = alb.addListener(`HttpListener-for-${projectName}`, {   
       port: 80,
-      protocol: elbv2.ApplicationProtocol.HTTP,      
+      // protocol: elbv2.ApplicationProtocol.HTTP,      
+      open: true
       // defaultAction: default_group
     }); 
 
