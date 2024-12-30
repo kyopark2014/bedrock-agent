@@ -501,7 +501,7 @@ EOF"`,
     const CUSTOM_HEADER_NAME = "X-Custom-Header"
     const CUSTOM_HEADER_VALUE = `${projectName}_12dab15e4s31`
     listener.addTargets(`WebEc2Target-for-${projectName}`, {
-      targetGroupName: `WebEc2TargetGroup-for-${projectName}`,
+      targetGroupName: `TG-for-${projectName}`,
       targets: targets,
       protocol: elbv2.ApplicationProtocol.HTTP,
       conditions: [
