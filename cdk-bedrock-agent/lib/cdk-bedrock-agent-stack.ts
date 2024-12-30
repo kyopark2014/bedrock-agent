@@ -493,13 +493,13 @@ EOF"`,
     // ALB Listener
     const listener = alb.addListener(`HttpListener-for-${projectName}`, {   
       port: 80,
-      // protocol: elbv2.ApplicationProtocol.HTTP,      
+      protocol: elbv2.ApplicationProtocol.HTTP,      
       open: true
       // defaultAction: default_group
     }); 
 
     const CUSTOM_HEADER_NAME = "X-Custom-Header"
-    const CUSTOM_HEADER_VALUE = `${projectName}_12dab15e4s31`
+    const CUSTOM_HEADER_VALUE = `${projectName}_12dab15e4s31` // Temporary value
     listener.addTargets(`WebEc2Target-for-${projectName}`, {
       targetGroupName: `TG-for-${projectName}`,
       targets: targets,
