@@ -501,6 +501,7 @@ EOF"`,
     const CUSTOM_HEADER_NAME = "X-Custom-Header"
     const CUSTOM_HEADER_VALUE = `${projectName}_12dab15e4s31`
     listener.addTargets(`WebEc2Target-for-${projectName}`, {
+      targetGroupName: `WebEc2TargetGroup-for-${projectName}`,
       targets: targets,
       protocol: elbv2.ApplicationProtocol.HTTP,
       conditions: [
@@ -531,7 +532,7 @@ EOF"`,
     }); 
     new cdk.CfnOutput(this, `distributionDomainName-for-${projectName}`, {
       value: distribution.domainName,
-      description: 'The domain name of the Distribution',
+      description: 'The domain name of the Distribution'
     });
   }
 }
