@@ -512,6 +512,18 @@ EOF"`,
       priority: 1
     });
     
+    // listener.addAction(`RedirectHttpListener-for-${projectName}`, {
+    //   action: default_action,
+    //   conditions: [elbv2.ListenerCondition.httpHeader(custom_header_name, [custom_header_value])],
+    //   priority: 5,
+    // });
+    listener.addAction(`DefaultAction-for-${projectName}`, {
+      action: elbv2.ListenerAction.fixedResponse(403, {
+        contentType: "text/plan",
+        messageBody: 'Access denied',
+      }),
+    });
+    
     const origin = new origins.LoadBalancerV2Origin(alb, {
       protocolPolicy: cloudFront.OriginProtocolPolicy.HTTP_ONLY,
       httpPort: targetPort,
