@@ -78,7 +78,7 @@ cdk deploy --require-approval never --all
 ```
 인프라가 설치가 되면 아래와 같은 Output을 확인할 수 있습니다. 
 
-![noname](https://github.com/user-attachments/assets/3c3f8210-851e-465f-b01b-5779ce489ef3)
+![image](https://github.com/user-attachments/assets/05a74dcb-89ea-4e7e-9f6c-d58799c26d6f)
 
 
 5) [Console-SecretManage](https://us-west-2.console.aws.amazon.com/secretsmanager/listsecrets?region=us-west-2)에서 생성한 API에 대한 Credential을 입력합니다.
@@ -102,11 +102,7 @@ AWS Credential을 입력합니다.
 ![noname](https://github.com/user-attachments/assets/bd372ce9-9e9b-403c-8d87-220cec1b1b90)
 
 
-7) Output의 distributionDomainNameforbedrockagent의 URL을 이용하여 접속합니다. 처음 접속시에는 Knowledge base 생성등의 초기화를 하므로 수초에서 수십초 정도 기다릴 수 있습니다.
-
-![image](https://github.com/user-attachments/assets/05a74dcb-89ea-4e7e-9f6c-d58799c26d6f)
-
-이때 실행된 결과는 아래와 같습니다.
+7) Output의 distributionDomainNameforbedrockagent의 URL을 이용하여 접속합니다. 처음 접속시에는 Knowledge base 생성등의 초기화를 하므로 수초에서 수십초 정도 기다릴 수 있습니다. 이때 실행된 화면은 아래와 같습니다.
 
 ![image](https://github.com/user-attachments/assets/06a5cbe8-1eaa-447f-88d8-34269cf4c231)
 
