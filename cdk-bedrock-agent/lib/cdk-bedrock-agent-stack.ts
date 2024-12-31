@@ -23,6 +23,7 @@ const enableHybridSearch = 'true';
 export class CdkBedrockAgentStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
+
     // Knowledge Base Role
     const knowledge_base_role = new iam.Role(this,  `role-knowledge-base-for-${projectName}`, {
       roleName: `role-knowledge-base-for-${projectName}-${region}`,
@@ -327,7 +328,7 @@ export class CdkBedrockAgentStack extends cdk.Stack {
       }),
     ); 
 
-    // vpc
+    // VPC
     const vpc = new ec2.Vpc(this, `vpc-for-${projectName}`, {
       vpcName: `vpc-for-${projectName}`,
       maxAzs: 2,
@@ -361,32 +362,6 @@ export class CdkBedrockAgentStack extends cdk.Stack {
       }),
     ); 
 
-    // ALB SG
-    const albSg = new ec2.SecurityGroup(this, `alb-sg-for-${projectName}`, {
-      vpc: vpc,
-      allowAllOutbound: true,
-      securityGroupName: `alb-sg-for-${projectName}`,
-      description: 'security group for alb'
-    });
-    
-    // ALB
-    const alb = new elbv2.ApplicationLoadBalancer(this, `alb-for-${projectName}`, {
-      internetFacing: true,
-      vpc: vpc,
-      vpcSubnets: {
-        subnets: vpc.publicSubnets
-      },
-      securityGroup: albSg,
-      loadBalancerName: `alb-for-${projectName}`
-    });
-    alb.applyRemovalPolicy(cdk.RemovalPolicy.DESTROY); 
-
-    new cdk.CfnOutput(this, `albUrl-for-${projectName}`, {
-      value: `http://${alb.loadBalancerDnsName}/`,
-      description: `albUrl-${projectName}`,
-      exportName: `albUrl-${projectName}`
-    }); 
-
     // EC2 Security Group
     const ec2Sg = new ec2.SecurityGroup(this, `ec2-sg-for-${projectName}`,
       {
@@ -406,8 +381,7 @@ export class CdkBedrockAgentStack extends cdk.Stack {
     //   ec2.Port.tcp(80),
     //   'HTTP',
     // );
-    ec2Sg.connections.allowFrom(albSg, ec2.Port.tcp(targetPort), 'allow traffic from alb') // alb -> ec2
-
+    
     const userData = ec2.UserData.forLinux();
 
     const environment = {
@@ -484,64 +458,87 @@ EOF"`,
       detailedMonitoring: true,
       instanceInitiatedShutdownBehavior: ec2.InstanceInitiatedShutdownBehavior.TERMINATE,
     }); 
+    s3Bucket.grantReadWrite(appInstance);
     appInstance.applyRemovalPolicy(cdk.RemovalPolicy.DESTROY);
 
     // ALB Target
     const targets: elbv2_tg.InstanceTarget[] = new Array();
     targets.push(new elbv2_tg.InstanceTarget(appInstance)); 
 
-    // ALB Listener
-    const listener = alb.addListener(`HttpListener-for-${projectName}`, {   
-      port: 80,
-      protocol: elbv2.ApplicationProtocol.HTTP,      
-      open: true
-      // defaultAction: default_group
+    // ALB SG
+    const albSg = new ec2.SecurityGroup(this, `alb-sg-for-${projectName}`, {
+      vpc: vpc,
+      allowAllOutbound: true,
+      securityGroupName: `alb-sg-for-${projectName}`,
+      description: 'security group for alb'
+    });
+    ec2Sg.connections.allowFrom(albSg, ec2.Port.tcp(targetPort), 'allow traffic from alb') // alb -> ec2
+
+    // ALB
+    const alb = new elbv2.ApplicationLoadBalancer(this, `alb-for-${projectName}`, {
+      internetFacing: true,
+      vpc: vpc,
+      vpcSubnets: {
+        subnets: vpc.publicSubnets
+      },
+      securityGroup: albSg,
+      loadBalancerName: `alb-for-${projectName}`
+    });
+    alb.applyRemovalPolicy(cdk.RemovalPolicy.DESTROY); 
+
+    new cdk.CfnOutput(this, `albUrl-for-${projectName}`, {
+      value: `http://${alb.loadBalancerDnsName}/`,
+      description: `albUrl-${projectName}`,
+      exportName: `albUrl-${projectName}`
     }); 
 
+    // CloudFront
     const CUSTOM_HEADER_NAME = "X-Custom-Header"
     const CUSTOM_HEADER_VALUE = `${projectName}_12dab15e4s31` // Temporary value
-    listener.addTargets(`WebEc2Target-for-${projectName}`, {
-      targetGroupName: `TG-for-${projectName}`,
-      targets: targets,
-      protocol: elbv2.ApplicationProtocol.HTTP,
-      port: targetPort,
-      conditions: [elbv2.ListenerCondition.httpHeader(CUSTOM_HEADER_NAME, [CUSTOM_HEADER_VALUE])],
-      priority: 1      
-    });
-    
-    // listener.addAction(`RedirectHttpListener-for-${projectName}`, {
-    //   action: default_action,
-    //   conditions: [elbv2.ListenerCondition.httpHeader(custom_header_name, [custom_header_value])],
-    //   priority: 5,
-    // });
-    listener.addAction(`DefaultAction-for-${projectName}`, {
-      action: elbv2.ListenerAction.fixedResponse(403, {
-        contentType: "text/plain",
-        messageBody: 'Access denied',
-      }),
-    });
-    
     const origin = new origins.LoadBalancerV2Origin(alb, {      
-      protocolPolicy: cloudFront.OriginProtocolPolicy.HTTP_ONLY,
-      httpPort: targetPort,
-      customHeaders: { [CUSTOM_HEADER_NAME] : CUSTOM_HEADER_VALUE },
+      httpPort: 80,
+      customHeaders: {[CUSTOM_HEADER_NAME] : CUSTOM_HEADER_VALUE},
       originShieldEnabled: false,
+      protocolPolicy: cloudFront.OriginProtocolPolicy.HTTP_ONLY      
     });
-
     const distribution = new cloudFront.Distribution(this, `cloudfront-for-${projectName}`, {
       comment: "CloudFront distribution for Streamlit frontend application",
       defaultBehavior: {
         origin: origin,
+        viewerProtocolPolicy: cloudFront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
         allowedMethods: cloudFront.AllowedMethods.ALLOW_ALL,
         cachePolicy: cloudFront.CachePolicy.CACHING_DISABLED,
-        originRequestPolicy: cloudFront.OriginRequestPolicy.ALL_VIEWER,
-        viewerProtocolPolicy: cloudFront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+        originRequestPolicy: cloudFront.OriginRequestPolicy.ALL_VIEWER        
       },
       priceClass: cloudFront.PriceClass.PRICE_CLASS_200
     }); 
     new cdk.CfnOutput(this, `distributionDomainName-for-${projectName}`, {
       value: 'https://'+distribution.domainName,
       description: 'The domain name of the Distribution'
+    });   
+    
+    // ALB Listener
+    const listener = alb.addListener(`HttpListener-for-${projectName}`, {   
+      port: 80,
+      open: true
+    });     
+    const targetGroup = listener.addTargets(`WebEc2Target-for-${projectName}`, {
+      targetGroupName: `TG-for-${projectName}`,
+      targets: targets,
+      protocol: elbv2.ApplicationProtocol.HTTP,
+      port: targetPort,
+      conditions: [elbv2.ListenerCondition.httpHeader(CUSTOM_HEADER_NAME, [CUSTOM_HEADER_VALUE])],
+      priority: 10      
     });
+    listener.addTargetGroups("demoTargetGroupInt", {
+      targetGroups: [targetGroup]
+    })
+    const defaultAction = elbv2.ListenerAction.fixedResponse(403, {
+        contentType: "text/plain",
+        messageBody: 'Access denied',
+    })
+    listener.addAction(`RedirectHttpListener-for-${projectName}`, {
+      action: defaultAction
+    });       
   }
 }
