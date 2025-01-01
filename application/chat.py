@@ -567,7 +567,6 @@ def general_conversation(query):
         "당신의 이름은 서연이고, 질문에 대해 친절하게 답변하는 사려깊은 인공지능 도우미입니다."
         "상황에 맞는 구체적인 세부 정보를 충분히 제공합니다." 
         "모르는 질문을 받으면 솔직히 모른다고 말합니다."
-        "답변은 markdown 포맷(예: ##)을 사용하지 않습니다."
     )
     
     human = "Question: {input}"
@@ -862,6 +861,7 @@ def retrieve_documents_from_knowledge_base(query, top_k):
                 "numberOfResults": top_k,
                 "overrideSearchType": "HYBRID"   # SEMANTIC
             }},
+            region_name=bedrock_region
         )
         
         documents = retriever.invoke(query)
