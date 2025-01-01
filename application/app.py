@@ -148,7 +148,7 @@ if prompt := st.chat_input("메시지를 입력하세요."):
 
         elif mode == 'RAG':
             with st.status("thinking...", expanded=True, state="running") as status:
-                response = chat.get_answer_using_knowledge_base(prompt)        
+                response = chat.run_rag_with_knowledge_base(prompt)        
                 st.write(response)
                 print('response: ', response)
 

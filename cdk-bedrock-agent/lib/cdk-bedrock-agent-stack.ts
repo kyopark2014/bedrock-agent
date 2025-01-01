@@ -220,6 +220,16 @@ export class CdkBedrockAgentStack extends cdk.Stack {
       )
     });
 
+    const secreatManagerPolicy = new iam.PolicyStatement({  
+      resources: ['*'],
+      actions: ['secretsmanager:GetSecretValue'],
+    });       
+    ec2Role.attachInlinePolicy( // for isengard
+      new iam.Policy(this, `secret-manager-policy-ec2-for-${projectName}`, {
+        statements: [secreatManagerPolicy],
+      }),
+    );  
+    
     // Secret
     const weatherApiSecret = new secretsmanager.Secret(this, `weather-api-secret-for-${projectName}`, {
       description: 'secret for weather api key', // openweathermap
@@ -253,16 +263,6 @@ export class CdkBedrockAgentStack extends cdk.Stack {
       },
     });
     tavilyApiSecret.grantRead(ec2Role) 
-
-    const secreatManagerPolicy = new iam.PolicyStatement({  
-      resources: ['*'],
-      actions: ['secretsmanager:GetSecretValue'],
-    });       
-    ec2Role.attachInlinePolicy( // for isengard
-      new iam.Policy(this, `secret-manager-policy-ec2-for-${projectName}`, {
-        statements: [secreatManagerPolicy],
-      }),
-    );  
 
     const pvrePolicy = new iam.PolicyStatement({  
       resources: ['*'],

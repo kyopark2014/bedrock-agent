@@ -8,7 +8,6 @@ import datetime
 import functools
 import uuid
 import time
-import logging
 import base64
 
 from io import BytesIO
@@ -47,7 +46,8 @@ except Exception:
         config = json.load(f)
         print('config: ', config)
 
-bedrock_region = "us-west-2"
+bedrock_region = config["region"] if "region" in config else "us-west-2"
+
 projectName = config["projectName"] if "projectName" in config else "bedrock-agent"
 
 accountId = config["accountId"] if "accountId" in config else None
@@ -102,17 +102,6 @@ length_of_models = 1
 doc_prefix = s3_prefix+'/'
 path = 'https://url/'   
 
-os_client = OpenSearch(
-    hosts = [{
-        'host': opensearch_url.replace("https://", ""), 
-        'port': 443
-    }],
-    http_auth=awsauth,
-    use_ssl = True,
-    verify_certs = True,
-    connection_class=RequestsHttpConnection,
-)
-
 multi_region_models = [   # Nova Pro
     {   
         "bedrock_region": "us-west-2", # Oregon
@@ -137,6 +126,492 @@ AI_PROMPT = "\n\nAssistant:"
 userId = "demo"
 map_chain = dict() 
 
+if userId in map_chain:  
+        # print('memory exist. reuse it!')
+        memory_chain = map_chain[userId]
+else: 
+    # print('memory does not exist. create new one!')        
+    memory_chain = ConversationBufferWindowMemory(memory_key="chat_history", output_key='answer', return_messages=True, k=5)
+    map_chain[userId] = memory_chain
+
+def clear_chat_history():
+    memory_chain = []
+    map_chain[userId] = memory_chain
+
+def save_chat_history(text, msg):
+    memory_chain.chat_memory.add_user_message(text)
+    if len(msg) > MSG_LENGTH:
+        memory_chain.chat_memory.add_ai_message(msg[:MSG_LENGTH])                          
+    else:
+        memory_chain.chat_memory.add_ai_message(msg) 
+
+def get_chat():
+    global selected_chat
+    
+    profile = multi_region_models[selected_chat]
+    length_of_models = len(multi_region_models)
+        
+    bedrock_region =  profile['bedrock_region']
+    modelId = profile['model_id']
+    maxOutputTokens = 4096
+    print(f'LLM: {selected_chat}, bedrock_region: {bedrock_region}, modelId: {modelId}')
+                          
+    # bedrock   
+    boto3_bedrock = boto3.client(
+        service_name='bedrock-runtime',
+        region_name=bedrock_region,
+        config=Config(
+            retries = {
+                'max_attempts': 30
+            }
+        )
+    )
+    parameters = {
+        "max_tokens":maxOutputTokens,     
+        "temperature":0.1,
+        "top_k":250,
+        "top_p":0.9,
+        "stop_sequences": [HUMAN_PROMPT]
+    }
+    # print('parameters: ', parameters)
+
+    chat = ChatBedrock(   # new chat model
+        model_id=modelId,
+        client=boto3_bedrock, 
+        model_kwargs=parameters,
+        region_name=bedrock_region
+    )    
+    
+    selected_chat = selected_chat + 1
+    if selected_chat == length_of_models:
+        selected_chat = 0
+    
+    return chat
+
+def get_multi_region_chat(models, selected):
+    profile = models[selected]
+    bedrock_region =  profile['bedrock_region']
+    modelId = profile['model_id']
+    maxOutputTokens = 4096
+    print(f'selected_chat: {selected}, bedrock_region: {bedrock_region}, modelId: {modelId}')
+                          
+    # bedrock   
+    boto3_bedrock = boto3.client(
+        service_name='bedrock-runtime',
+        region_name=bedrock_region,
+        config=Config(
+            retries = {
+                'max_attempts': 30
+            }
+        )
+    )
+    parameters = {
+        "max_tokens":maxOutputTokens,     
+        "temperature":0.1,
+        "top_k":250,
+        "top_p":0.9,
+        "stop_sequences": [HUMAN_PROMPT]
+    }
+    # print('parameters: ', parameters)
+
+    chat = ChatBedrock(   # new chat model
+        model_id=modelId,
+        client=boto3_bedrock, 
+        model_kwargs=parameters,
+    )        
+    return chat
+
+def print_doc(i, doc):
+    if len(doc.page_content)>=100:
+        text = doc.page_content[:100]
+    else:
+        text = doc.page_content
+            
+    print(f"{i}: {text}, metadata:{doc.metadata}")
+
+def translate_text(text):
+    chat = get_chat()
+
+    system = (
+        "You are a helpful assistant that translates {input_language} to {output_language} in <article> tags. Put it in <result> tags."
+    )
+    human = "<article>{text}</article>"
+    
+    prompt = ChatPromptTemplate.from_messages([("system", system), ("human", human)])
+    # print('prompt: ', prompt)
+    
+    if isKorean(text)==False :
+        input_language = "English"
+        output_language = "Korean"
+    else:
+        input_language = "Korean"
+        output_language = "English"
+                        
+    chain = prompt | chat    
+    try: 
+        result = chain.invoke(
+            {
+                "input_language": input_language,
+                "output_language": output_language,
+                "text": text,
+            }
+        )
+        msg = result.content
+        print('translated text: ', msg)
+    except Exception:
+        err_msg = traceback.format_exc()
+        print('error message: ', err_msg)       
+        raise Exception ("Not able to request to LLM")
+
+    return msg[msg.find('<result>')+8:len(msg)-9] # remove <result> tag
+    
+def check_grammer(text):
+    chat = get_chat()
+
+    if isKorean(text)==True:
+        system = (
+            "다음의 <article> tag안의 문장의 오류를 찾아서 설명하고, 오류가 수정된 문장을 답변 마지막에 추가하여 주세요."
+        )
+    else: 
+        system = (
+            "Here is pieces of article, contained in <article> tags. Find the error in the sentence and explain it, and add the corrected sentence at the end of your answer."
+        )
+        
+    human = "<article>{text}</article>"
+    
+    prompt = ChatPromptTemplate.from_messages([("system", system), ("human", human)])
+    # print('prompt: ', prompt)
+    
+    chain = prompt | chat    
+    try: 
+        result = chain.invoke(
+            {
+                "text": text
+            }
+        )
+        
+        msg = result.content
+        print('result of grammer correction: ', msg)
+    except Exception:
+        err_msg = traceback.format_exc()
+        print('error message: ', err_msg)        
+        raise Exception ("Not able to request to LLM")
+    
+    return msg
+
+def grade_document_based_on_relevance(conn, question, doc, models, selected):     
+    chat = get_multi_region_chat(models, selected)
+    retrieval_grader = get_retrieval_grader(chat)
+    score = retrieval_grader.invoke({"question": question, "document": doc.page_content})
+    # print(f"score: {score}")
+    
+    grade = score.binary_score    
+    if grade == 'yes':
+        print("---GRADE: DOCUMENT RELEVANT---")
+        conn.send(doc)
+    else:  # no
+        print("---GRADE: DOCUMENT NOT RELEVANT---")
+        conn.send(None)
+    
+    conn.close()
+
+def grade_documents_using_parallel_processing(question, documents):
+    global selected_chat
+    
+    filtered_docs = []    
+
+    processes = []
+    parent_connections = []
+    
+    for i, doc in enumerate(documents):
+        #print(f"grading doc[{i}]: {doc.page_content}")        
+        parent_conn, child_conn = Pipe()
+        parent_connections.append(parent_conn)
+            
+        process = Process(target=grade_document_based_on_relevance, args=(child_conn, question, doc, multi_region_models, selected_chat))
+        processes.append(process)
+
+        selected_chat = selected_chat + 1
+        if selected_chat == length_of_models:
+            selected_chat = 0
+    for process in processes:
+        process.start()
+            
+    for parent_conn in parent_connections:
+        relevant_doc = parent_conn.recv()
+
+        if relevant_doc is not None:
+            filtered_docs.append(relevant_doc)
+
+    for process in processes:
+        process.join()
+    
+    #print('filtered_docs: ', filtered_docs)
+    return filtered_docs
+
+class GradeDocuments(BaseModel):
+    """Binary score for relevance check on retrieved documents."""
+
+    binary_score: str = Field(description="Documents are relevant to the question, 'yes' or 'no'")
+
+def get_retrieval_grader(chat):
+    system = """You are a grader assessing relevance of a retrieved document to a user question. \n 
+    If the document contains keyword(s) or semantic meaning related to the question, grade it as relevant. \n
+    Give a binary score 'yes' or 'no' score to indicate whether the document is relevant to the question."""
+
+    grade_prompt = ChatPromptTemplate.from_messages(
+        [
+            ("system", system),
+            ("human", "Retrieved document: \n\n {document} \n\n User question: {question}"),
+        ]
+    )
+    
+    structured_llm_grader = chat.with_structured_output(GradeDocuments)
+    retrieval_grader = grade_prompt | structured_llm_grader
+    return retrieval_grader
+
+def grade_documents(question, documents):
+    print("###### grade_documents ######")
+    
+    print("start grading...")
+    print("grade_state: ", grade_state)
+    
+    if grade_state == "LLM":
+        filtered_docs = []
+        if multi_region == 'enable':  # parallel processing        
+            filtered_docs = grade_documents_using_parallel_processing(question, documents)
+
+        else:
+            # Score each doc    
+            chat = get_chat()
+            retrieval_grader = get_retrieval_grader(chat)
+            for i, doc in enumerate(documents):
+                # print('doc: ', doc)
+                print_doc(i, doc)
+                
+                score = retrieval_grader.invoke({"question": question, "document": doc.page_content})
+                # print("score: ", score)
+                
+                grade = score.binary_score
+                # print("grade: ", grade)
+                # Document relevant
+                if grade.lower() == "yes":
+                    print("---GRADE: DOCUMENT RELEVANT---")
+                    filtered_docs.append(doc)
+                # Document not relevant
+                else:
+                    print("---GRADE: DOCUMENT NOT RELEVANT---")
+                    # We do not include the document in filtered_docs
+                    # We set a flag to indicate that we want to run web search
+                    continue
+    
+    else:  # OTHERS
+        filtered_docs = documents
+
+    return filtered_docs
+
+contentList = []
+def check_duplication(docs):
+    global contentList
+    length_original = len(docs)
+    
+    updated_docs = []
+    print('length of relevant_docs:', len(docs))
+    for doc in docs:            
+        # print('excerpt: ', doc['metadata']['excerpt'])
+            if doc.page_content in contentList:
+                print('duplicated!')
+                continue
+            contentList.append(doc.page_content)
+            updated_docs.append(doc)            
+    length_updateed_docs = len(updated_docs)     
+    
+    if length_original == length_updateed_docs:
+        print('no duplication')
+    
+    return updated_docs
+
+reference_docs = []
+# api key to get weather information in agent
+secretsmanager = boto3.client(
+    service_name='secretsmanager',
+    region_name=bedrock_region
+)
+try:
+    get_weather_api_secret = secretsmanager.get_secret_value(
+        SecretId=f"openweathermap-{projectName}"
+    )
+    #print('get_weather_api_secret: ', get_weather_api_secret)
+    secret = json.loads(get_weather_api_secret['SecretString'])
+    #print('secret: ', secret)
+    weather_api_key = secret['weather_api_key']
+
+except Exception as e:
+    raise e
+
+# api key to use LangSmith
+langsmith_api_key = ""
+try:
+    get_langsmith_api_secret = secretsmanager.get_secret_value(
+        SecretId=f"langsmithapikey-{projectName}"
+    )
+    #print('get_langsmith_api_secret: ', get_langsmith_api_secret)
+    secret = json.loads(get_langsmith_api_secret['SecretString'])
+    #print('secret: ', secret)
+    langsmith_api_key = secret['langsmith_api_key']
+    langchain_project = secret['langchain_project']
+except Exception as e:
+    raise e
+
+if langsmith_api_key:
+    os.environ["LANGCHAIN_API_KEY"] = langsmith_api_key
+    os.environ["LANGCHAIN_TRACING_V2"] = "true"
+    os.environ["LANGCHAIN_PROJECT"] = langchain_project
+
+# api key to use Tavily Search
+tavily_api_key = []
+tavily_key = ""
+try:
+    get_tavily_api_secret = secretsmanager.get_secret_value(
+        SecretId=f"tavilyapikey-{projectName}"
+    )
+    #print('get_tavily_api_secret: ', get_tavily_api_secret)
+    secret = json.loads(get_tavily_api_secret['SecretString'])
+    #print('secret: ', secret)
+    tavily_key = secret['tavily_api_key']
+    #print('tavily_api_key: ', tavily_api_key)
+except Exception as e: 
+    raise e
+
+if tavily_key:
+    os.environ["TAVILY_API_KEY"] = tavily_key
+
+def tavily_search(query, k):
+    docs = []    
+    try:
+        tavily_client = TavilyClient(api_key=tavily_key)
+        response = tavily_client.search(query, max_results=k)
+        # print('tavily response: ', response)
+            
+        for r in response["results"]:
+            name = r.get("title")
+            if name is None:
+                name = 'WWW'
+            
+            docs.append(
+                Document(
+                    page_content=r.get("content"),
+                    metadata={
+                        'name': name,
+                        'url': r.get("url"),
+                        'from': 'tavily'
+                    },
+                )
+            )                   
+    except Exception as e:
+        print('Exception: ', e)
+
+    return docs
+
+def isKorean(text):
+    # check korean
+    pattern_hangul = re.compile('[\u3131-\u3163\uac00-\ud7a3]+')
+    word_kor = pattern_hangul.search(str(text))
+    # print('word_kor: ', word_kor)
+
+    if word_kor and word_kor != 'None':
+        print('Korean: ', word_kor)
+        return True
+    else:
+        print('Not Korean: ', word_kor)
+        return False
+    
+def traslation(chat, text, input_language, output_language):
+    system = (
+        "You are a helpful assistant that translates {input_language} to {output_language} in <article> tags." 
+        "Put it in <result> tags."
+    )
+    human = "<article>{text}</article>"
+    
+    prompt = ChatPromptTemplate.from_messages([("system", system), ("human", human)])
+    # print('prompt: ', prompt)
+    
+    chain = prompt | chat    
+    try: 
+        result = chain.invoke(
+            {
+                "input_language": input_language,
+                "output_language": output_language,
+                "text": text,
+            }
+        )
+        
+        msg = result.content
+        # print('translated text: ', msg)
+    except Exception:
+        err_msg = traceback.format_exc()
+        print('error message: ', err_msg)          
+        raise Exception ("Not able to request to LLM")
+
+    return msg[msg.find('<result>')+8:len(msg)-9] # remove <result> tag
+
+
+####################### LangChain #######################
+# General Conversation
+#########################################################
+
+def general_conversation(query):
+    chat = get_chat()
+
+    system = (
+        "당신의 이름은 서연이고, 질문에 대해 친절하게 답변하는 사려깊은 인공지능 도우미입니다."
+        "상황에 맞는 구체적인 세부 정보를 충분히 제공합니다." 
+        "모르는 질문을 받으면 솔직히 모른다고 말합니다."
+        "답변은 markdown 포맷(예: ##)을 사용하지 않습니다."
+    )
+    
+    human = "Question: {input}"
+    
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", system), 
+        MessagesPlaceholder(variable_name="history"), 
+        ("human", human)
+    ])
+                
+    history = memory_chain.load_memory_variables({})["chat_history"]
+
+    chain = prompt | chat | StrOutputParser()
+    try: 
+        stream = chain.stream(
+            {
+                "history": history,
+                "input": query,
+            }
+        )  
+        print('stream: ', stream)
+            
+    except Exception:
+        err_msg = traceback.format_exc()
+        print('error message: ', err_msg)        
+        raise Exception ("Not able to request to LLM: "+err_msg)
+        
+    return stream
+
+
+####################### LangGraph #######################
+# RAG: Knowledge Base
+#########################################################
+
+os_client = OpenSearch(
+    hosts = [{
+        'host': opensearch_url.replace("https://", ""), 
+        'port': 443
+    }],
+    http_auth=awsauth,
+    use_ssl = True,
+    verify_certs = True,
+    connection_class=RequestsHttpConnection,
+)
 def is_not_exist(index_name):    
     print('index_name: ', index_name)
         
@@ -378,308 +853,63 @@ def initiate_knowledge_base():
             
 initiate_knowledge_base()
 
-if userId in map_chain:  
-        # print('memory exist. reuse it!')
-        memory_chain = map_chain[userId]
-else: 
-    # print('memory does not exist. create new one!')        
-    memory_chain = ConversationBufferWindowMemory(memory_key="chat_history", output_key='answer', return_messages=True, k=5)
-    map_chain[userId] = memory_chain
-
-def get_chat():
-    global selected_chat
-    
-    profile = multi_region_models[selected_chat]
-    length_of_models = len(multi_region_models)
-        
-    bedrock_region =  profile['bedrock_region']
-    modelId = profile['model_id']
-    maxOutputTokens = 4096
-    print(f'LLM: {selected_chat}, bedrock_region: {bedrock_region}, modelId: {modelId}')
-                          
-    # bedrock   
-    boto3_bedrock = boto3.client(
-        service_name='bedrock-runtime',
-        region_name=bedrock_region,
-        config=Config(
-            retries = {
-                'max_attempts': 30
-            }
-        )
-    )
-    parameters = {
-        "max_tokens":maxOutputTokens,     
-        "temperature":0.1,
-        "top_k":250,
-        "top_p":0.9,
-        "stop_sequences": [HUMAN_PROMPT]
-    }
-    # print('parameters: ', parameters)
-
-    chat = ChatBedrock(   # new chat model
-        model_id=modelId,
-        client=boto3_bedrock, 
-        model_kwargs=parameters,
-        region_name=bedrock_region
-    )    
-    
-    selected_chat = selected_chat + 1
-    if selected_chat == length_of_models:
-        selected_chat = 0
-    
-    return chat
-
-def get_multi_region_chat(models, selected):
-    profile = models[selected]
-    bedrock_region =  profile['bedrock_region']
-    modelId = profile['model_id']
-    maxOutputTokens = 4096
-    print(f'selected_chat: {selected}, bedrock_region: {bedrock_region}, modelId: {modelId}')
-                          
-    # bedrock   
-    boto3_bedrock = boto3.client(
-        service_name='bedrock-runtime',
-        region_name=bedrock_region,
-        config=Config(
-            retries = {
-                'max_attempts': 30
-            }
-        )
-    )
-    parameters = {
-        "max_tokens":maxOutputTokens,     
-        "temperature":0.1,
-        "top_k":250,
-        "top_p":0.9,
-        "stop_sequences": [HUMAN_PROMPT]
-    }
-    # print('parameters: ', parameters)
-
-    chat = ChatBedrock(   # new chat model
-        model_id=modelId,
-        client=boto3_bedrock, 
-        model_kwargs=parameters,
-    )        
-    return chat
-
-def general_conversation(query):
-    chat = get_chat()
-
-    system = (
-        "당신의 이름은 서연이고, 질문에 대해 친절하게 답변하는 사려깊은 인공지능 도우미입니다."
-        "상황에 맞는 구체적인 세부 정보를 충분히 제공합니다." 
-        "모르는 질문을 받으면 솔직히 모른다고 말합니다."
-        "답변은 markdown 포맷(예: ##)을 사용하지 않습니다."
-    )
-    
-    human = "Question: {input}"
-    
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", system), 
-        MessagesPlaceholder(variable_name="history"), 
-        ("human", human)
-    ])
-                
-    history = memory_chain.load_memory_variables({})["chat_history"]
-
-    chain = prompt | chat | StrOutputParser()
-    try: 
-        stream = chain.stream(
-            {
-                "history": history,
-                "input": query,
-            }
-        )  
-        print('stream: ', stream)
-            
-    except Exception:
-        err_msg = traceback.format_exc()
-        print('error message: ', err_msg)        
-        raise Exception ("Not able to request to LLM: "+err_msg)
-        
-    return stream
-
-def print_doc(i, doc):
-    if len(doc.page_content)>=100:
-        text = doc.page_content[:100]
-    else:
-        text = doc.page_content
-            
-    print(f"{i}: {text}, metadata:{doc.metadata}")
-
-def get_docs_from_knowledge_base(documents):        
+def retrieve_documents_from_knowledge_base(query, top_k):
     relevant_docs = []
-    for doc in documents:
-        content = ""
-        if doc.page_content:
-            content = doc.page_content
+    if knowledge_base_id:    
+        retriever = AmazonKnowledgeBasesRetriever(
+            knowledge_base_id=knowledge_base_id, 
+            retrieval_config={"vectorSearchConfiguration": {
+                "numberOfResults": top_k,
+                "overrideSearchType": "HYBRID"   # SEMANTIC
+            }},
+        )
         
-        score = doc.metadata["score"]
+        documents = retriever.invoke(query)
+        # print('docs: ', docs)
+        print('--> docs from knowledge base')
+        for i, doc in enumerate(documents):
+            print_doc(i, doc)
         
-        link = ""
-        if "s3Location" in doc.metadata["location"]:
-            link = doc.metadata["location"]["s3Location"]["uri"] if doc.metadata["location"]["s3Location"]["uri"] is not None else ""
+        relevant_docs = []
+        for doc in documents:
+            content = ""
+            if doc.page_content:
+                content = doc.page_content
             
-            # print('link:', link)    
-            pos = link.find(f"/{doc_prefix}")
-            name = link[pos+len(doc_prefix)+1:]
-            encoded_name = parse.quote(name)
-            # print('name:', name)
-            link = f"{path}{doc_prefix}{encoded_name}"
+            score = doc.metadata["score"]
             
-        elif "webLocation" in doc.metadata["location"]:
-            link = doc.metadata["location"]["webLocation"]["url"] if doc.metadata["location"]["webLocation"]["url"] is not None else ""
-            name = "WEB"
+            link = ""
+            if "s3Location" in doc.metadata["location"]:
+                link = doc.metadata["location"]["s3Location"]["uri"] if doc.metadata["location"]["s3Location"]["uri"] is not None else ""
+                
+                # print('link:', link)    
+                pos = link.find(f"/{doc_prefix}")
+                name = link[pos+len(doc_prefix)+1:]
+                encoded_name = parse.quote(name)
+                # print('name:', name)
+                link = f"{path}{doc_prefix}{encoded_name}"
+                
+            elif "webLocation" in doc.metadata["location"]:
+                link = doc.metadata["location"]["webLocation"]["url"] if doc.metadata["location"]["webLocation"]["url"] is not None else ""
+                name = "WEB"
 
-        url = link
-        # print('url:', url)
-        
-        relevant_docs.append(
-            Document(
-                page_content=content,
-                metadata={
-                    'name': name,
-                    'score': score,
-                    'url': url,
-                    'from': 'RAG'
-                },
-            )
-        )    
+            url = link
+            # print('url:', url)
+            
+            relevant_docs.append(
+                Document(
+                    page_content=content,
+                    metadata={
+                        'name': name,
+                        'score': score,
+                        'url': url,
+                        'from': 'RAG'
+                    },
+                )
+            )    
     return relevant_docs
 
-def grade_document_based_on_relevance(conn, question, doc, models, selected):     
-    chat = get_multi_region_chat(models, selected)
-    retrieval_grader = get_retrieval_grader(chat)
-    score = retrieval_grader.invoke({"question": question, "document": doc.page_content})
-    # print(f"score: {score}")
-    
-    grade = score.binary_score    
-    if grade == 'yes':
-        print("---GRADE: DOCUMENT RELEVANT---")
-        conn.send(doc)
-    else:  # no
-        print("---GRADE: DOCUMENT NOT RELEVANT---")
-        conn.send(None)
-    
-    conn.close()
-
-def grade_documents_using_parallel_processing(question, documents):
-    global selected_chat
-    
-    filtered_docs = []    
-
-    processes = []
-    parent_connections = []
-    
-    for i, doc in enumerate(documents):
-        #print(f"grading doc[{i}]: {doc.page_content}")        
-        parent_conn, child_conn = Pipe()
-        parent_connections.append(parent_conn)
-            
-        process = Process(target=grade_document_based_on_relevance, args=(child_conn, question, doc, multi_region_models, selected_chat))
-        processes.append(process)
-
-        selected_chat = selected_chat + 1
-        if selected_chat == length_of_models:
-            selected_chat = 0
-    for process in processes:
-        process.start()
-            
-    for parent_conn in parent_connections:
-        relevant_doc = parent_conn.recv()
-
-        if relevant_doc is not None:
-            filtered_docs.append(relevant_doc)
-
-    for process in processes:
-        process.join()
-    
-    #print('filtered_docs: ', filtered_docs)
-    return filtered_docs
-
-class GradeDocuments(BaseModel):
-    """Binary score for relevance check on retrieved documents."""
-
-    binary_score: str = Field(description="Documents are relevant to the question, 'yes' or 'no'")
-
-def get_retrieval_grader(chat):
-    system = """You are a grader assessing relevance of a retrieved document to a user question. \n 
-    If the document contains keyword(s) or semantic meaning related to the question, grade it as relevant. \n
-    Give a binary score 'yes' or 'no' score to indicate whether the document is relevant to the question."""
-
-    grade_prompt = ChatPromptTemplate.from_messages(
-        [
-            ("system", system),
-            ("human", "Retrieved document: \n\n {document} \n\n User question: {question}"),
-        ]
-    )
-    
-    structured_llm_grader = chat.with_structured_output(GradeDocuments)
-    retrieval_grader = grade_prompt | structured_llm_grader
-    return retrieval_grader
-
-def grade_documents(question, documents):
-    print("###### grade_documents ######")
-    
-    print("start grading...")
-    print("grade_state: ", grade_state)
-    
-    if grade_state == "LLM":
-        filtered_docs = []
-        if multi_region == 'enable':  # parallel processing        
-            filtered_docs = grade_documents_using_parallel_processing(question, documents)
-
-        else:
-            # Score each doc    
-            chat = get_chat()
-            retrieval_grader = get_retrieval_grader(chat)
-            for i, doc in enumerate(documents):
-                # print('doc: ', doc)
-                print_doc(i, doc)
-                
-                score = retrieval_grader.invoke({"question": question, "document": doc.page_content})
-                # print("score: ", score)
-                
-                grade = score.binary_score
-                # print("grade: ", grade)
-                # Document relevant
-                if grade.lower() == "yes":
-                    print("---GRADE: DOCUMENT RELEVANT---")
-                    filtered_docs.append(doc)
-                # Document not relevant
-                else:
-                    print("---GRADE: DOCUMENT NOT RELEVANT---")
-                    # We do not include the document in filtered_docs
-                    # We set a flag to indicate that we want to run web search
-                    continue
-    
-    else:  # OTHERS
-        filtered_docs = documents
-
-    return filtered_docs
-
-contentList = []
-def check_duplication(docs):
-    global contentList
-    length_original = len(docs)
-    
-    updated_docs = []
-    print('length of relevant_docs:', len(docs))
-    for doc in docs:            
-        # print('excerpt: ', doc['metadata']['excerpt'])
-            if doc.page_content in contentList:
-                print('duplicated!')
-                continue
-            contentList.append(doc.page_content)
-            updated_docs.append(doc)            
-    length_updateed_docs = len(updated_docs)     
-    
-    if length_original == length_updateed_docs:
-        print('no duplication')
-    
-    return updated_docs
-
-def query_using_RAG_context(chat, context, revised_question):    
+def generate_answer_using_RAG(chat, context, revised_question):    
     if isKorean(revised_question)==True:
         system = (
             """다음의 <context> tag안의 참고자료를 이용하여 상황에 맞는 구체적인 세부 정보를 충분히 제공합니다. Assistant의 이름은 서연이고, 모르는 질문을 받으면 솔직히 모른다고 말합니다.
@@ -721,32 +951,18 @@ def query_using_RAG_context(chat, context, revised_question):
 
     return msg
 
-def get_answer_using_knowledge_base(text):
+def run_rag_with_knowledge_base(text):
     global reference_docs
 
     chat = get_chat()
     
     msg = reference = ""
     top_k = numberOfDocs
-    relevant_docs = []
-    if knowledge_base_id:    
-        retriever = AmazonKnowledgeBasesRetriever(
-            knowledge_base_id=knowledge_base_id, 
-            retrieval_config={"vectorSearchConfiguration": {
-                "numberOfResults": top_k,
-                "overrideSearchType": "HYBRID"   # SEMANTIC
-            }},
-        )
-        
-        docs = retriever.invoke(text)
-        # print('docs: ', docs)
-        print('--> docs from knowledge base')
-        for i, doc in enumerate(docs):
-            print_doc(i, doc)
-        
-        relevant_docs = get_docs_from_knowledge_base(docs)
-        
-    # grading   
+    
+    # retrieve
+    relevant_docs = retrieve_documents_from_knowledge_base(text, top_k)
+
+    # grade  
     filtered_docs = grade_documents(text, relevant_docs)    
     
     filtered_docs = check_duplication(filtered_docs) # duplication checker
@@ -761,113 +977,18 @@ def get_answer_using_knowledge_base(text):
         
     print('relevant_context: ', relevant_context)
 
-    msg = query_using_RAG_context(chat, relevant_context, text)
+    # generate
+    msg = generate_answer_using_RAG(chat, relevant_context, text)
     
     if len(filtered_docs):
         reference_docs += filtered_docs 
             
     return msg
 
-def run_flow(text):
-    global reference_docs
 
-    chat = get_chat()
-    
-    msg = reference = ""
-    top_k = numberOfDocs
-    relevant_docs = []
-    if knowledge_base_id:    
-        retriever = AmazonKnowledgeBasesRetriever(
-            knowledge_base_id=knowledge_base_id, 
-            retrieval_config={"vectorSearchConfiguration": {
-                "numberOfResults": top_k,
-                "overrideSearchType": "HYBRID"   # SEMANTIC
-            }},
-        )
-        
-        docs = retriever.invoke(text)
-        # print('docs: ', docs)
-        print('--> docs from knowledge base')
-        for i, doc in enumerate(docs):
-            print_doc(i, doc)
-        
-        relevant_docs = get_docs_from_knowledge_base(docs)
-        
-    # grading   
-    filtered_docs = grade_documents(text, relevant_docs)    
-    
-    filtered_docs = check_duplication(filtered_docs) # duplication checker
-            
-    relevant_context = ""
-    for i, document in enumerate(filtered_docs):
-        print(f"{i}: {document}")
-        if document.page_content:
-            content = document.page_content
-            
-        relevant_context = relevant_context + content + "\n\n"
-        
-    print('relevant_context: ', relevant_context)
-
-    msg = query_using_RAG_context(chat, relevant_context, text)
-    
-    if len(filtered_docs):
-        reference_docs += filtered_docs 
-            
-    return msg
-
-def run_bedrock_agent(text):
-    global reference_docs
-
-    chat = get_chat()
-    
-    msg = reference = ""
-    top_k = numberOfDocs
-    relevant_docs = []
-    if knowledge_base_id:    
-        retriever = AmazonKnowledgeBasesRetriever(
-            knowledge_base_id=knowledge_base_id, 
-            retrieval_config={"vectorSearchConfiguration": {
-                "numberOfResults": top_k,
-                "overrideSearchType": "HYBRID"   # SEMANTIC
-            }},
-        )
-        
-        docs = retriever.invoke(text)
-        # print('docs: ', docs)
-        print('--> docs from knowledge base')
-        for i, doc in enumerate(docs):
-            print_doc(i, doc)
-        
-        relevant_docs = get_docs_from_knowledge_base(docs)
-        
-    # grading   
-    filtered_docs = grade_documents(text, relevant_docs)    
-    
-    filtered_docs = check_duplication(filtered_docs) # duplication checker
-            
-    relevant_context = ""
-    for i, document in enumerate(filtered_docs):
-        print(f"{i}: {document}")
-        if document.page_content:
-            content = document.page_content
-            
-        relevant_context = relevant_context + content + "\n\n"
-        
-    print('relevant_context: ', relevant_context)
-
-    msg = query_using_RAG_context(chat, relevant_context, text)
-    
-    if len(filtered_docs):
-        reference_docs += filtered_docs 
-            
-    return msg
-
-def save_chat_history(text, msg):
-    memory_chain.chat_memory.add_user_message(text)
-    if len(msg) > MSG_LENGTH:
-        memory_chain.chat_memory.add_ai_message(msg[:MSG_LENGTH])                          
-    else:
-        memory_chain.chat_memory.add_ai_message(msg) 
+####################### LangGraph #######################
+# Agentic Workflow: Tool Use
+#########################################################
 
 @tool 
 def get_book_list(keyword: str) -> str:
@@ -952,7 +1073,8 @@ def get_weather_info(city: str) -> str:
                 wind_speed = result['wind']['speed']
                 cloud = result['clouds']['all']
                 
-                weather_str = f"{city}의 현재 날씨의 특징은 {overall}이며, 현재 온도는 {current_temp}도 이고, 최저온도는 {min_temp}도, 최고 온도는 {max_temp}도 입니다. 현재 습도는 {humidity}% 이고, 바람은 초당 {wind_speed} 미터 입니다. 구름은 {cloud}% 입니다."
+                weather_str = f"{city}의 현재 날씨의 특징은 {overall}이며, 현재 온도는 {current_temp} 입니다. 현재 습도는 {humidity}% 이고, 바람은 초당 {wind_speed} 미터 입니다. 구름은 {cloud}% 입니다."                
+                #weather_str = f"{city}의 현재 날씨의 특징은 {overall}이며, 현재 온도는 {current_temp}도 이고, 최저온도는 {min_temp}도, 최고 온도는 {max_temp}도 입니다. 현재 습도는 {humidity}% 이고, 바람은 초당 {wind_speed} 미터 입니다. 구름은 {cloud}% 입니다."
                 #weather_str = f"Today, the overall of {city} is {overall}, current temperature is {current_temp} degree, min temperature is {min_temp} degree, highest temperature is {max_temp} degree. huminity is {humidity}%, wind status is {wind_speed} meter per second. the amount of cloud is {cloud}%."            
         except Exception:
             err_msg = traceback.format_exc()
@@ -1014,134 +1136,6 @@ def search_by_tavily(keyword: str) -> str:
 
 tools = [get_current_time, get_book_list, get_weather_info, search_by_tavily]        
 
-reference_docs = []
-# api key to get weather information in agent
-secretsmanager = boto3.client(
-    service_name='secretsmanager',
-    region_name=bedrock_region
-)
-try:
-    get_weather_api_secret = secretsmanager.get_secret_value(
-        SecretId=f"openweathermap-{projectName}"
-    )
-    #print('get_weather_api_secret: ', get_weather_api_secret)
-    secret = json.loads(get_weather_api_secret['SecretString'])
-    #print('secret: ', secret)
-    weather_api_key = secret['weather_api_key']
-
-except Exception as e:
-    raise e
-
-# api key to use LangSmith
-langsmith_api_key = ""
-try:
-    get_langsmith_api_secret = secretsmanager.get_secret_value(
-        SecretId=f"langsmithapikey-{projectName}"
-    )
-    #print('get_langsmith_api_secret: ', get_langsmith_api_secret)
-    secret = json.loads(get_langsmith_api_secret['SecretString'])
-    #print('secret: ', secret)
-    langsmith_api_key = secret['langsmith_api_key']
-    langchain_project = secret['langchain_project']
-except Exception as e:
-    raise e
-
-if langsmith_api_key:
-    os.environ["LANGCHAIN_API_KEY"] = langsmith_api_key
-    os.environ["LANGCHAIN_TRACING_V2"] = "true"
-    os.environ["LANGCHAIN_PROJECT"] = langchain_project
-
-# api key to use Tavily Search
-tavily_api_key = []
-tavily_key = ""
-try:
-    get_tavily_api_secret = secretsmanager.get_secret_value(
-        SecretId=f"tavilyapikey-{projectName}"
-    )
-    #print('get_tavily_api_secret: ', get_tavily_api_secret)
-    secret = json.loads(get_tavily_api_secret['SecretString'])
-    #print('secret: ', secret)
-    tavily_key = secret['tavily_api_key']
-    #print('tavily_api_key: ', tavily_api_key)
-except Exception as e: 
-    raise e
-
-if tavily_key:
-    os.environ["TAVILY_API_KEY"] = tavily_key
-
-def tavily_search(query, k):
-    docs = []    
-    try:
-        tavily_client = TavilyClient(api_key=tavily_key)
-        response = tavily_client.search(query, max_results=k)
-        # print('tavily response: ', response)
-            
-        for r in response["results"]:
-            name = r.get("title")
-            if name is None:
-                name = 'WWW'
-            
-            docs.append(
-                Document(
-                    page_content=r.get("content"),
-                    metadata={
-                        'name': name,
-                        'url': r.get("url"),
-                        'from': 'tavily'
-                    },
-                )
-            )                   
-    except Exception as e:
-        print('Exception: ', e)
-
-    return docs
-
-def isKorean(text):
-    # check korean
-    pattern_hangul = re.compile('[\u3131-\u3163\uac00-\ud7a3]+')
-    word_kor = pattern_hangul.search(str(text))
-    # print('word_kor: ', word_kor)
-
-    if word_kor and word_kor != 'None':
-        print('Korean: ', word_kor)
-        return True
-    else:
-        print('Not Korean: ', word_kor)
-        return False
-    
-def traslation(chat, text, input_language, output_language):
-    system = (
-        "You are a helpful assistant that translates {input_language} to {output_language} in <article> tags." 
-        "Put it in <result> tags."
-    )
-    human = "<article>{text}</article>"
-    
-    prompt = ChatPromptTemplate.from_messages([("system", system), ("human", human)])
-    # print('prompt: ', prompt)
-    
-    chain = prompt | chat    
-    try: 
-        result = chain.invoke(
-            {
-                "input_language": input_language,
-                "output_language": output_language,
-                "text": text,
-            }
-        )
-        
-        msg = result.content
-        # print('translated text: ', msg)
-    except Exception:
-        err_msg = traceback.format_exc()
-        print('error message: ', err_msg)          
-        raise Exception ("Not able to request to LLM")
-
-    return msg[msg.find('<result>')+8:len(msg)-9] # remove <result> tag
-
-####################### LangGraph #######################
-# Chat Agent Executor 
-# Agentic Workflow: Tool Use
-#########################################################
 def run_agent_executor2(query):        
     class State(TypedDict):
         messages: Annotated[list, add_messages]
@@ -1333,79 +1327,302 @@ def get_basic_answer(query):
 
     return output.content
 
-def translate_text(text):
-    chat = get_chat()
 
-    system = (
-        "You are a helpful assistant that translates {input_language} to {output_language} in <article> tags. Put it in <result> tags."
-    )
-    human = "<article>{text}</article>"
+
+####################### Prompt Flow #######################
+# Prompt Flow
+###########################################################  
     
-    prompt = ChatPromptTemplate.from_messages([("system", system), ("human", human)])
-    # print('prompt: ', prompt)
+flow_arn = None
+flow_alias_identifier = None
+def run_flow(text, connectionId, requestId):    
+    print('prompt_flow_name: ', prompt_flow_name)
     
-    if isKorean(text)==False :
-        input_language = "English"
-        output_language = "Korean"
-    else:
-        input_language = "Korean"
-        output_language = "English"
-                        
-    chain = prompt | chat    
-    try: 
-        result = chain.invoke(
-            {
-                "input_language": input_language,
-                "output_language": output_language,
-                "text": text,
-            }
-        )
-        msg = result.content
-        print('translated text: ', msg)
-    except Exception:
-        err_msg = traceback.format_exc()
-        print('error message: ', err_msg)       
-        raise Exception ("Not able to request to LLM")
-
-    return msg[msg.find('<result>')+8:len(msg)-9] # remove <result> tag
-
-def clear_chat_history():
-    memory_chain = []
-    map_chain[userId] = memory_chain
+    client = boto3.client(
+        service_name='bedrock-agent',
+        region_name=bedrock_region
+    )   
     
-def check_grammer(text):
-    chat = get_chat()
-
-    if isKorean(text)==True:
-        system = (
-            "다음의 <article> tag안의 문장의 오류를 찾아서 설명하고, 오류가 수정된 문장을 답변 마지막에 추가하여 주세요."
+    global flow_arn, flow_alias_identifier
+    
+    if not flow_arn:
+        response = client.list_flows(
+            maxResults=10
         )
-    else: 
-        system = (
-            "Here is pieces of article, contained in <article> tags. Find the error in the sentence and explain it, and add the corrected sentence at the end of your answer."
-        )
+        print('response: ', response)
         
-    human = "<article>{text}</article>"
-    
-    prompt = ChatPromptTemplate.from_messages([("system", system), ("human", human)])
-    # print('prompt: ', prompt)
-    
-    chain = prompt | chat    
-    try: 
-        result = chain.invoke(
-            {
-                "text": text
-            }
-        )
+        for flow in response["flowSummaries"]:
+            print('flow: ', flow)
+            if flow["name"] == prompt_flow_name:
+                flow_arn = flow["arn"]
+                print('flow_arn: ', flow_arn)
+                break
+
+    msg = ""
+    if flow_arn:
+        if not flow_alias_identifier:
+            # get flow alias arn
+            response_flow_aliases = client.list_flow_aliases(
+                flowIdentifier=flow_arn
+            )
+            print('response_flow_aliases: ', response_flow_aliases)
+            
+            flowAlias = response_flow_aliases["flowAliasSummaries"]
+            for alias in flowAlias:
+                print('alias: ', alias)
+                if alias['name'] == "latest_version":  # the name of prompt flow alias
+                    flow_alias_identifier = alias['arn']
+                    print('flowAliasIdentifier: ', flow_alias_identifier)
+                    break
         
-        msg = result.content
-        print('result of grammer correction: ', msg)
-    except Exception:
-        err_msg = traceback.format_exc()
-        print('error message: ', err_msg)        
-        raise Exception ("Not able to request to LLM")
-    
+        # invoke_flow        
+        client_runtime = boto3.client(
+            service_name='bedrock-agent-runtime',
+            region_name=bedrock_region
+        )
+
+        response = client_runtime.invoke_flow(
+            flowIdentifier=flow_arn,
+            flowAliasIdentifier=flow_alias_identifier,
+            inputs=[
+                {
+                    "content": {
+                        "document": text,
+                    },
+                    "nodeName": "FlowInputNode",
+                    "nodeOutputName": "document"
+                }
+            ]
+        )
+        print('response of invoke_flow(): ', response)
+        
+        response_stream = response['responseStream']
+        try:
+            result = {}
+            for event in response_stream:
+                print('event: ', event)
+                result.update(event)
+            print('result: ', result)
+
+            if result['flowCompletionEvent']['completionReason'] == 'SUCCESS':
+                print("Prompt flow invocation was successful! The output of the prompt flow is as follows:\n")
+                # msg = result['flowOutputEvent']['content']['document']
+                
+                msg = result['flowOutputEvent']['content']['document']
+                print('msg: ', msg)
+            else:
+                print("The prompt flow invocation completed because of the following reason:", result['flowCompletionEvent']['completionReason'])
+        except Exception as e:
+            raise Exception("unexpected event.",e)
+
     return msg
+
+rag_flow_arn = None
+rag_flow_alias_identifier = None
+def run_RAG_prompt_flow(text, connectionId, requestId):
+    global rag_flow_arn, rag_flow_alias_identifier
+    
+    print('rag_prompt_flow_name: ', rag_prompt_flow_name) 
+    print('rag_flow_arn: ', rag_flow_arn)
+    print('rag_flow_alias_identifier: ', rag_flow_alias_identifier)
+    
+    client = boto3.client(
+        service_name='bedrock-agent',
+        region_name=bedrock_region
+    )
+    if not rag_flow_arn:
+        response = client.list_flows(
+            maxResults=10
+        )
+        print('response: ', response)
+         
+        for flow in response["flowSummaries"]:
+            if flow["name"] == rag_prompt_flow_name:
+                rag_flow_arn = flow["arn"]
+                print('rag_flow_arn: ', rag_flow_arn)
+                break
+    
+    if not rag_flow_alias_identifier and rag_flow_arn:
+        # get flow alias arn
+        response_flow_aliases = client.list_flow_aliases(
+            flowIdentifier=rag_flow_arn
+        )
+        print('response_flow_aliases: ', response_flow_aliases)
+        rag_flow_alias_identifier = ""
+        flowAlias = response_flow_aliases["flowAliasSummaries"]
+        for alias in flowAlias:
+            print('alias: ', alias)
+            if alias['name'] == "latest_version":  # the name of prompt flow alias
+                rag_flow_alias_identifier = alias['arn']
+                print('flowAliasIdentifier: ', rag_flow_alias_identifier)
+                break
+    
+    # invoke_flow
+    client_runtime = boto3.client(
+        service_name='bedrock-agent-runtime',
+        region_name=bedrock_region
+    )
+    response = client_runtime.invoke_flow(
+        flowIdentifier=rag_flow_arn,
+        flowAliasIdentifier=rag_flow_alias_identifier,
+        inputs=[
+            {
+                "content": {
+                    "document": text,
+                },
+                "nodeName": "FlowInputNode",
+                "nodeOutputName": "document"
+            }
+        ]
+    )
+    print('response of invoke_flow(): ', response)
+    
+    response_stream = response['responseStream']
+    try:
+        result = {}
+        for event in response_stream:
+            print('event: ', event)
+            result.update(event)
+        print('result: ', result)
+
+        if result['flowCompletionEvent']['completionReason'] == 'SUCCESS':
+            print("Prompt flow invocation was successful! The output of the prompt flow is as follows:\n")
+            # msg = result['flowOutputEvent']['content']['document']
+            
+            msg = result['flowOutputEvent']['content']['document']
+            print('msg: ', msg)
+        else:
+            print("The prompt flow invocation completed because of the following reason:", result['flowCompletionEvent']['completionReason'])
+    except Exception as e:
+        raise Exception("unexpected event.",e)
+
+    return msg
+
+####################### Bedrock Agent #######################
+# Agentic Workflow: Bedrock Agent
+########################################################### 
+
+agent_id = agent_alias_id = None
+sessionId = dict() 
+def run_bedrock_agent(text, connectionId, requestId, userId, sessionState):
+    global agent_id, agent_alias_id
+    print('agent_id: ', agent_id)
+    print('agent_alias_id: ', agent_alias_id)
+    
+    client = boto3.client(service_name='bedrock-agent')  
+    if not agent_id:
+        response_agent = client.list_agents(
+            maxResults=10
+        )
+        print('response of list_agents(): ', response_agent)
+        
+        for summary in response_agent["agentSummaries"]:
+            if summary["agentName"] == "tool-executor":
+                agent_id = summary["agentId"]
+                print('agent_id: ', agent_id)
+                break
+    
+    if not agent_alias_id and agent_id:
+        response_agent_alias = client.list_agent_aliases(
+            agentId = agent_id,
+            maxResults=10
+        )
+        print('response of list_agent_aliases(): ', response_agent_alias)   
+        
+        for summary in response_agent_alias["agentAliasSummaries"]:
+            if summary["agentAliasName"] == "latest_version":
+                agent_alias_id = summary["agentAliasId"]
+                print('agent_alias_id: ', agent_alias_id) 
+                break
+    
+    global sessionId
+    if not userId in sessionId:
+        sessionId[userId] = str(uuid.uuid4())
+        
+    msg = msg_contents = ""
+    if agent_alias_id and agent_id:
+        client_runtime = boto3.client('bedrock-agent-runtime')
+        try:
+            if sessionState:
+                response = client_runtime.invoke_agent( 
+                    agentAliasId=agent_alias_id,
+                    agentId=agent_id,
+                    inputText=text, 
+                    sessionId=sessionId[userId], 
+                    memoryId='memory-'+userId,
+                    sessionState=sessionState
+                )
+            else:
+                response = client_runtime.invoke_agent( 
+                    agentAliasId=agent_alias_id,
+                    agentId=agent_id,
+                    inputText=text, 
+                    sessionId=sessionId[userId], 
+                    memoryId='memory-'+userId
+                )
+            print('response of invoke_agent(): ', response)
+            
+            response_stream = response['completion']
+            
+            for event in response_stream:
+                chunk = event.get('chunk')
+                if chunk:
+                    msg += chunk.get('bytes').decode()
+                    print('event: ', chunk.get('bytes').decode())
+                        
+                    result = {
+                        'request_id': requestId,
+                        'msg': msg,
+                        'status': 'proceeding'
+                    }
+                    #print('result: ', json.dumps(result))
+                    msg = result
+                    print('msg: ', msg)
+                    
+                # files generated by code interpreter
+                if 'files' in event:
+                    files = event['files']['files']
+                    for file in files:
+                        objectName = file['name']
+                        print('objectName: ', objectName)
+                        contentType = file['type']
+                        print('contentType: ', contentType)
+                        bytes_data = file['bytes']
+                                                
+                        pixels = BytesIO(bytes_data)
+                        pixels.seek(0, 0)
+                                    
+                        img_key = 'agent/contents/'+objectName
+                        
+                        s3_client = boto3.client('s3')  
+                        response = s3_client.put_object(
+                            Bucket=bucketName,
+                            Key=img_key,
+                            ContentType=contentType,
+                            Body=pixels
+                        )
+                        print('response: ', response)
+                        
+                        url = path+'agent/contents/'+parse.quote(objectName)
+                        print('url: ', url)
+                        
+                        if contentType == 'application/json':
+                            msg_contents = f"\n\n<a href={url} target=_blank>{objectName}</a>"
+                        elif contentType == 'application/csv':
+                            msg_contents = f"\n\n<a href={url} target=_blank>{objectName}</a>"
+                        else:
+                            width = 600            
+                            msg_contents = f'\n\n<img src=\"{url}\" alt=\"{objectName}\" width=\"{width}\">'
+                            print('msg_contents: ', msg_contents)
+                                                            
+        except Exception as e:
+            raise Exception("unexpected event.",e)
+        
+    return msg+msg_contents
+
+####################### LangChain #######################
+# Image Analysis
+#########################################################
 
 def upload_to_s3(file_bytes, file_name):
     """
@@ -1580,294 +1797,3 @@ def extract_text(img_base64):
         msg = "텍스트를 추출하지 못하였습니다."    
     
     return msg
-
-####################### Prompt Flow #######################
-# Prompt Flow
-###########################################################  
-    
-flow_arn = None
-flow_alias_identifier = None
-def run_flow(text, connectionId, requestId):    
-    print('prompt_flow_name: ', prompt_flow_name)
-    
-    client = boto3.client(
-        service_name='bedrock-agent',
-        region_name=bedrock_region
-    )   
-    
-    global flow_arn, flow_alias_identifier
-    
-    if not flow_arn:
-        response = client.list_flows(
-            maxResults=10
-        )
-        print('response: ', response)
-        
-        for flow in response["flowSummaries"]:
-            print('flow: ', flow)
-            if flow["name"] == prompt_flow_name:
-                flow_arn = flow["arn"]
-                print('flow_arn: ', flow_arn)
-                break
-
-    msg = ""
-    if flow_arn:
-        if not flow_alias_identifier:
-            # get flow alias arn
-            response_flow_aliases = client.list_flow_aliases(
-                flowIdentifier=flow_arn
-            )
-            print('response_flow_aliases: ', response_flow_aliases)
-            
-            flowAlias = response_flow_aliases["flowAliasSummaries"]
-            for alias in flowAlias:
-                print('alias: ', alias)
-                if alias['name'] == "latest_version":  # the name of prompt flow alias
-                    flow_alias_identifier = alias['arn']
-                    print('flowAliasIdentifier: ', flow_alias_identifier)
-                    break
-        
-        # invoke_flow        
-        client_runtime = boto3.client(
-            service_name='bedrock-agent-runtime',
-            region_name=bedrock_region
-        )
-
-        response = client_runtime.invoke_flow(
-            flowIdentifier=flow_arn,
-            flowAliasIdentifier=flow_alias_identifier,
-            inputs=[
-                {
-                    "content": {
-                        "document": text,
-                    },
-                    "nodeName": "FlowInputNode",
-                    "nodeOutputName": "document"
-                }
-            ]
-        )
-        print('response of invoke_flow(): ', response)
-        
-        response_stream = response['responseStream']
-        try:
-            result = {}
-            for event in response_stream:
-                print('event: ', event)
-                result.update(event)
-            print('result: ', result)
-
-            if result['flowCompletionEvent']['completionReason'] == 'SUCCESS':
-                print("Prompt flow invocation was successful! The output of the prompt flow is as follows:\n")
-                # msg = result['flowOutputEvent']['content']['document']
-                
-                msg = result['flowOutputEvent']['content']['document']
-                print('msg: ', msg)
-            else:
-                print("The prompt flow invocation completed because of the following reason:", result['flowCompletionEvent']['completionReason'])
-        except Exception as e:
-            raise Exception("unexpected event.",e)
-
-    return msg
-
-rag_flow_arn = None
-rag_flow_alias_identifier = None
-def run_RAG_prompt_flow(text, connectionId, requestId):
-    global rag_flow_arn, rag_flow_alias_identifier
-    
-    print('rag_prompt_flow_name: ', rag_prompt_flow_name) 
-    print('rag_flow_arn: ', rag_flow_arn)
-    print('rag_flow_alias_identifier: ', rag_flow_alias_identifier)
-    
-    client = boto3.client(
-        service_name='bedrock-agent',
-        region_name=bedrock_region
-    )
-    if not rag_flow_arn:
-        response = client.list_flows(
-            maxResults=10
-        )
-        print('response: ', response)
-         
-        for flow in response["flowSummaries"]:
-            if flow["name"] == rag_prompt_flow_name:
-                rag_flow_arn = flow["arn"]
-                print('rag_flow_arn: ', rag_flow_arn)
-                break
-    
-    if not rag_flow_alias_identifier and rag_flow_arn:
-        # get flow alias arn
-        response_flow_aliases = client.list_flow_aliases(
-            flowIdentifier=rag_flow_arn
-        )
-        print('response_flow_aliases: ', response_flow_aliases)
-        rag_flow_alias_identifier = ""
-        flowAlias = response_flow_aliases["flowAliasSummaries"]
-        for alias in flowAlias:
-            print('alias: ', alias)
-            if alias['name'] == "latest_version":  # the name of prompt flow alias
-                rag_flow_alias_identifier = alias['arn']
-                print('flowAliasIdentifier: ', rag_flow_alias_identifier)
-                break
-    
-    # invoke_flow
-    client_runtime = boto3.client(
-        service_name='bedrock-agent-runtime',
-        region_name=bedrock_region
-    )
-    response = client_runtime.invoke_flow(
-        flowIdentifier=rag_flow_arn,
-        flowAliasIdentifier=rag_flow_alias_identifier,
-        inputs=[
-            {
-                "content": {
-                    "document": text,
-                },
-                "nodeName": "FlowInputNode",
-                "nodeOutputName": "document"
-            }
-        ]
-    )
-    print('response of invoke_flow(): ', response)
-    
-    response_stream = response['responseStream']
-    try:
-        result = {}
-        for event in response_stream:
-            print('event: ', event)
-            result.update(event)
-        print('result: ', result)
-
-        if result['flowCompletionEvent']['completionReason'] == 'SUCCESS':
-            print("Prompt flow invocation was successful! The output of the prompt flow is as follows:\n")
-            # msg = result['flowOutputEvent']['content']['document']
-            
-            msg = result['flowOutputEvent']['content']['document']
-            print('msg: ', msg)
-        else:
-            print("The prompt flow invocation completed because of the following reason:", result['flowCompletionEvent']['completionReason'])
-    except Exception as e:
-        raise Exception("unexpected event.",e)
-
-    return msg
-
-####################### Bedrock Agent #######################
-# Bedrock Agent
-#############################################################
-
-agent_id = agent_alias_id = None
-sessionId = dict() 
-def run_bedrock_agent(text, connectionId, requestId, userId, sessionState):
-    global agent_id, agent_alias_id
-    print('agent_id: ', agent_id)
-    print('agent_alias_id: ', agent_alias_id)
-    
-    client = boto3.client(service_name='bedrock-agent')  
-    if not agent_id:
-        response_agent = client.list_agents(
-            maxResults=10
-        )
-        print('response of list_agents(): ', response_agent)
-        
-        for summary in response_agent["agentSummaries"]:
-            if summary["agentName"] == "tool-executor":
-                agent_id = summary["agentId"]
-                print('agent_id: ', agent_id)
-                break
-    
-    if not agent_alias_id and agent_id:
-        response_agent_alias = client.list_agent_aliases(
-            agentId = agent_id,
-            maxResults=10
-        )
-        print('response of list_agent_aliases(): ', response_agent_alias)   
-        
-        for summary in response_agent_alias["agentAliasSummaries"]:
-            if summary["agentAliasName"] == "latest_version":
-                agent_alias_id = summary["agentAliasId"]
-                print('agent_alias_id: ', agent_alias_id) 
-                break
-    
-    global sessionId
-    if not userId in sessionId:
-        sessionId[userId] = str(uuid.uuid4())
-        
-    msg = msg_contents = ""
-    if agent_alias_id and agent_id:
-        client_runtime = boto3.client('bedrock-agent-runtime')
-        try:
-            if sessionState:
-                response = client_runtime.invoke_agent( 
-                    agentAliasId=agent_alias_id,
-                    agentId=agent_id,
-                    inputText=text, 
-                    sessionId=sessionId[userId], 
-                    memoryId='memory-'+userId,
-                    sessionState=sessionState
-                )
-            else:
-                response = client_runtime.invoke_agent( 
-                    agentAliasId=agent_alias_id,
-                    agentId=agent_id,
-                    inputText=text, 
-                    sessionId=sessionId[userId], 
-                    memoryId='memory-'+userId
-                )
-            print('response of invoke_agent(): ', response)
-            
-            response_stream = response['completion']
-            
-            for event in response_stream:
-                chunk = event.get('chunk')
-                if chunk:
-                    msg += chunk.get('bytes').decode()
-                    print('event: ', chunk.get('bytes').decode())
-                        
-                    result = {
-                        'request_id': requestId,
-                        'msg': msg,
-                        'status': 'proceeding'
-                    }
-                    #print('result: ', json.dumps(result))
-                    msg = result
-                    print('msg: ', msg)
-                    
-                # files generated by code interpreter
-                if 'files' in event:
-                    files = event['files']['files']
-                    for file in files:
-                        objectName = file['name']
-                        print('objectName: ', objectName)
-                        contentType = file['type']
-                        print('contentType: ', contentType)
-                        bytes_data = file['bytes']
-                                                
-                        pixels = BytesIO(bytes_data)
-                        pixels.seek(0, 0)
-                                    
-                        img_key = 'agent/contents/'+objectName
-                        
-                        s3_client = boto3.client('s3')  
-                        response = s3_client.put_object(
-                            Bucket=bucketName,
-                            Key=img_key,
-                            ContentType=contentType,
-                            Body=pixels
-                        )
-                        print('response: ', response)
-                        
-                        url = path+'agent/contents/'+parse.quote(objectName)
-                        print('url: ', url)
-                        
-                        if contentType == 'application/json':
-                            msg_contents = f"\n\n<a href={url} target=_blank>{objectName}</a>"
-                        elif contentType == 'application/csv':
-                            msg_contents = f"\n\n<a href={url} target=_blank>{objectName}</a>"
-                        else:
-                            width = 600            
-                            msg_contents = f'\n\n<img src=\"{url}\" alt=\"{objectName}\" width=\"{width}\">'
-                            print('msg_contents: ', msg_contents)
-                                                            
-        except Exception as e:
-            raise Exception("unexpected event.",e)
-        
-    return msg+msg_contents
