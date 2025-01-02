@@ -1136,7 +1136,129 @@ def search_by_tavily(keyword: str) -> str:
 
 tools = [get_current_time, get_book_list, get_weather_info, search_by_tavily]        
 
-def run_agent_executor2(query):        
+def run_agent_executor(query, st, debugMode):
+    chatModel = get_chat() 
+    
+    model = chatModel.bind_tools(tools)
+
+    class State(TypedDict):
+        # messages: Annotated[Sequence[BaseMessage], operator.add]
+        messages: Annotated[list, add_messages]
+
+    tool_node = ToolNode(tools)
+
+    def should_continue(state: State) -> Literal["continue", "end"]:
+        print("###### should_continue ######")
+        messages = state["messages"]    
+        print('last_message: ', messages[-1])
+        
+        last_message = messages[-1]
+        if not last_message.tool_calls:
+            return "end"
+        else:                
+            return "continue"
+
+    def call_model(state: State, config):
+        print("###### call_model ######")
+        # print('state: ', state["messages"])
+                
+        if isKorean(state["messages"][0].content)==True:
+            system = (
+                "당신의 이름은 서연이고, 질문에 친근한 방식으로 대답하도록 설계된 대화형 AI입니다."
+                "상황에 맞는 구체적인 세부 정보를 충분히 제공합니다."
+                "모르는 질문을 받으면 솔직히 모른다고 말합니다."
+                "최종 답변에는 조사한 내용을 반드시 포함합니다."
+            )
+        else: 
+            system = (            
+                "You are a conversational AI designed to answer in a friendly way to a question."
+                "If you don't know the answer, just say that you don't know, don't try to make up an answer."
+                "You will be acting as a thoughtful advisor."    
+            )
+                
+        try:
+            prompt = ChatPromptTemplate.from_messages(
+                [
+                    ("system", system),
+                    MessagesPlaceholder(variable_name="messages"),
+                ]
+            )
+            chain = prompt | model
+                
+            response = chain.invoke(state["messages"])
+            print('call_model response: ', response)
+        
+            for re in response.content:
+                if "type" in re:
+                    if re['type'] == 'text':
+                        print(f"--> {re['type']}: {re['text']}")
+
+                        status = re['text']
+                        if status.find('<thinking>') != -1:
+                            print('Remove <thinking> tag.')
+                            status = status[status.find('<thinking>')+11:status.find('</thinking>')]
+                            print('status without tag: ', status)
+
+                        if debugMode=="Debug":
+                            st.info(status)
+
+                    elif re['type'] == 'tool_use':                
+                        print(f"--> {re['type']}: {re['name']}, {re['input']}")
+
+                        if debugMode=="Debug":
+                            st.info(f"{re['type']}: {re['name']}, {re['input']}")
+                    else:
+                        print(re)
+                else: # answer
+                    print(response.content)
+                    break
+        except Exception:
+            response = AIMessage(content="답변을 찾지 못하였습니다.")
+
+            err_msg = traceback.format_exc()
+            print('error message: ', err_msg)
+            # raise Exception ("Not able to request to LLM")
+
+        return {"messages": [response]}
+
+    def buildChatAgent():
+        workflow = StateGraph(State)
+
+        workflow.add_node("agent", call_model)
+        workflow.add_node("action", tool_node)
+        workflow.add_edge(START, "agent")
+        workflow.add_conditional_edges(
+            "agent",
+            should_continue,
+            {
+                "continue": "action",
+                "end": END,
+            },
+        )
+        workflow.add_edge("action", "agent")
+
+        return workflow.compile()
+
+    app = buildChatAgent()
+            
+    inputs = [HumanMessage(content=query)]
+    config = {
+        "recursion_limit": 50
+    }
+    
+    message = ""
+    for event in app.stream({"messages": inputs}, config, stream_mode="values"):   
+        # print('event: ', event)
+        
+        message = event["messages"][-1]
+        # print('message: ', message)
+
+    msg = message.content
+
+    #return msg[msg.find('<result>')+8:len(msg)-9]
+    return msg
+
+def run_agent_executor2(query, st, debugMode):        
     class State(TypedDict):
         messages: Annotated[list, add_messages]
         answer: str
@@ -1194,8 +1316,21 @@ def run_agent_executor2(query):
             if "type" in re:
                 if re['type'] == 'text':
                     print(f"--> {re['type']}: {re['text']}")
+
+                    status = re['text']
+                    if status.find('<thinking>') != -1:
+                        print('Remove <thinking> tag.')
+                        status = status[status.find('<thinking>')+11:status.find('</thinking>')]
+                        print('status without tag: ', status)
+
+                    if debugMode=="Debug":
+                        st.info(status)
+
                 elif re['type'] == 'tool_use':                
                     print(f"--> {re['type']}: name: {re['name']}, input: {re['input']}")
+
+                    if debugMode=="Debug":
+                        st.info(f"{re['type']}: name: {re['name']}, input: {re['input']}")
                 else:
                     print(re)
             else: # answer
@@ -1326,7 +1461,6 @@ def get_basic_answer(query):
     print('output.content: ', output.content)
 
     return output.content
-
 
 
 ####################### Prompt Flow #######################
