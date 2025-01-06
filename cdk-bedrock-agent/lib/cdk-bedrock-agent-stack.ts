@@ -362,6 +362,20 @@ export class CdkBedrockAgentStack extends cdk.Stack {
       }),
     ); 
 
+    const bedrockEndpoint = vpc.addInterfaceEndpoint(`bedrock-endpoint-${projectName}`, {
+      privateDnsEnabled: true,
+      service: new ec2.InterfaceVpcEndpointService(`com.amazonaws.${region}.bedrock-runtime`, 443)
+    });
+    bedrockEndpoint.connections.allowDefaultPortFrom(ec2.Peer.ipv4(vpc.vpcCidrBlock), `allowBedrockPortFrom-${projectName}`)
+
+    bedrockEndpoint.addToPolicy(
+      new iam.PolicyStatement({
+        principals: [new iam.AnyPrincipal()],
+        actions: ['bedrock:*'],
+        resources: ['*'],
+      }),
+    ); 
+
     // EC2 Security Group
     const ec2Sg = new ec2.SecurityGroup(this, `ec2-sg-for-${projectName}`,
       {
@@ -419,7 +433,7 @@ export class CdkBedrockAgentStack extends cdk.Stack {
       protocolPolicy: cloudFront.OriginProtocolPolicy.HTTP_ONLY      
     });
     const distribution = new cloudFront.Distribution(this, `cloudfront-for-${projectName}`, {
-      comment: "CloudFront distribution for Streamlit frontend application",
+      comment: `Distribution-for-${projectName}`,
       defaultBehavior: {
         origin: origin,
         viewerProtocolPolicy: cloudFront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
@@ -471,14 +485,14 @@ ExecStart=/home/ec2-user/.local/bin/streamlit run /home/ec2-user/${projectName}/
 WantedBy=multi-user.target
 EOF"`,
         `runuser -l ec2-user -c "mkdir -p /home/ec2-user/.streamlit"`,
-        `runuser -l ec2-user -c "cat <<EOF > /home/ec2-user/.streamlit/config.toml
+        `runuser -l ec2-user -c 'cat <<EOF > /home/ec2-user/.streamlit/config.toml
 [server]
 port=${targetPort}
 
 [theme]
 base="dark"
 primaryColor="#fff700"
-EOF"`,
+EOF'`,
       `json='${JSON.stringify(environment)}' && echo "$json">/home/config.json`,
       `runuser -l ec2-user -c 'cd && git clone https://github.com/kyopark2014/${projectName}'`,
       `runuser -l ec2-user -c 'pip install streamlit streamlit_chat beautifulsoup4 pytz tavily-python'`,        

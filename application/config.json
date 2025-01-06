@@ -1,9 +1,9 @@
 {
-    "projectName":"bedrock-agent",
+    "projectName":"langgraph-nova",
     "accountId":"262976740991",
     "region":"us-west-2",
-    "knowledge_base_role":"arn:aws:iam::262976740991:role/role-knowledge-base-for-bedrock-agent-us-west-2",
-    "collectionArn":"arn:aws:aoss:us-west-2:262976740991:collection/iqtg972hdtemoati1gve",
-    "opensearch_url":"https://iqtg972hdtemoati1gve.us-west-2.aoss.amazonaws.com",
-    "s3_arn":"arn:aws:s3:::storage-for-bedrock-agent-262976740991-us-west-2"
+    "knowledge_base_role":"arn:aws:iam::262976740991:role/role-knowledge-base-for-langgraph-nova-us-west-2",
+    "collectionArn":"arn:aws:aoss:us-west-2:262976740991:collection/nn55lhsdx2jj2mqu8ugj",
+    "opensearch_url":"https://nn55lhsdx2jj2mqu8ugj.us-west-2.aoss.amazonaws.com",
+    "s3_arn":"arn:aws:s3:::storage-for-langgraph-nova-262976740991-us-west-2"
  }
