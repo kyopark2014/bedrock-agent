@@ -98,14 +98,13 @@ knowledge_base_name = projectName
 
 prompt_flow_name = 'aws-bot'
 rag_prompt_flow_name = 'rag-prompt-flow'
-knowledge_base_name = 'aws-rag'
+knowledge_base_name = projectName
 
 numberOfDocs = 4
 MSG_LENGTH = 100    
 grade_state = "LLM" # LLM, OTHERS
 
 doc_prefix = s3_prefix+'/'
-path = 'https://url/'   
 
 userId = "demo"
 map_chain = dict() 
