@@ -3,12 +3,12 @@ import boto3
 import os
 import json
 import re
-import requests
-import datetime
-import functools
 import uuid
 import time
 import base64
+import info 
+import PyPDF2
+import csv
 
 from io import BytesIO
 from PIL import Image
@@ -35,6 +35,8 @@ from multiprocessing import Process, Pipe
 from urllib import parse
 from pydantic.v1 import BaseModel, Field
 from langchain_core.output_parsers import StrOutputParser
+from langchain_community.utilities.tavily_search import TavilySearchAPIWrapper
+from langchain.text_splitter import RecursiveCharacterTextSplitter
 
 try:
     with open("/home/config.json", "r", encoding="utf-8") as f:
@@ -57,9 +59,6 @@ if accountId is None:
 region = config["region"] if "region" in config else "us-west-2"
 print('region: ', region)
 
-bucketName = config["bucketName"] if "bucketName" in config else f"storage-for-{projectName}-{accountId}-{region}" 
-print('bucketName: ', bucketName)
-
 s3_prefix = 'docs'
 
 knowledge_base_role = config["knowledge_base_role"] if "knowledge_base_role" in config else None
@@ -76,6 +75,10 @@ opensearch_url = config["opensearch_url"] if "opensearch_url" in config else Non
 if opensearch_url is None:
     raise Exception ("No OpenSearch URL")
 
+path = config["sharing_url"] if "sharing_url" in config else None
+if path is None:
+    raise Exception ("No Sharing URL")
+
 credentials = boto3.Session().get_credentials()
 service = "aoss" 
 awsauth = AWSV4SignerAuth(credentials, region, service)
@@ -83,6 +86,10 @@ awsauth = AWSV4SignerAuth(credentials, region, service)
 s3_arn = config["s3_arn"] if "s3_arn" in config else None
 if s3_arn is None:
     raise Exception ("No S3 ARN")
+
+s3_bucket = config["s3_bucket"] if "s3_bucket" in config else None
+if s3_bucket is None:
+    raise Exception ("No storage!")
 
 parsingModelArn = f"arn:aws:bedrock:{region}::foundation-model/anthropic.claude-3-haiku-20240307-v1:0"
 embeddingModelArn = f"arn:aws:bedrock:{region}::foundation-model/amazon.titan-embed-text-v2:0"
@@ -95,44 +102,50 @@ knowledge_base_name = 'aws-rag'
 
 numberOfDocs = 4
 MSG_LENGTH = 100    
-grade_state = "LLM" # LLM, PRIORITY_SEARCH, OTHERS
-multi_region = 'disable'
-minDocSimilarity = 400
-length_of_models = 1
+grade_state = "LLM" # LLM, OTHERS
+
 doc_prefix = s3_prefix+'/'
 path = 'https://url/'   
-
-multi_region_models = [   # Nova Pro
-    {   
-        "bedrock_region": "us-west-2", # Oregon
-        "model_type": "nova",
-        "model_id": "us.amazon.nova-pro-v1:0"
-    },
-    {
-        "bedrock_region": "us-east-1", # N.Virginia
-        "model_type": "nova",
-        "model_id": "us.amazon.nova-pro-v1:0"
-    },
-    {
-        "bedrock_region": "us-east-2", # Ohio
-        "model_type": "nova",
-        "model_id": "us.amazon.nova-pro-v1:0"
-    }
-]
-selected_chat = 0
-HUMAN_PROMPT = "\n\nHuman:"
-AI_PROMPT = "\n\nAssistant:"
 
 userId = "demo"
 map_chain = dict() 
 
-if userId in map_chain:  
-        # print('memory exist. reuse it!')
-        memory_chain = map_chain[userId]
-else: 
-    # print('memory does not exist. create new one!')        
-    memory_chain = ConversationBufferWindowMemory(memory_key="chat_history", output_key='answer', return_messages=True, k=5)
-    map_chain[userId] = memory_chain
+model_name = "Nova Pro"
+model_type = "nova"
+debug_mode = "Enable"
+
+models = info.get_model_info(model_name)
+
+def update(modelName, debugMode):    
+    global model_name, debug_mode
+    global models
+    
+    if model_name != modelName:
+        model_name = modelName
+        print('model_name: ', model_name)
+        
+        models = info.get_model_info(model_name)
+        
+    if debug_mode != debugMode:
+        debug_mode = debugMode
+        print('debug_mode: ', debug_mode)
+
+def initiate():
+    global userId
+    global memory_chain
+
+    userId = uuid.uuid4().hex
+    print('userId: ', userId)
+
+    if userId in map_chain:  
+            # print('memory exist. reuse it!')
+            memory_chain = map_chain[userId]
+    else: 
+        # print('memory does not exist. create new one!')        
+        memory_chain = ConversationBufferWindowMemory(memory_key="chat_history", output_key='answer', return_messages=True, k=5)
+        map_chain[userId] = memory_chain
+
+initiate()
 
 def clear_chat_history():
     memory_chain = []
@@ -146,15 +159,21 @@ def save_chat_history(text, msg):
         memory_chain.chat_memory.add_ai_message(msg) 
 
 def get_chat():
-    global selected_chat
-    
-    profile = multi_region_models[selected_chat]
-    length_of_models = len(multi_region_models)
+    global model_type
+
+    profile = models[0]
+    # print('profile: ', profile)
         
     bedrock_region =  profile['bedrock_region']
     modelId = profile['model_id']
     maxOutputTokens = 4096
-    print(f'LLM: {selected_chat}, bedrock_region: {bedrock_region}, modelId: {modelId}')
+    model_type = profile['model_type']
+    print(f'LLM: bedrock_region: {bedrock_region}, modelId: {modelId}, model_type: {model_type}')
+
+    if profile['model_type'] == 'nova':
+        STOP_SEQUENCE = '"\n\n<thinking>", "\n<thinking>", " <thinking>"'
+    elif profile['model_type'] == 'claude':
+        STOP_SEQUENCE = "\n\nHuman:" 
                           
     # bedrock   
     boto3_bedrock = boto3.client(
@@ -171,7 +190,7 @@ def get_chat():
         "temperature":0.1,
         "top_k":250,
         "top_p":0.9,
-        "stop_sequences": [HUMAN_PROMPT]
+        "stop_sequences": [STOP_SEQUENCE]
     }
     # print('parameters: ', parameters)
 
@@ -182,43 +201,6 @@ def get_chat():
         region_name=bedrock_region
     )    
     
-    selected_chat = selected_chat + 1
-    if selected_chat == length_of_models:
-        selected_chat = 0
-    
-    return chat
-
-def get_multi_region_chat(models, selected):
-    profile = models[selected]
-    bedrock_region =  profile['bedrock_region']
-    modelId = profile['model_id']
-    maxOutputTokens = 4096
-    print(f'selected_chat: {selected}, bedrock_region: {bedrock_region}, modelId: {modelId}')
-                          
-    # bedrock   
-    boto3_bedrock = boto3.client(
-        service_name='bedrock-runtime',
-        region_name=bedrock_region,
-        config=Config(
-            retries = {
-                'max_attempts': 30
-            }
-        )
-    )
-    parameters = {
-        "max_tokens":maxOutputTokens,     
-        "temperature":0.1,
-        "top_k":250,
-        "top_p":0.9,
-        "stop_sequences": [HUMAN_PROMPT]
-    }
-    # print('parameters: ', parameters)
-
-    chat = ChatBedrock(   # new chat model
-        model_id=modelId,
-        client=boto3_bedrock, 
-        model_kwargs=parameters,
-    )        
     return chat
 
 def print_doc(i, doc):
@@ -299,8 +281,8 @@ def check_grammer(text):
     
     return msg
 
-def grade_document_based_on_relevance(conn, question, doc, models, selected):     
-    chat = get_multi_region_chat(models, selected)
+def grade_document_based_on_relevance(conn, question, doc):     
+    chat = get_chat()
     retrieval_grader = get_retrieval_grader(chat)
     score = retrieval_grader.invoke({"question": question, "document": doc.page_content})
     # print(f"score: {score}")
@@ -314,40 +296,6 @@ def grade_document_based_on_relevance(conn, question, doc, models, selected):
         conn.send(None)
     
     conn.close()
-
-def grade_documents_using_parallel_processing(question, documents):
-    global selected_chat
-    
-    filtered_docs = []    
-
-    processes = []
-    parent_connections = []
-    
-    for i, doc in enumerate(documents):
-        #print(f"grading doc[{i}]: {doc.page_content}")        
-        parent_conn, child_conn = Pipe()
-        parent_connections.append(parent_conn)
-            
-        process = Process(target=grade_document_based_on_relevance, args=(child_conn, question, doc, multi_region_models, selected_chat))
-        processes.append(process)
-
-        selected_chat = selected_chat + 1
-        if selected_chat == length_of_models:
-            selected_chat = 0
-    for process in processes:
-        process.start()
-            
-    for parent_conn in parent_connections:
-        relevant_doc = parent_conn.recv()
-
-        if relevant_doc is not None:
-            filtered_docs.append(relevant_doc)
-
-    for process in processes:
-        process.join()
-    
-    #print('filtered_docs: ', filtered_docs)
-    return filtered_docs
 
 class GradeDocuments(BaseModel):
     """Binary score for relevance check on retrieved documents."""
@@ -378,33 +326,29 @@ def grade_documents(question, documents):
     
     if grade_state == "LLM":
         filtered_docs = []
-        if multi_region == 'enable':  # parallel processing        
-            filtered_docs = grade_documents_using_parallel_processing(question, documents)
+        # Score each doc    
+        chat = get_chat()
+        retrieval_grader = get_retrieval_grader(chat)
+        for i, doc in enumerate(documents):
+            # print('doc: ', doc)
+            print_doc(i, doc)
+            
+            score = retrieval_grader.invoke({"question": question, "document": doc.page_content})
+            # print("score: ", score)
+            
+            grade = score.binary_score
+            # print("grade: ", grade)
+            # Document relevant
+            if grade.lower() == "yes":
+                print("---GRADE: DOCUMENT RELEVANT---")
+                filtered_docs.append(doc)
+            # Document not relevant
+            else:
+                print("---GRADE: DOCUMENT NOT RELEVANT---")
+                # We do not include the document in filtered_docs
+                # We set a flag to indicate that we want to run web search
+                continue
 
-        else:
-            # Score each doc    
-            chat = get_chat()
-            retrieval_grader = get_retrieval_grader(chat)
-            for i, doc in enumerate(documents):
-                # print('doc: ', doc)
-                print_doc(i, doc)
-                
-                score = retrieval_grader.invoke({"question": question, "document": doc.page_content})
-                # print("score: ", score)
-                
-                grade = score.binary_score
-                # print("grade: ", grade)
-                # Document relevant
-                if grade.lower() == "yes":
-                    print("---GRADE: DOCUMENT RELEVANT---")
-                    filtered_docs.append(doc)
-                # Document not relevant
-                else:
-                    print("---GRADE: DOCUMENT NOT RELEVANT---")
-                    # We do not include the document in filtered_docs
-                    # We set a flag to indicate that we want to run web search
-                    continue
-    
     else:  # OTHERS
         filtered_docs = documents
 
@@ -478,12 +422,78 @@ try:
     secret = json.loads(get_tavily_api_secret['SecretString'])
     #print('secret: ', secret)
     tavily_key = secret['tavily_api_key']
-    #print('tavily_key: ', tavily_key)
+    #print('tavily_api_key: ', tavily_api_key)
+
+    tavily_api_wrapper = TavilySearchAPIWrapper(tavily_api_key=tavily_key)
+    #     os.environ["TAVILY_API_KEY"] = tavily_key
+
+    # Tavily Tool Test
+    query = 'what is Amazon Nova Pro?'
+    search = TavilySearchResults(
+        max_results=1,
+        include_answer=True,
+        include_raw_content=True,
+        api_wrapper=tavily_api_wrapper,
+        search_depth="advanced", # "basic"
+        # include_domains=["google.com", "naver.com"]
+    )
+    output = search.invoke(query)
+    print('tavily output: ', output)    
 except Exception as e: 
+    print('Tavily credential is required: ', e)
     raise e
 
-if tavily_key:
-    os.environ["TAVILY_API_KEY"] = tavily_key
+def get_references(docs):    
+    reference = ""
+    for i, doc in enumerate(docs):
+        page = ""
+        if "page" in doc.metadata:
+            page = doc.metadata['page']
+            #print('page: ', page)            
+        url = ""
+        if "url" in doc.metadata:
+            url = doc.metadata['url']
+            print('url: ', url)
+        name = ""
+        if "name" in doc.metadata:
+            name = doc.metadata['name']
+            #print('name: ', name)     
+        
+        sourceType = ""
+        if "from" in doc.metadata:
+            sourceType = doc.metadata['from']
+        else:
+            # if useEnhancedSearch:
+            #     sourceType = "OpenSearch"
+            # else:
+            #     sourceType = "WWW"
+            sourceType = "WWW"
+
+        #print('sourceType: ', sourceType)        
+        
+        #if len(doc.page_content)>=1000:
+        #    excerpt = ""+doc.page_content[:1000]
+        #else:
+        #    excerpt = ""+doc.page_content
+        excerpt = ""+doc.page_content
+        # print('excerpt: ', excerpt)
+        
+        # for some of unusual case 
+        #excerpt = excerpt.replace('"', '')        
+        #excerpt = ''.join(c for c in excerpt if c not in '"')
+        excerpt = re.sub('"', '', excerpt)
+        excerpt = re.sub('#', '', excerpt)        
+        print('excerpt(quotation removed): ', excerpt)
+        
+        if page:                
+            reference += f"{i+1}. {page}page in [{name}]({url})), {excerpt[:30]}...\n"
+        else:
+            reference += f"{i+1}. [{name}]({url}), {excerpt[:30]}...\n"
+
+    if reference: 
+        reference = "\n\n#### 관련 문서\n"+reference
+
+    return reference
 
 def tavily_search(query, k):
     docs = []    
@@ -596,10 +606,6 @@ def general_conversation(query):
     return stream
 
 
-####################### LangGraph #######################
-# RAG: Knowledge Base
-#########################################################
-
 os_client = OpenSearch(
     hosts = [{
         'host': opensearch_url.replace("https://", ""), 
@@ -610,6 +616,7 @@ os_client = OpenSearch(
     verify_certs = True,
     connection_class=RequestsHttpConnection,
 )
+
 def is_not_exist(index_name):    
     print('index_name: ', index_name)
         
@@ -677,7 +684,7 @@ def initiate_knowledge_base():
                         }                  
                     },
                     "AMAZON_BEDROCK_METADATA": {"type": "text", "index": False},
-                    "AMAZON_BEDROCK_TEXT_CHUNK": {"type": "text"},
+                    "AMAZON_BEDROCK_TEXT": {"type": "text"},
                 }
             }
         }
@@ -709,7 +716,6 @@ def initiate_knowledge_base():
             service_name='bedrock-agent',
             region_name=bedrock_region
         )   
-
         response = client.list_knowledge_bases(
             maxResults=10
         )
@@ -727,7 +733,7 @@ def initiate_knowledge_base():
                     
     if not knowledge_base_id:
         print('creating knowledge base...')        
-        for atempt in range(3):
+        for atempt in range(20):
             try:
                 response = client.create_knowledge_base(
                     name=knowledge_base_name,
@@ -750,7 +756,7 @@ def initiate_knowledge_base():
                             'collectionArn': collectionArn,
                             'fieldMapping': {
                                 'metadataField': 'AMAZON_BEDROCK_METADATA',
-                                'textField': 'AMAZON_BEDROCK_TEXT_CHUNK',
+                                'textField': 'AMAZON_BEDROCK_TEXT',
                                 'vectorField': 'vector_field'
                             },
                             'vectorIndexName': vectorIndexName
@@ -776,7 +782,7 @@ def initiate_knowledge_base():
     #########################
     # data source      
     #########################
-    data_source_name = bucketName  
+    data_source_name = s3_bucket  
     try: 
         response = client.list_data_sources(
             knowledgeBaseId=knowledge_base_id,
@@ -809,7 +815,7 @@ def initiate_knowledge_base():
                     },
                     'type': 'S3'
                 },
-                description = f"S3 data source: {bucketName}",
+                description = f"S3 data source: {s3_bucket}",
                 knowledgeBaseId = knowledge_base_id,
                 name = data_source_name,
                 vectorIngestionConfiguration={
@@ -863,11 +869,16 @@ def retrieve_documents_from_knowledge_base(query, top_k):
             region_name=bedrock_region
         )
         
-        documents = retriever.invoke(query)
-        # print('docs: ', docs)
-        print('--> docs from knowledge base')
-        for i, doc in enumerate(documents):
-            print_doc(i, doc)
+        try: 
+            documents = retriever.invoke(query)
+            # print('documents: ', documents)
+            print('--> docs from knowledge base')
+            for i, doc in enumerate(documents):
+                print_doc(i, doc)
+        except Exception:
+            err_msg = traceback.format_exc()
+            print('error message: ', err_msg)    
+            raise Exception ("Not able to request to LLM: "+err_msg)
         
         relevant_docs = []
         for doc in documents:
@@ -886,14 +897,14 @@ def retrieve_documents_from_knowledge_base(query, top_k):
                 name = link[pos+len(doc_prefix)+1:]
                 encoded_name = parse.quote(name)
                 # print('name:', name)
-                link = f"{path}{doc_prefix}{encoded_name}"
+                link = f"{path}/{doc_prefix}{encoded_name}"
                 
             elif "webLocation" in doc.metadata["location"]:
                 link = doc.metadata["location"]["webLocation"]["url"] if doc.metadata["location"]["webLocation"]["url"] is not None else ""
                 name = "WEB"
 
             url = link
-            # print('url:', url)
+            print('url:', url)
             
             relevant_docs.append(
                 Document(
@@ -908,558 +919,160 @@ def retrieve_documents_from_knowledge_base(query, top_k):
             )    
     return relevant_docs
 
-def generate_answer_using_RAG(chat, context, revised_question):    
-    if isKorean(revised_question)==True:
-        system = (
-            """다음의 <context> tag안의 참고자료를 이용하여 상황에 맞는 구체적인 세부 정보를 충분히 제공합니다. Assistant의 이름은 서연이고, 모르는 질문을 받으면 솔직히 모른다고 말합니다.
-            
-            <context>
-            {context}
-            </context>"""
-        )
-    else: 
-        system = (
-            """Here is pieces of context, contained in <context> tags. Provide a concise answer to the question at the end. If you don't know the answer, just say that you don't know, don't try to make up an answer.
-            
-            <context>
-            {context}
-            </context>"""
-        )
+def sync_data_source():
+    if knowledge_base_id and data_source_id:
+        try:
+            client = boto3.client(
+                service_name='bedrock-agent',
+                region_name=bedrock_region                
+            )
+            response = client.start_ingestion_job(
+                knowledgeBaseId=knowledge_base_id,
+                dataSourceId=data_source_id
+            )
+            print('(start_ingestion_job) response: ', response)
+        except Exception:
+            err_msg = traceback.format_exc()
+            print('error message: ', err_msg)
+
+def get_rag_prompt(text):
+    # print("###### get_rag_prompt ######")
+    chat = get_chat()
+    # print('model_type: ', model_type)
     
-    human = "{input}"
+    if model_type == "nova":
+        if isKorean(text)==True:
+            system = (
+                "당신의 이름은 서연이고, 질문에 대해 친절하게 답변하는 사려깊은 인공지능 도우미입니다."
+                "다음의 Reference texts을 이용하여 user의 질문에 답변합니다."
+                "모르는 질문을 받으면 솔직히 모른다고 말합니다."
+                "답변의 이유를 풀어서 명확하게 설명합니다."
+            )
+        else: 
+            system = (
+                "You will be acting as a thoughtful advisor."
+                "Provide a concise answer to the question at the end using reference texts." 
+                "If you don't know the answer, just say that you don't know, don't try to make up an answer."
+                "You will only answer in text format, using markdown format is not allowed."
+            )    
     
+        human = (
+            "Question: {question}"
+
+            "Reference texts: "
+            "{context}"
+        ) 
+        
+    elif model_type == "claude":
+        if isKorean(text)==True:
+            system = (
+                "당신의 이름은 서연이고, 질문에 대해 친절하게 답변하는 사려깊은 인공지능 도우미입니다."
+                "다음의 <context> tag안의 참고자료를 이용하여 상황에 맞는 구체적인 세부 정보를 충분히 제공합니다." 
+                "모르는 질문을 받으면 솔직히 모른다고 말합니다."
+                "답변의 이유를 풀어서 명확하게 설명합니다."
+                "결과는 <result> tag를 붙여주세요."
+            )
+        else: 
+            system = (
+                "You will be acting as a thoughtful advisor."
+                "Here is pieces of context, contained in <context> tags." 
+                "If you don't know the answer, just say that you don't know, don't try to make up an answer."
+                "You will only answer in text format, using markdown format is not allowed."
+                "Put it in <result> tags."
+            )    
+
+        human = (
+            "<question>"
+            "{question}"
+            "</question>"
+
+            "<context>"
+            "{context}"
+            "</context>"
+        )
+
     prompt = ChatPromptTemplate.from_messages([("system", system), ("human", human)])
     # print('prompt: ', prompt)
-                   
-    chain = prompt | chat
     
-    try: 
-        output = chain.invoke(
-            {
-                "context": context,
-                "input": revised_question,
-            }
-        )
-        msg = output.content
-        print('msg: ', msg)
-        
-    except Exception:
-        err_msg = traceback.format_exc()
-        print('error message: ', err_msg)    
-        raise Exception ("Not able to request to LLM: "+err_msg)
+    rag_chain = prompt | chat
 
-    return msg
+    return rag_chain
 
-def run_rag_with_knowledge_base(text):
-    global reference_docs
+def run_rag_with_knowledge_base(text, st):
+    global reference_docs, contentList
+    reference_docs = []
+    contentList = []
 
     chat = get_chat()
     
-    msg = reference = ""
+    msg = ""
     top_k = numberOfDocs
     
     # retrieve
-    relevant_docs = retrieve_documents_from_knowledge_base(text, top_k)
+    if debug_mode == "Enable":
+        st.info(f"RAG 검색을 수행합니다. 검색어: {text}")  
+    
+    relevant_docs = retrieve_documents_from_knowledge_base(text, top_k=top_k)
+    # relevant_docs += retrieve_documents_from_tavily(text, top_k=top_k)
 
-    # grade  
-    filtered_docs = grade_documents(text, relevant_docs)    
+    # grade   
+    if debug_mode == "Enable":
+        st.info(f"가져온 {len(relevant_docs)}개의 문서를 평가하고 있습니다.") 
+
+    # docs = []
+    # for doc in relevant_docs:
+    #     chat = get_chat()
+    #     if not isKorean(doc.page_content):
+    #         translated_content = traslation(chat, doc.page_content, "English", "Korean")
+    #         doc.page_content = translated_content
+    #         print("doc.page_content: ", doc.page_content)
+    #     docs.append(doc)
+    # print('translated relevant docs: ', docs)
+
+    filtered_docs = grade_documents(text, relevant_docs)
     
     filtered_docs = check_duplication(filtered_docs) # duplication checker
-            
-    relevant_context = ""
-    for i, document in enumerate(filtered_docs):
-        print(f"{i}: {document}")
-        if document.page_content:
-            content = document.page_content
-            
-        relevant_context = relevant_context + content + "\n\n"
-        
-    print('relevant_context: ', relevant_context)
 
-    # generate
-    msg = generate_answer_using_RAG(chat, relevant_context, text)
-    
     if len(filtered_docs):
         reference_docs += filtered_docs 
-            
-    return msg
 
-
-####################### LangGraph #######################
-# Agentic Workflow: Tool Use
-#########################################################
-
-@tool 
-def get_book_list(keyword: str) -> str:
-    """
-    Search book list by keyword and then return book list
-    keyword: search keyword
-    return: book list
-    """
+    if debug_mode == "Enable":
+        st.info(f"{len(filtered_docs)}개의 문서가 선택되었습니다.")
     
-    keyword = keyword.replace('\'','')
+    # generate
+    if debug_mode == "Enable":
+        st.info(f"결과를 생성중입니다.")
+    relevant_context = ""
+    for document in filtered_docs:
+        relevant_context = relevant_context + document.page_content + "\n\n"        
+    # print('relevant_context: ', relevant_context)
 
-    answer = ""
-    url = f"https://search.kyobobook.co.kr/search?keyword={keyword}&gbCode=TOT&target=total"
-    response = requests.get(url)
-    if response.status_code == 200:
-        soup = BeautifulSoup(response.text, "html.parser")
-        prod_info = soup.find_all("a", attrs={"class": "prod_info"})
-        
-        if len(prod_info):
-            answer = "추천 도서는 아래와 같습니다.\n"
-            
-        for prod in prod_info[:5]:
-            title = prod.text.strip().replace("\n", "")       
-            link = prod.get("href")
-            answer = answer + f"{title}, URL: {link}\n\n"
-    
-    return answer
-
-@tool
-def get_current_time(format: str=f"%Y-%m-%d %H:%M:%S")->str:
-    """Returns the current date and time in the specified format"""
-    # f"%Y-%m-%d %H:%M:%S"
-    
-    format = format.replace('\'','')
-    timestr = datetime.datetime.now(timezone('Asia/Seoul')).strftime(format)
-    print('timestr:', timestr)
-    
-    return timestr
-
-@tool
-def get_weather_info(city: str) -> str:
-    """
-    retrieve weather information by city name and then return weather statement.
-    city: the name of city to retrieve
-    return: weather statement
-    """    
-    
-    city = city.replace('\n','')
-    city = city.replace('\'','')
-    city = city.replace('\"','')
-                
-    chat = get_chat()
-    if isKorean(city):
-        place = traslation(chat, city, "Korean", "English")
-        print('city (translated): ', place)
-    else:
-        place = city
-        city = traslation(chat, city, "English", "Korean")
-        print('city (translated): ', city)
-        
-    print('place: ', place)
-    
-    weather_str: str = f"{city}에 대한 날씨 정보가 없습니다."
-    if weather_api_key: 
-        apiKey = weather_api_key
-        lang = 'en' 
-        units = 'metric' 
-        api = f"https://api.openweathermap.org/data/2.5/weather?q={place}&APPID={apiKey}&lang={lang}&units={units}"
-        # print('api: ', api)
-                
-        try:
-            result = requests.get(api)
-            result = json.loads(result.text)
-            print('result: ', result)
-        
-            if 'weather' in result:
-                overall = result['weather'][0]['main']
-                current_temp = result['main']['temp']
-                min_temp = result['main']['temp_min']
-                max_temp = result['main']['temp_max']
-                humidity = result['main']['humidity']
-                wind_speed = result['wind']['speed']
-                cloud = result['clouds']['all']
-                
-                weather_str = f"{city}의 현재 날씨의 특징은 {overall}이며, 현재 온도는 {current_temp} 입니다. 현재 습도는 {humidity}% 이고, 바람은 초당 {wind_speed} 미터 입니다. 구름은 {cloud}% 입니다."                
-                #weather_str = f"{city}의 현재 날씨의 특징은 {overall}이며, 현재 온도는 {current_temp}도 이고, 최저온도는 {min_temp}도, 최고 온도는 {max_temp}도 입니다. 현재 습도는 {humidity}% 이고, 바람은 초당 {wind_speed} 미터 입니다. 구름은 {cloud}% 입니다."
-                #weather_str = f"Today, the overall of {city} is {overall}, current temperature is {current_temp} degree, min temperature is {min_temp} degree, highest temperature is {max_temp} degree. huminity is {humidity}%, wind status is {wind_speed} meter per second. the amount of cloud is {cloud}%."            
-        except Exception:
-            err_msg = traceback.format_exc()
-            print('error message: ', err_msg)   
-            # raise Exception ("Not able to request to LLM")    
-        
-    print('weather_str: ', weather_str)                            
-    return weather_str
-
-@tool
-def search_by_tavily(keyword: str) -> str:
-    """
-    Search general information by keyword and then return the result as a string.
-    keyword: search keyword
-    return: the information of keyword
-    """    
-    global reference_docs    
-    answer = ""
-    
-    if tavily_key:
-        keyword = keyword.replace('\'','')
-        
-        search = TavilySearchResults(
-            max_results=3,
-            include_answer=True,
-            include_raw_content=True,
-            search_depth="advanced", # "basic"
-            include_domains=["google.com", "naver.com"]
-        )
-                    
-        try: 
-            output = search.invoke(keyword)
-            print('tavily output: ', output)
-            
-            for result in output:
-                print('result: ', result)
-                if result:
-                    content = result.get("content")
-                    url = result.get("url")
-                    
-                    reference_docs.append(
-                        Document(
-                            page_content=content,
-                            metadata={
-                                'name': 'WWW',
-                                'url': url,
-                                'from': 'tavily'
-                            },
-                        )
-                    )                
-                    answer = answer + f"{content}, URL: {url}\n"
-        
-        except Exception:
-            err_msg = traceback.format_exc()
-            print('error message: ', err_msg)           
-            # raise Exception ("Not able to request to tavily")   
-        
-    return answer
-
-tools = [get_current_time, get_book_list, get_weather_info, search_by_tavily]        
-
-def run_agent_executor(query, st, debugMode):
-    chatModel = get_chat() 
-    
-    model = chatModel.bind_tools(tools)
-
-    class State(TypedDict):
-        # messages: Annotated[Sequence[BaseMessage], operator.add]
-        messages: Annotated[list, add_messages]
-
-    tool_node = ToolNode(tools)
-
-    def should_continue(state: State) -> Literal["continue", "end"]:
-        print("###### should_continue ######")
-        messages = state["messages"]    
-        print('last_message: ', messages[-1])
-        
-        last_message = messages[-1]
-        if not last_message.tool_calls:
-            return "end"
-        else:                
-            return "continue"
-
-    def call_model(state: State, config):
-        print("###### call_model ######")
-        # print('state: ', state["messages"])
-                
-        if isKorean(state["messages"][0].content)==True:
-            system = (
-                "당신의 이름은 서연이고, 질문에 친근한 방식으로 대답하도록 설계된 대화형 AI입니다."
-                "상황에 맞는 구체적인 세부 정보를 충분히 제공합니다."
-                "모르는 질문을 받으면 솔직히 모른다고 말합니다."
-                "최종 답변에는 조사한 내용을 반드시 포함합니다."
-            )
-        else: 
-            system = (            
-                "You are a conversational AI designed to answer in a friendly way to a question."
-                "If you don't know the answer, just say that you don't know, don't try to make up an answer."
-                "You will be acting as a thoughtful advisor."    
-            )
-                
-        try:
-            prompt = ChatPromptTemplate.from_messages(
-                [
-                    ("system", system),
-                    MessagesPlaceholder(variable_name="messages"),
-                ]
-            )
-            chain = prompt | model
-                
-            response = chain.invoke(state["messages"])
-            print('call_model response: ', response)
-        
-            for re in response.content:
-                if "type" in re:
-                    if re['type'] == 'text':
-                        print(f"--> {re['type']}: {re['text']}")
-
-                        status = re['text']
-                        if status.find('<thinking>') != -1:
-                            print('Remove <thinking> tag.')
-                            status = status[status.find('<thinking>')+11:status.find('</thinking>')]
-                            print('status without tag: ', status)
-
-                        if debugMode=="Debug":
-                            st.info(status)
-
-                    elif re['type'] == 'tool_use':                
-                        print(f"--> {re['type']}: {re['name']}, {re['input']}")
-
-                        if debugMode=="Debug":
-                            st.info(f"{re['type']}: {re['name']}, {re['input']}")
-                    else:
-                        print(re)
-                else: # answer
-                    print(response.content)
-                    break
-        except Exception:
-            response = AIMessage(content="답변을 찾지 못하였습니다.")
-
-            err_msg = traceback.format_exc()
-            print('error message: ', err_msg)
-            # raise Exception ("Not able to request to LLM")
-
-        return {"messages": [response]}
-
-    def buildChatAgent():
-        workflow = StateGraph(State)
-
-        workflow.add_node("agent", call_model)
-        workflow.add_node("action", tool_node)
-        workflow.add_edge(START, "agent")
-        workflow.add_conditional_edges(
-            "agent",
-            should_continue,
+    rag_chain = get_rag_prompt(text)
+                       
+    msg = ""    
+    try: 
+        result = rag_chain.invoke(
             {
-                "continue": "action",
-                "end": END,
-            },
-        )
-        workflow.add_edge("action", "agent")
-
-        return workflow.compile()
-
-    app = buildChatAgent()
-            
-    inputs = [HumanMessage(content=query)]
-    config = {
-        "recursion_limit": 50
-    }
-    
-    message = ""
-    for event in app.stream({"messages": inputs}, config, stream_mode="values"):   
-        # print('event: ', event)
-        
-        message = event["messages"][-1]
-        # print('message: ', message)
-
-    msg = message.content
-
-    #return msg[msg.find('<result>')+8:len(msg)-9]
-    return msg
-
-def run_agent_executor2(query, st, debugMode):        
-    class State(TypedDict):
-        messages: Annotated[list, add_messages]
-        answer: str
-
-    tool_node = ToolNode(tools)
-            
-    def create_agent(chat, tools):        
-        tool_names = ", ".join([tool.name for tool in tools])
-        print("tool_names: ", tool_names)
-
-        system = (
-            "당신의 이름은 서연이고, 질문에 친근한 방식으로 대답하도록 설계된 대화형 AI입니다."
-            "상황에 맞는 구체적인 세부 정보를 충분히 제공합니다."
-            "모르는 질문을 받으면 솔직히 모른다고 말합니다."
-
-            "Use the provided tools to progress towards answering the question."
-            "If you are unable to fully answer, that's OK, another assistant with different tools "
-            "will help where you left off. Execute what you can to make progress."
-            "You have access to the following tools: {tool_names}."
-        )
-
-        prompt = ChatPromptTemplate.from_messages(
-            [
-                ("system",system),
-                MessagesPlaceholder(variable_name="messages"),
-            ]
-        )
-        
-        prompt = prompt.partial(tool_names=tool_names)
-        
-        return prompt | chat.bind_tools(tools)
-    
-    def agent_node(state, agent, name):
-        print(f"###### agent_node:{name} ######")
-
-        last_message = state["messages"][-1]
-        print('last_message: ', last_message)
-        if isinstance(last_message, ToolMessage) and last_message.content=="":    
-            print('last_message is empty') 
-            answer = get_basic_answer(state["messages"][0].content)  
-            return {
-                "messages": [AIMessage(content=answer)],
-                "answer": answer
+                "question": text,
+                "context": relevant_context                
             }
-        
-        response = agent.invoke(state["messages"])
-        print('response: ', response)
-
-        if "answer" in state:
-            answer = state['answer']
-        else:
-            answer = ""
-
-        for re in response.content:
-            if "type" in re:
-                if re['type'] == 'text':
-                    print(f"--> {re['type']}: {re['text']}")
-
-                    status = re['text']
-                    if status.find('<thinking>') != -1:
-                        print('Remove <thinking> tag.')
-                        status = status[status.find('<thinking>')+11:status.find('</thinking>')]
-                        print('status without tag: ', status)
-
-                    if debugMode=="Debug":
-                        st.info(status)
-
-                elif re['type'] == 'tool_use':                
-                    print(f"--> {re['type']}: name: {re['name']}, input: {re['input']}")
-
-                    if debugMode=="Debug":
-                        st.info(f"{re['type']}: name: {re['name']}, input: {re['input']}")
-                else:
-                    print(re)
-            else: # answer
-                answer += '\n'+response.content
-                print(response.content)
-                break
-
-        response = AIMessage(**response.dict(exclude={"type", "name"}), name=name)     
-        print('message: ', response)
-        
-        return {
-            "messages": [response],
-            "answer": answer
-        }
-    
-    def final_answer(state):
-        print(f"###### final_answer ######")        
-
-        answer = ""        
-        if "answer" in state:
-            answer = state['answer']            
-        else:
-            answer = state["messages"][-1].content
-
-        if answer.find('<thinking>') != -1:
-            print('Remove <thinking> tag.')
-            answer = answer[answer.find('</thinking>')+12:]
-        print('answer: ', answer)
-        
-        return {
-            "answer": answer
-        }
-    
-    chat = get_chat()
-    
-    execution_agent = create_agent(chat, tools)
-    
-    execution_agent_node = functools.partial(agent_node, agent=execution_agent, name="execution_agent")
-    
-    def should_continue(state: State, config) -> Literal["continue", "end"]:
-        print("###### should_continue ######")
-        messages = state["messages"]    
-        # print('(should_continue) messages: ', messages)
-        
-        last_message = messages[-1]        
-        if not last_message.tool_calls:
-            print("Final: ", last_message.content)
-            print("--- END ---")
-            return "end"
-        else:      
-            print(f"tool_calls: ", last_message.tool_calls)
-
-            for message in last_message.tool_calls:
-                print(f"tool name: {message['name']}, args: {message['args']}")
-                # update_state_message(f"calling... {message['name']}", config)
-
-            print(f"--- CONTINUE: {last_message.tool_calls[-1]['name']} ---")
-            return "continue"
-
-    def buildAgentExecutor():
-        workflow = StateGraph(State)
-
-        workflow.add_node("agent", execution_agent_node)
-        workflow.add_node("action", tool_node)
-        workflow.add_node("final_answer", final_answer)
-        
-        workflow.add_edge(START, "agent")
-        workflow.add_conditional_edges(
-            "agent",
-            should_continue,
-            {
-                "continue": "action",
-                "end": "final_answer",
-            },
         )
-        workflow.add_edge("action", "agent")
-        workflow.add_edge("final_answer", END)
+        print('result: ', result)
 
-        return workflow.compile()
-
-    app = buildAgentExecutor()
-            
-    inputs = [HumanMessage(content=query)]
-    config = {"recursion_limit": 50}
-    
-    msg = ""
-    # for event in app.stream({"messages": inputs}, config, stream_mode="values"):   
-    #     # print('event: ', event)
+        msg = result.content        
+        if msg.find('<result>')!=-1:
+            msg = msg[msg.find('<result>')+8:msg.find('</result>')]
         
-    #     if "answer" in event:
-    #         msg = event["answer"]
-    #     else:
-    #         msg = event["messages"][-1].content
-    #     # print('message: ', message)
-
-    output = app.invoke({"messages": inputs}, config)
-    print('output: ', output)
-
-    msg = output['answer']
-
-    return msg
-
-def get_basic_answer(query):
-    print('#### get_basic_answer ####')
-    chat = get_chat()
-
-    if isKorean(query)==True:
-        system = (
-            "당신의 이름은 서연이고, 질문에 대해 친절하게 답변하는 사려깊은 인공지능 도우미입니다."
-            "상황에 맞는 구체적인 세부 정보를 충분히 제공합니다." 
-            "모르는 질문을 받으면 솔직히 모른다고 말합니다."
-        )
-    else: 
-        system = (
-            "You will be acting as a thoughtful advisor."
-            "Using the following conversation, answer friendly for the newest question." 
-            "If you don't know the answer, just say that you don't know, don't try to make up an answer."     
-        )    
+    except Exception:
+        err_msg = traceback.format_exc()
+        print('error message: ', err_msg)                    
+        raise Exception ("Not able to request to LLM")
     
-    human = "Question: {input}"    
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", system), 
-        ("human", human)
-    ])    
-    
-    chain = prompt | chat    
-    output = chain.invoke({"input": query})
-    print('output.content: ', output.content)
+    reference = ""
+    if reference_docs:
+        reference = get_references(reference_docs)
 
-    return output.content
+    return msg+reference, reference_docs
 
 
 ####################### Prompt Flow #######################
@@ -1729,7 +1342,7 @@ def run_bedrock_agent(text, connectionId, requestId, userId, sessionState):
                         
                         s3_client = boto3.client('s3')  
                         response = s3_client.put_object(
-                            Bucket=bucketName,
+                            Bucket=s3_bucket,
                             Key=img_key,
                             ContentType=contentType,
                             Body=pixels
@@ -1753,10 +1366,6 @@ def run_bedrock_agent(text, connectionId, requestId, userId, sessionState):
         
     return msg+msg_contents
 
-####################### LangChain #######################
-# Image Analysis
-#########################################################
-
 def upload_to_s3(file_bytes, file_name):
     """
     Upload a file to S3 and return the URL
@@ -1766,24 +1375,50 @@ def upload_to_s3(file_bytes, file_name):
             service_name='s3',
             region_name=bedrock_region
         )
-
         # Generate a unique file name to avoid collisions
         #timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         #unique_id = str(uuid.uuid4())[:8]
         #s3_key = f"uploaded_images/{timestamp}_{unique_id}_{file_name}"
         s3_key = f"{s3_prefix}/{file_name}"
 
-        content_type = (
-            "image/jpeg"
-            if file_name.lower().endswith((".jpg", ".jpeg"))
-            else "image/png"
+        if file_name.lower().endswith((".jpg", ".jpeg")):
+            content_type = "image/jpeg"
+        elif file_name.lower().endswith((".pdf")):
+            content_type = "application/pdf"
+        elif file_name.lower().endswith((".txt")):
+            content_type = "text/plain"
+        elif file_name.lower().endswith((".csv")):
+            content_type = "text/csv"
+        elif file_name.lower().endswith((".ppt", ".pptx")):
+            content_type = "application/vnd.ms-powerpoint"
+        elif file_name.lower().endswith((".doc", ".docx")):
+            content_type = "application/msword"
+        elif file_name.lower().endswith((".xls")):
+            content_type = "application/vnd.ms-excel"
+        elif file_name.lower().endswith((".py")):
+            content_type = "text/x-python"
+        elif file_name.lower().endswith((".js")):
+            content_type = "application/javascript"
+        elif file_name.lower().endswith((".md")):
+            content_type = "text/markdown"
+        elif file_name.lower().endswith((".png")):
+            content_type = "image/png"
+        
+        user_meta = {  # user-defined metadata
+            "content_type": content_type,
+            "model_name": model_name
+        }
+        
+        response = s3_client.put_object(
+            Bucket=s3_bucket, 
+            Key=s3_key, 
+            ContentType=content_type,
+            Metadata = user_meta,
+            Body=file_bytes            
         )
+        print('upload response: ', response)
 
-        s3_client.put_object(
-            Bucket=bucketName, Key=s3_key, Body=file_bytes, ContentType=content_type
-        )
-
-        url = f"https://{bucketName}.s3.amazonaws.com/{s3_key}"
+        url = f"https://{s3_bucket}.s3.amazonaws.com/{s3_key}"
         return url
     
     except Exception as e:
@@ -1817,71 +1452,143 @@ def extract_and_display_s3_images(text, s3_client):
 
     return images
 
-def summary_image(object_name, prompt):
-    # load image
-    s3_client = boto3.client(
-        service_name='s3',
-        region_name=bedrock_region
-    )
-                    
-    image_obj = s3_client.get_object(Bucket=bucketName, Key=s3_prefix+'/'+object_name)
-    # print('image_obj: ', image_obj)
-    
-    image_content = image_obj['Body'].read()
-    img = Image.open(BytesIO(image_content))
-    
-    width, height = img.size 
-    print(f"width: {width}, height: {height}, size: {width*height}")
-    
-    isResized = False
-    while(width*height > 5242880):                    
-        width = int(width/2)
-        height = int(height/2)
-        isResized = True
-        print(f"width: {width}, height: {height}, size: {width*height}")
-    
-    if isResized:
-        img = img.resize((width, height))
-    
-    buffer = BytesIO()
-    img.save(buffer, format="PNG")
-    img_base64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
-    
-    if prompt == "":
-        command = "이미지에 포함된 내용을 요약해 주세요."
-    else:
-        command = prompt
-    
-    # verify the image
-    msg = use_multimodal(img_base64, command)
+# load csv documents from s3
+def load_csv_document(s3_file_name):
+    s3r = boto3.resource("s3")
+    doc = s3r.Object(s3_bucket, s3_prefix+'/'+s3_file_name)
 
-    return msg, img_base64
-
-def use_multimodal(img_base64, query):    
-    multimodal = get_chat()
+    lines = doc.get()['Body'].read().decode('utf-8').split('\n')   # read csv per line
+    print('lins: ', len(lines))
+        
+    columns = lines[0].split(',')  # get columns
+    #columns = ["Category", "Information"]  
+    #columns_to_metadata = ["type","Source"]
+    print('columns: ', columns)
     
-    if query == "":
-        query = "그림에 대해 상세히 설명해줘."
-    
-    messages = [
-        SystemMessage(content="답변은 500자 이내의 한국어로 설명해주세요."),
-        HumanMessage(
-            content=[
-                {
-                    "type": "image_url",
-                    "image_url": {
-                        "url": f"data:image/png;base64,{img_base64}", 
-                    },
-                },
-                {
-                    "type": "text", "text": query
-                },
-            ]
+    docs = []
+    n = 0
+    for row in csv.DictReader(lines, delimiter=',',quotechar='"'):
+        # print('row: ', row)
+        #to_metadata = {col: row[col] for col in columns_to_metadata if col in row}
+        values = {k: row[k] for k in columns if k in row}
+        content = "\n".join(f"{k.strip()}: {v.strip()}" for k, v in values.items())
+        doc = Document(
+            page_content=content,
+            metadata={
+                'name': s3_file_name,
+                'row': n+1,
+            }
+            #metadata=to_metadata
         )
-    ]
+        docs.append(doc)
+        n = n+1
+    print('docs[0]: ', docs[0])
+
+    return docs
+
+def get_summary(docs):    
+    chat = get_chat()
+
+    text = ""
+    for doc in docs:
+        text = text + doc
     
+    if isKorean(text)==True:
+        system = (
+            "다음의 <article> tag안의 문장을 요약해서 500자 이내로 설명하세오."
+        )
+    else: 
+        system = (
+            "Here is pieces of article, contained in <article> tags. Write a concise summary within 500 characters."
+        )
+    
+    human = "<article>{text}</article>"
+    
+    prompt = ChatPromptTemplate.from_messages([("system", system), ("human", human)])
+    # print('prompt: ', prompt)
+    
+    chain = prompt | chat    
     try: 
-        result = multimodal.invoke(messages)
+        result = chain.invoke(
+            {
+                "text": text
+            }
+        )
+        
+        summary = result.content
+        print('result of summarization: ', summary)
+    except Exception:
+        err_msg = traceback.format_exc()
+        print('error message: ', err_msg)                    
+        raise Exception ("Not able to request to LLM")
+    
+    return summary
+
+# load documents from s3 for pdf and txt
+def load_document(file_type, s3_file_name):
+    s3r = boto3.resource("s3")
+    doc = s3r.Object(s3_bucket, s3_prefix+'/'+s3_file_name)
+    
+    contents = ""
+    if file_type == 'pdf':
+        contents = doc.get()['Body'].read()
+        reader = PyPDF2.PdfReader(BytesIO(contents))
+        
+        raw_text = []
+        for page in reader.pages:
+            raw_text.append(page.extract_text())
+        contents = '\n'.join(raw_text)    
+        
+    elif file_type == 'txt' or file_type == 'md':        
+        contents = doc.get()['Body'].read().decode('utf-8')
+        
+    print('contents: ', contents)
+    new_contents = str(contents).replace("\n"," ") 
+    print('length: ', len(new_contents))
+
+    text_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=1000,
+        chunk_overlap=100,
+        separators=["\n\n", "\n", ".", " ", ""],
+        length_function = len,
+    ) 
+    texts = text_splitter.split_text(new_contents) 
+    if texts:
+        print('texts[0]: ', texts[0])
+    
+    return texts
+
+def summary_of_code(code, mode):
+    if mode == 'py':
+        system = (
+            "다음의 <article> tag에는 python code가 있습니다."
+            "code의 전반적인 목적에 대해 설명하고, 각 함수의 기능과 역할을 자세하게 한국어 500자 이내로 설명하세요."
+        )
+    elif mode == 'js':
+        system = (
+            "다음의 <article> tag에는 node.js code가 있습니다." 
+            "code의 전반적인 목적에 대해 설명하고, 각 함수의 기능과 역할을 자세하게 한국어 500자 이내로 설명하세요."
+        )
+    else:
+        system = (
+            "다음의 <article> tag에는 code가 있습니다."
+            "code의 전반적인 목적에 대해 설명하고, 각 함수의 기능과 역할을 자세하게 한국어 500자 이내로 설명하세요."
+        )
+    
+    human = "<article>{code}</article>"
+    
+    prompt = ChatPromptTemplate.from_messages([("system", system), ("human", human)])
+    # print('prompt: ', prompt)
+    
+    chat = get_chat()
+
+    chain = prompt | chat    
+    try: 
+        result = chain.invoke(
+            {
+                "code": code
+            }
+        )
         
         summary = result.content
         print('result of code summarization: ', summary)
@@ -1892,9 +1599,14 @@ def use_multimodal(img_base64, query):
     
     return summary
 
-def extract_text(img_base64):    
-    multimodal = get_chat()
-    query = "그림의 텍스트와 표를 Markdown Format으로 추출합니다."
+def summary_image(img_base64, instruction):      
+    chat = get_chat()
+
+    if instruction:
+        print('instruction: ', instruction)  
+        query = f"{instruction}. <result> tag를 붙여주세요."
+    else:
+        query = "이미지가 의미하는 내용을 풀어서 자세히 알려주세요. markdown 포맷으로 답변을 작성합니다."
     
     messages = [
         HumanMessage(
@@ -1912,21 +1624,186 @@ def extract_text(img_base64):
         )
     ]
     
-    try: 
-        result = multimodal.invoke(messages)
+    for attempt in range(5):
+        print('attempt: ', attempt)
+        try: 
+            result = chat.invoke(messages)
+            
+            extracted_text = result.content
+            # print('summary from an image: ', extracted_text)
+            break
+        except Exception:
+            err_msg = traceback.format_exc()
+            print('error message: ', err_msg)                    
+            raise Exception ("Not able to request to LLM")
         
-        extracted_text = result.content
-        print('result of text extraction from an image: ', extracted_text)
-    except Exception:
-        err_msg = traceback.format_exc()
-        print('error message: ', err_msg)                    
-        raise Exception ("Not able to request to LLM")
+    return extracted_text
+
+def extract_text(img_base64):    
+    multimodal = get_chat()
+    query = "텍스트를 추출해서 markdown 포맷으로 변환하세요. <result> tag를 붙여주세요."
     
-    #extracted_text = text[text.find('<result>')+8:text.find('</result>')] # remove <result> tag
+    messages = [
+        HumanMessage(
+            content=[
+                {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:image/png;base64,{img_base64}", 
+                    },
+                },
+                {
+                    "type": "text", "text": query
+                },
+            ]
+        )
+    ]
+    
+    for attempt in range(5):
+        print('attempt: ', attempt)
+        try: 
+            result = multimodal.invoke(messages)
+            
+            extracted_text = result.content
+            # print('result of text extraction from an image: ', extracted_text)
+            break
+        except Exception:
+            err_msg = traceback.format_exc()
+            print('error message: ', err_msg)                    
+            raise Exception ("Not able to request to LLM")
+    
     print('extracted_text: ', extracted_text)
-    if len(extracted_text)>10:
-        msg = f"{extracted_text}\n"    
-    else:
-        msg = "텍스트를 추출하지 못하였습니다."    
+    if len(extracted_text)<10:
+        extracted_text = "텍스트를 추출하지 못하였습니다."    
+
+    return extracted_text
+
+fileId = uuid.uuid4().hex
+# print('fileId: ', fileId)
+def get_summary_of_uploaded_file(file_name, st):
+    file_type = file_name[file_name.rfind('.')+1:len(file_name)]            
+    print('file_type: ', file_type)
     
+    if file_type == 'csv':
+        docs = load_csv_document(file_name)
+        contexts = []
+        for doc in docs:
+            contexts.append(doc.page_content)
+        print('contexts: ', contexts)
+    
+        msg = get_summary(contexts)
+
+    elif file_type == 'pdf' or file_type == 'txt' or file_type == 'md' or file_type == 'pptx' or file_type == 'docx':
+        texts = load_document(file_type, file_name)
+
+        if len(texts):
+            docs = []
+            for i in range(len(texts)):
+                docs.append(
+                    Document(
+                        page_content=texts[i],
+                        metadata={
+                            'name': file_name,
+                            # 'page':i+1,
+                            'url': path+'/'+doc_prefix+parse.quote(file_name)
+                        }
+                    )
+                )
+            print('docs[0]: ', docs[0])    
+            print('docs size: ', len(docs))
+
+            contexts = []
+            for doc in docs:
+                contexts.append(doc.page_content)
+            print('contexts: ', contexts)
+
+            msg = get_summary(contexts)
+        else:
+            msg = "문서 로딩에 실패하였습니다."
+        
+    elif file_type == 'py' or file_type == 'js':
+        s3r = boto3.resource("s3")
+        doc = s3r.Object(s3_bucket, s3_prefix+'/'+file_name)
+        
+        contents = doc.get()['Body'].read().decode('utf-8')
+        
+        #contents = load_code(file_type, object)                
+                        
+        msg = summary_of_code(contents, file_type)                  
+        
+    elif file_type == 'png' or file_type == 'jpeg' or file_type == 'jpg':
+        print('multimodal: ', file_name)
+        
+        s3_client = boto3.client(
+            service_name='s3',
+            region_name=bedrock_region
+        )             
+        if debug_mode=="Enable":
+            status = "이미지를 가져옵니다."
+            print('status: ', status)
+            st.info(status)
+            
+        image_obj = s3_client.get_object(Bucket=s3_bucket, Key=s3_prefix+'/'+file_name)
+        # print('image_obj: ', image_obj)
+        
+        image_content = image_obj['Body'].read()
+        img = Image.open(BytesIO(image_content))
+        
+        width, height = img.size 
+        print(f"width: {width}, height: {height}, size: {width*height}")
+        
+        isResized = False
+        while(width*height > 5242880):                    
+            width = int(width/2)
+            height = int(height/2)
+            isResized = True
+            print(f"width: {width}, height: {height}, size: {width*height}")
+        
+        if isResized:
+            img = img.resize((width, height))
+        
+        buffer = BytesIO()
+        img.save(buffer, format="PNG")
+        img_base64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
+               
+        # extract text from the image
+        if debug_mode=="Enable":
+            status = "이미지에서 텍스트를 추출합니다."
+            print('status: ', status)
+            st.info(status)
+        
+        text = extract_text(img_base64)
+        # print('extracted text: ', text)
+
+        if text.find('<result>') != -1:
+            extracted_text = text[text.find('<result>')+8:text.find('</result>')] # remove <result> tag
+            # print('extracted_text: ', extracted_text)
+        else:
+            extracted_text = text
+
+        if debug_mode=="Enable":
+            status = f"### 추출된 텍스트\n\n{extracted_text}"
+            print('status: ', status)
+            st.info(status)
+    
+        if debug_mode=="Enable":
+            status = "이미지의 내용을 분석합니다."
+            print('status: ', status)
+            st.info(status)
+
+        image_summary = summary_image(img_base64, "")
+        print('image summary: ', image_summary)
+            
+        if len(extracted_text) > 10:
+            contents = f"## 이미지 분석\n\n{image_summary}\n\n## 추출된 텍스트\n\n{extracted_text}"
+        else:
+            contents = f"## 이미지 분석\n\n{image_summary}"
+        print('image contents: ', contents)
+
+        msg = contents
+
+    global fileId
+    fileId = uuid.uuid4().hex
+    # print('fileId: ', fileId)
+
     return msg

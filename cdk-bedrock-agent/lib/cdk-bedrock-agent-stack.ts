@@ -448,6 +448,21 @@ export class CdkBedrockAgentStack extends cdk.Stack {
       description: 'The domain name of the Distribution'
     });
     
+    // cloudfront for sharing s3
+    const distribution_sharing = new cloudFront.Distribution(this, `sharing-for-${projectName}`, {
+      defaultBehavior: {
+        origin: origins.S3BucketOrigin.withOriginAccessControl(s3Bucket),
+        allowedMethods: cloudFront.AllowedMethods.ALLOW_ALL,
+        cachePolicy: cloudFront.CachePolicy.CACHING_DISABLED,
+        viewerProtocolPolicy: cloudFront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+      },
+      priceClass: cloudFront.PriceClass.PRICE_CLASS_200,  
+    });
+    new cdk.CfnOutput(this, `distribution-sharing-DomainName-for-${projectName}`, {
+      value: 'https://'+distribution_sharing.domainName,
+      description: 'The domain name of the Distribution Sharing',
+    });
+
     const userData = ec2.UserData.forLinux();
 
     const environment = {
@@ -457,7 +472,8 @@ export class CdkBedrockAgentStack extends cdk.Stack {
       "knowledge_base_role": knowledge_base_role.roleArn,
       "collectionArn": collectionArn,
       "opensearch_url": OpenSearchCollection.attrCollectionEndpoint,
-      "s3_arn": s3Bucket.bucketArn
+      "s3_arn": s3Bucket.bucketArn,
+      "sharing_url": 'https://'+distribution_sharing.domainName
     }    
     new cdk.CfnOutput(this, `environment-for-${projectName}`, {
       value: JSON.stringify(environment),
@@ -488,6 +504,7 @@ EOF"`,
         `runuser -l ec2-user -c 'cat <<EOF > /home/ec2-user/.streamlit/config.toml
 [server]
 port=${targetPort}
+maxUploadSize = 50
 
 [theme]
 base="dark"
@@ -496,7 +513,7 @@ EOF'`,
       `json='${JSON.stringify(environment)}' && echo "$json">/home/config.json`,
       `runuser -l ec2-user -c 'cd && git clone https://github.com/kyopark2014/${projectName}'`,
       `runuser -l ec2-user -c 'pip install streamlit streamlit_chat beautifulsoup4 pytz tavily-python'`,        
-      `runuser -l ec2-user -c 'pip install boto3 langchain_aws langchain langchain_community langgraph opensearch-py'`,
+      `runuser -l ec2-user -c 'pip install boto3 langchain_aws langchain langchain_community langgraph opensearch-py PyPDF2'`,
       'systemctl enable streamlit.service',
       'systemctl start streamlit'
     ];    

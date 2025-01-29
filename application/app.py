@@ -32,7 +32,7 @@ with st.sidebar:
     st.title("🔮 Menu")
     
     st.markdown(
-        "Amazon Nova Pro를 이용해 다양한 형태의 대화를 구현합니다." 
+        "Amazon Bedrock을 이용해 다양한 형태의 대화를 구현합니다." 
         "여기에서는 일상적인 대화와 각종 툴을 이용해 Agent를 구현할 수 있습니다." 
         "또한 번역이나 문법 확인과 같은 용도로 사용할 수 있습니다."
         "주요 코드는 LangChain과 LangGraph를 이용해 구현되었습니다.\n"
@@ -61,14 +61,68 @@ with st.sidebar:
 
     print('mode: ', mode)
 
-    st.subheader("🌇 이미지 업로드")
-    uploaded_file = st.file_uploader("이미지 선택", type=["png", "jpg", "jpeg"])
+    # model selection box
+    modelName = st.selectbox(
+        '🖊️ 사용 모델을 선택하세요',
+        ('Nova Pro', 'Nova Lite', 'Nova Micro', 'Claude 3.5 Sonnet', 'Claude 3.0 Sonnet', 'Claude 3.5 Haiku')
+    )
 
-    st.success("Connected to Nova Pro", icon="💚")
+    # debug checkbox
+    select_debugMode = st.checkbox('Debug Mode', value=True)
+    debugMode = 'Enable' if select_debugMode else 'Disable'
+    #print('debugMode: ', debugMode)
+
+    chat.update(modelName, debugMode)
+
+    st.subheader("📋 문서 업로드")
+    # print('fileId: ', chat.fileId)
+    uploaded_file = st.file_uploader("RAG를 위한 파일을 선택합니다.", type=["pdf", "txt", "py", "md", "csv"], key=chat.fileId)
+
+    st.success(f"Connected to {modelName}", icon="💚")
     clear_button = st.button("대화 초기화", key="clear")
     print('clear_button: ', clear_button)
 
 st.title('🔮 '+ mode)
+
+# Initialize chat history
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+    st.session_state.greetings = False
+
+if clear_button==True:
+    chat.initiate()
+
+# Preview the uploaded image in the sidebar
+file_name = ""
+if uploaded_file is not None and clear_button==False:
+    if uploaded_file.name:
+        chat.initiate()
+
+        if debugMode=='Enable':
+            status = '선택한 파일을 업로드합니다.'
+            print('status: ', status)
+            st.info(status)
+
+        file_name = uploaded_file.name
+        file_url = chat.upload_to_s3(uploaded_file.getvalue(), file_name)
+        print('file_url: ', file_url) 
+
+        chat.sync_data_source()  # sync uploaded files
+            
+        status = f'선택한 "{file_name}"의 내용을 요약합니다.'
+        # my_bar = st.sidebar.progress(0, text=status)
+        
+        # for percent_complete in range(100):
+        #     time.sleep(0.2)
+        #     my_bar.progress(percent_complete + 1, text=status)
+        if debugMode=='Enable':
+            print('status: ', status)
+            st.info(status)
+    
+        msg = chat.get_summary_of_uploaded_file(file_name, st)
+        st.session_state.messages.append({"role": "assistant", "content": f"선택한 문서({file_name})를 요약하면 아래와 같습니다.\n\n{msg}"})    
+        print('msg: ', msg)
+        st.rerun()
 
 # Initialize chat history
 if "messages" not in st.session_state:
@@ -85,6 +139,13 @@ def display_chat_messages() -> None:
             st.markdown(message["content"])
 
 display_chat_messages()
+
+def show_references(reference_docs):
+    if debugMode == "Enable" and reference_docs:
+        with st.expander(f"답변에서 참조한 {len(reference_docs)}개의 문서입니다."):
+            for i, doc in enumerate(reference_docs):
+                st.markdown(f"**{doc.metadata['name']}**: {doc.page_content}")
+                st.markdown("---")
 
 # Greet user
 if not st.session_state.greetings:
@@ -103,15 +164,7 @@ if clear_button or "messages" not in st.session_state:
     st.rerun()
 
     chat.clear_chat_history()
-file_name = ""
-# Preview the uploaded image in the sidebar
-if uploaded_file and clear_button==False and mode == '이미지 분석':
-    st.image(uploaded_file, caption="이미지 미리보기", use_container_width=True)
 
-    file_name = uploaded_file.name
-    image_url = chat.upload_to_s3(uploaded_file.getvalue(), file_name)
-    print('image_url: ', image_url)
-        
 # Always show the chat input
 if prompt := st.chat_input("메시지를 입력하세요."):
     with st.chat_message("user"):  # display user message in chat message container
@@ -130,32 +183,19 @@ if prompt := st.chat_input("메시지를 입력하세요."):
 
             chat.save_chat_history(prompt, response)
 
-        elif mode == 'Agentic Workflow (Tool Use)':
-            with st.status("thinking...", expanded=True, state="running") as status:
-                response = chat.run_agent_executor2(prompt, st, debugMode)
-                st.write(response)
-                print('response: ', response)
-
-                if response.find('<thinking>') != -1:
-                    print('Remove <thinking> tag.')
-                    response = response[response.find('</thinking>')+12:]
-                    print('response without tag: ', response)
-
-                st.session_state.messages.append({"role": "assistant", "content": response})
-                st.rerun()
-
-                chat.save_chat_history(prompt, response)
-
         elif mode == 'RAG':
-            with st.status("thinking...", expanded=True, state="running") as status:
-                response = chat.run_rag_with_knowledge_base(prompt)        
+            with st.status("running...", expanded=True, state="running") as status:
+                response, reference_docs = chat.run_rag_with_knowledge_base(prompt, st)                           
                 st.write(response)
                 print('response: ', response)
 
                 st.session_state.messages.append({"role": "assistant", "content": response})
-                st.rerun()
+                if debugMode != "Enable":
+                    st.rerun()
 
                 chat.save_chat_history(prompt, response)
+            
+            show_references(reference_docs) 
 
         elif mode == 'Flow':
             with st.status("thinking...", expanded=True, state="running") as status:
@@ -192,28 +232,6 @@ if prompt := st.chat_input("메시지를 입력하세요."):
 
             st.session_state.messages.append({"role": "assistant", "content": response})
             chat.save_chat_history(prompt, response)
-
-        elif mode == '이미지 분석':
-            if uploaded_file is None or uploaded_file == "":
-                st.error("파일을 먼저 업로드하세요.")
-                st.stop()
-
-            else:                
-                with st.status("thinking...", expanded=True, state="running") as status:
-                    summary, img_base64 = chat.summary_image(file_name, prompt)
-                    st.write(summary)
-                    print('summary: ', summary)
-                    st.session_state.messages.append({"role": "assistant", "content": summary})
-
-                    chat.save_chat_history(prompt, summary)
-
-                    text = chat.extract_text(img_base64)
-                    st.write(text)
-                    st.session_state.messages.append({"role": "assistant", "content": text})
-
-                    st.rerun()
-
-                    chat.save_chat_history(prompt, text)
 
         else:
             stream = chat.general_conversation(prompt)
