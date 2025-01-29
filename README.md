@@ -19,6 +19,46 @@
 ### Agentic Workflow
 
 
+### 활용 방법
+
+EC2는 Private Subnet에 있으므로 SSL로 접속할 수 없습니다. 따라서, [Console-EC2](https://us-west-2.console.aws.amazon.com/ec2/home?region=us-west-2#Instances:)에 접속하여 "app-for-bedrock-agent"를 선택한 후에 Connect에서 sesseion manager를 선택하여 접속합니다. 
+
+Github에서 app에 대한 코드를 업데이트 하였다면, session manager에 접속하여 아래 명령어로 업데이트 합니다. 
+
+```text
+sudo runuser -l ec2-user -c 'cd /home/ec2-user/bedrock-agent && git pull'
+```
+
+Streamlit의 재시작이 필요하다면 아래 명령어로 service를 stop/start 시키고 동작을 확인할 수 있습니다.
+
+```text
+sudo systemctl stop streamlit
+sudo systemctl start streamlit
+sudo systemctl status streamlit -l
+```
+
+Local에서 디버깅을 빠르게 진행하고 싶다면 [Local에서 실행하기](https://github.com/kyopark2014/llm-streamlit/blob/main/deployment.md#local%EC%97%90%EC%84%9C-%EC%8B%A4%ED%96%89%ED%95%98%EA%B8%B0)에 따라서 Local에 필요한 패키지와 환경변수를 업데이트 합니다. 이후 아래 명령어서 실행합니다.
+
+```text
+streamlit run application/app.py
+```
+
+EC2에서 debug을 하면서 개발할때 사용하는 명령어입니다.
+
+먼저, 시스템에 등록된 streamlit을 종료합니다.
+
+```text
+sudo systemctl stop streamlit
+```
+
+이후 EC2를 session manager를 이용해 접속한 이후에 아래 명령어를 이용해 실행하면 로그를 보면서 수정을 할 수 있습니다. 
+
+```text
+sudo runuser -l ec2-user -c "/home/ec2-user/.local/bin/streamlit run /home/ec2-user/bedrock-agent/application/app.py"
+```
+
+
+
 
 ## 직접 실습 해보기
 
