@@ -472,6 +472,7 @@ export class CdkBedrockAgentStack extends cdk.Stack {
       "knowledge_base_role": knowledge_base_role.roleArn,
       "collectionArn": collectionArn,
       "opensearch_url": OpenSearchCollection.attrCollectionEndpoint,
+      "s3_bucket": s3Bucket.bucketName,      
       "s3_arn": s3Bucket.bucketArn,
       "sharing_url": 'https://'+distribution_sharing.domainName
     }    
