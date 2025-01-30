@@ -95,3 +95,9 @@ cd ~/bedrock-agent/cdk-bedrock-agent && cdk destroy --all
 [On AWS CDK and Agents for Amazon Bedrock](https://medium.com/@micheldirk/aws-cdk-and-agents-for-amazon-bedrock-e313be7543fe)
 
 [Bedrock Agents-Based AI AppBuilder Assistant with Boto3 SDK](https://github.com/aws-samples/application-builder-assistant-using-bedrock-agents-and-multiple-knowledge-bases/blob/main/ai_appbuilder_assistant/BedrockAgents_AI_AppBuilder_Assistant.ipynb)
+
+[Agents for Amazon Bedrock - create agent](https://github.com/aws-samples/amazon-nova-samples/blob/main/multimodal-understanding/workshop/4.1_create_agent.ipynb)
+
+[AWS re:Invent 2024 - Building an AWS solutions architect agentic app with Amazon Bedrock (DEV331)](https://www.youtube.com/watch?v=XPHOybnXCd4&t=1589s)
+
+[Building Agentic Workflows on AWS](https://catalog.workshops.aws/building-agentic-workflows/en-US)
