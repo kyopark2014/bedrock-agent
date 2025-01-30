@@ -1303,26 +1303,26 @@ def run_bedrock_agent(text, st):
             time.sleep(5)            
             
             # associate knowledge base            
-            # if knowledge_base_id:
-            #     rag_prompt = (
-            #         "당신의 이름은 서연이고, 질문에 대해 친절하게 답변하는 사려깊은 인공지능 도우미입니다."
-            #         "다음의 Reference texts을 이용하여 user의 질문에 답변합니다."
-            #         "모르는 질문을 받으면 솔직히 모른다고 말합니다."
-            #         "답변의 이유를 풀어서 명확하게 설명합니다."
-            #     )
-            #     try: 
-            #         response = client.associate_agent_knowledge_base(
-            #             agentId=agent_id,
-            #             agentVersion='DRAFT',
-            #             description=rag_prompt,
-            #             knowledgeBaseId=knowledge_base_id,
-            #             knowledgeBaseState='ENABLED'
-            #         )
-            #         print(f'response of associate_agent_knowledge_base(): {response}')
-            #         time.sleep(5) # delay 5 seconds
-            #     except Exception:
-            #         err_msg = traceback.format_exc()
-            #         print(f'error message: {err_msg}')  
+            if knowledge_base_id:
+                rag_prompt = (
+                    "당신의 이름은 서연이고, 질문에 대해 친절하게 답변하는 사려깊은 인공지능 도우미입니다."
+                    "다음의 Reference texts을 이용하여 user의 질문에 답변합니다."
+                    "모르는 질문을 받으면 솔직히 모른다고 말합니다."
+                    "답변의 이유를 풀어서 명확하게 설명합니다."
+                )
+                try: 
+                    response = client.associate_agent_knowledge_base(
+                        agentId=agent_id,
+                        agentVersion='DRAFT',
+                        description=rag_prompt,
+                        knowledgeBaseId=knowledge_base_id,
+                        knowledgeBaseState='ENABLED'
+                    )
+                    print(f'response of associate_agent_knowledge_base(): {response}')
+                    time.sleep(5) # delay 5 seconds
+                except Exception:
+                    err_msg = traceback.format_exc()
+                    print(f'error message: {err_msg}')  
 
             # preparing
             try:
