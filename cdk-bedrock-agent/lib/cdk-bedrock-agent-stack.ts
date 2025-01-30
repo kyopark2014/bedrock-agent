@@ -463,6 +463,38 @@ export class CdkBedrockAgentStack extends cdk.Stack {
       description: 'The domain name of the Distribution Sharing',
     });
 
+    // agent role
+    const agent_role = new iam.Role(this,  `role-agent-for-${projectName}`, {
+      roleName: `role-agent-for-${projectName}-${region}`,
+      assumedBy: new iam.CompositePrincipal(
+        new iam.ServicePrincipal("bedrock.amazonaws.com")
+      )
+    });
+    
+    const agentInvokePolicy = new iam.PolicyStatement({ 
+      effect: iam.Effect.ALLOW,
+      resources: [
+        `arn:aws:bedrock:${region}::foundation-model/amazon.nova-pro-v1:0`,
+        `arn:aws:bedrock:${region}::foundation-model/amazon.nova-lite-v1:0`,
+        `arn:aws:bedrock:${region}::foundation-model/amazon.nova-micro-v1:0`,
+        `arn:aws:bedrock:${region}::foundation-model/anthropic.claude-3-5-sonnet-20241022-v2:0`,
+        `arn:aws:bedrock:${region}::foundation-model/anthropic.claude-3-sonnet-20240229-v1:0`,
+        `arn:aws:bedrock:${region}::foundation-model/anthropic.claude-3-5-haiku-20241022-v1:0`
+      ],
+      // resources: ['*'],
+      actions: [
+        "bedrock:InvokeModel", 
+        "bedrock:InvokeModelEndpoint", 
+        "bedrock:InvokeModelEndpointAsync",        
+      ],
+    });        
+    agent_role.attachInlinePolicy( 
+      new iam.Policy(this, `agent-invoke-policy-for-${projectName}`, {
+        statements: [agentInvokePolicy],
+      }),
+    );  
+
+    // user data for setting EC2
     const userData = ec2.UserData.forLinux();
 
     const environment = {
@@ -471,6 +503,7 @@ export class CdkBedrockAgentStack extends cdk.Stack {
       "region": region,
       "knowledge_base_role": knowledge_base_role.roleArn,
       "collectionArn": collectionArn,
+      "agent_role_arn": agent_role.roleArn,
       "opensearch_url": OpenSearchCollection.attrCollectionEndpoint,
       "s3_bucket": s3Bucket.bucketName,      
       "s3_arn": s3Bucket.bucketArn,

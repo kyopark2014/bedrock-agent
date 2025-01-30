@@ -1249,12 +1249,16 @@ def run_RAG_prompt_flow(text, connectionId, requestId):
 
 agent_id = agent_alias_id = None
 sessionId = dict() 
+agent_name = projectName
 def run_bedrock_agent(text, connectionId, requestId, userId, sessionState):
     global agent_id, agent_alias_id
     print('agent_id: ', agent_id)
     print('agent_alias_id: ', agent_alias_id)
     
-    client = boto3.client(service_name='bedrock-agent')  
+    client = boto3.client(
+        service_name='bedrock-agent',
+        region_name=bedrock_region
+    )  
     if not agent_id:
         response_agent = client.list_agents(
             maxResults=10
@@ -1262,10 +1266,14 @@ def run_bedrock_agent(text, connectionId, requestId, userId, sessionState):
         print('response of list_agents(): ', response_agent)
         
         for summary in response_agent["agentSummaries"]:
-            if summary["agentName"] == "tool-executor":
+            if summary["agentName"] == agent_name:
                 agent_id = summary["agentId"]
                 print('agent_id: ', agent_id)
                 break
+
+        if not agent_id:
+            # create
+            
     
     if not agent_alias_id and agent_id:
         response_agent_alias = client.list_agent_aliases(
