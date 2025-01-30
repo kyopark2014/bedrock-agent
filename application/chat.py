@@ -1255,6 +1255,7 @@ agent_id = agent_alias_id = None
 sessionId = dict() 
 agent_name = projectName
 sessionState = ""
+agent_alias_name = "latest_version"
 def run_bedrock_agent(text):
     global agent_id, agent_alias_id
     print('agent_id: ', agent_id)
@@ -1285,10 +1286,7 @@ def run_bedrock_agent(text):
             )
             # modelId = "us.amazon.nova-pro-v1:0"
             modelId = 'anthropic.claude-3-5-sonnet-20241022-v2:0'
-
-            #'foundationModel': 'anthropic.claude-3-5-sonnet-20241022-v2:0'
             print('modelId: ', modelId)
-            agent_model = f"arn:aws:bedrock:{region}::foundation-model/{modelId}"
 
             response = client.create_agent(
                 agentResourceRoleArn=agent_role_arn,
@@ -1299,12 +1297,50 @@ def run_bedrock_agent(text):
                 idleSessionTTLInSeconds=600
             )
             print('response of create_agent(): ', response)
-    
-        response = client.get_agent(
-            agentId=agent_id
-        )
-        print('response of get_agent(): ', response)
 
+            agent_id = response['agent']['agentId']
+            print('agent_id: ', agent_id)
+            time.sleep(5)            
+
+            # associate knowledge base            
+            if knowledge_base_id:
+                rag_prompt = (
+                    "당신의 이름은 서연이고, 질문에 대해 친절하게 답변하는 사려깊은 인공지능 도우미입니다."
+                    "다음의 Reference texts을 이용하여 user의 질문에 답변합니다."
+                    "모르는 질문을 받으면 솔직히 모른다고 말합니다."
+                    "답변의 이유를 풀어서 명확하게 설명합니다."
+                )
+                try: 
+                    response = client.associate_agent_knowledge_base(
+                        agentId=agent_id,
+                        agentVersion='DRAFT',
+                        description=rag_prompt,
+                        knowledgeBaseId=knowledge_base_id,
+                        knowledgeBaseState='ENABLED'
+                    )
+                    print(f'response of associate_agent_knowledge_base(): {response}')
+                    time.sleep(5) # delay 5 seconds
+                except Exception:
+                    err_msg = traceback.format_exc()
+                    print(f'error message: {err_msg}')  
+
+            # preparing
+            try:
+                response = client.prepare_agent(
+                    agentId=agent_id
+                )
+                print('response of prepare_agent(): ', response)      
+                time.sleep(5) # delay 5 seconds
+
+            except Exception:
+                err_msg = traceback.format_exc()
+                print(f'error message: {err_msg}')                      
+                                
+        # else:
+        #     response = client.get_agent(
+        #         agentId=agent_id
+        #     )
+        #     print('response of get_agent(): ', response)
     
     if not agent_alias_id and agent_id:
         response_agent_alias = client.list_agent_aliases(
@@ -1312,13 +1348,36 @@ def run_bedrock_agent(text):
             maxResults=10
         )
         print('response of list_agent_aliases(): ', response_agent_alias)   
-        
+
         for summary in response_agent_alias["agentAliasSummaries"]:
-            if summary["agentAliasName"] == "latest_version":
+            if summary["agentAliasName"] == agent_alias_name:                
                 agent_alias_id = summary["agentAliasId"]
                 print('agent_alias_id: ', agent_alias_id) 
+
+                if summary["agentAliasStatus"] is not "PREPARED":
+                    try: # preparing                        
+                        response = client.prepare_agent(
+                            agentId=agent_id
+                        )
+                        print('response of prepare_agent(): ', response)
+                        time.sleep(5) # delay 5 seconds
+                    except Exception:
+                        err_msg = traceback.format_exc()
+                        print(f'error message: {err_msg}')
                 break
-    
+        
+        if not agent_alias_id:
+            response = client.create_agent_alias(
+                agentAliasName=agent_alias_name,
+                agentId=agent_id,
+                description='lastest deployment'
+            )
+            print('response of create_agent_alias(): ', response)
+
+            agent_alias_id = response['agentAlias']['agentAliasId']
+            print('agent_alias_id: ', agent_alias_id)
+            time.sleep(5) # delay 5 seconds
+
     global sessionId
     if not userId in sessionId:
         sessionId[userId] = str(uuid.uuid4())
