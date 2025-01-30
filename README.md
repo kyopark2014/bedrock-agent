@@ -93,3 +93,5 @@ cd ~/bedrock-agent/cdk-bedrock-agent && cdk destroy --all
 [generative-ai-cdk-constructs](https://awslabs.github.io/generative-ai-cdk-constructs/src/cdk-lib/bedrock/#knowledge-bases)
 
 [On AWS CDK and Agents for Amazon Bedrock](https://medium.com/@micheldirk/aws-cdk-and-agents-for-amazon-bedrock-e313be7543fe)
+
+[Bedrock Agents-Based AI AppBuilder Assistant with Boto3 SDK](https://github.com/aws-samples/application-builder-assistant-using-bedrock-agents-and-multiple-knowledge-bases/blob/main/ai_appbuilder_assistant/BedrockAgents_AI_AppBuilder_Assistant.ipynb)
