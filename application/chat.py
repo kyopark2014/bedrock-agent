@@ -1260,6 +1260,9 @@ def run_bedrock_agent(text, st):
     global agent_id, agent_alias_id
     print('agent_id: ', agent_id)
     print('agent_alias_id: ', agent_alias_id)
+
+    global reference_docs
+    reference_docs = []
     
     client = boto3.client(
         service_name='bedrock-agent',
@@ -1402,8 +1405,8 @@ def run_bedrock_agent(text, st):
         sessionId[userId] = str(uuid.uuid4())
 
     if agent_alias_id and agent_id:
-        # if debug_mode=="Enable":
-        #     st.info('답변을 기다립니다.')
+        if debug_mode=="Enable":
+            st.info('답변을 생성하고 있습니다.')
 
         client_runtime = boto3.client(            
             service_name='bedrock-agent-runtime',
@@ -1415,6 +1418,7 @@ def run_bedrock_agent(text, st):
                     agentAliasId=agent_alias_id,
                     agentId=agent_id,
                     inputText=text, 
+                    enableTrace=True,
                     sessionId=sessionId[userId], 
                     memoryId='memory-'+userId,
                     sessionState=sessionState
@@ -1424,6 +1428,7 @@ def run_bedrock_agent(text, st):
                     agentAliasId=agent_alias_id,
                     agentId=agent_id,
                     inputText=text, 
+                    enableTrace=True,
                     sessionId=sessionId[userId], 
                     memoryId='memory-'+userId
                 )
@@ -1437,7 +1442,6 @@ def run_bedrock_agent(text, st):
                 if "chunk" in event:
                     chunk = event.get('chunk')
                     answer = chunk["bytes"].decode()
-                    st.markdown(answer)
 
                     result += answer
                         
@@ -1452,11 +1456,56 @@ def run_bedrock_agent(text, st):
                                 "name": file["name"],
                                 "bytes": file["bytes"],
                             }
-                        )                                                            
+                        ) 
+                         
+                if 'trace' in event:
+                    trace = event['trace']['trace']
+                    # print('trace: ', trace)
+
+                    if 'orchestrationTrace' in trace:                        
+                        orchestrationTrace = trace['orchestrationTrace']
+                        # print('orchestrationTrace: ', orchestrationTrace)
+
+                        if "observation" in orchestrationTrace:
+                            observation = orchestrationTrace['observation']
+                            # print('observation: ', observation)
+                            
+                            if 'knowledgeBaseLookupOutput' in observation:
+                                retrievedReferences = observation['knowledgeBaseLookupOutput']['retrievedReferences']
+                                # print('retrievedReferences: ', retrievedReferences)
+                                
+                                for ref in retrievedReferences:
+                                    content = ref['content']['text']
+                                    # print('content: ', content)
+                                    uri = ref['location']['s3Location']['uri']
+                                    # print('uri: ', uri)
+
+                                    name = uri.split('/')[-1]
+                                    encoded_name = parse.quote(name)
+                                    url = f"{path}/{doc_prefix}{encoded_name}"
+                                    # print('url: ', url)
+
+                                    reference_docs.append(
+                                        Document(
+                                            page_content=content,
+                                            metadata={
+                                                'name': name,
+                                                'url': url,
+                                                'from': 'RAG'
+                                            },
+                                        )
+                                    )    
+            print('reference_docs: ', reference_docs)
+            
         except Exception as e:
             raise Exception("unexpected event.",e)
         
-    return result
+        reference = ""
+        if reference_docs:
+            reference = get_references(reference_docs)
+        print('reference: ', reference)        
+    
+    return result+reference, reference_docs
 
 def upload_to_s3(file_bytes, file_name):
     """
