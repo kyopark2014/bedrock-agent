@@ -473,9 +473,7 @@ export class CdkBedrockAgentStack extends cdk.Stack {
     const agentInvokePolicy = new iam.PolicyStatement({ 
       effect: iam.Effect.ALLOW,
       resources: [
-        `arn:aws:bedrock:us-west-2::foundation-model/*`,
-        `arn:aws:bedrock:us-east-1::foundation-model/*`,
-        `arn:aws:bedrock:us-east-2::foundation-model/*`,
+        `arn:aws:bedrock:*::foundation-model/*`
       ],
       actions: [
         "bedrock:InvokeModel"
@@ -499,6 +497,24 @@ export class CdkBedrockAgentStack extends cdk.Stack {
     agent_role.attachInlinePolicy( 
       new iam.Policy(this, `bedrock-retrieve-policy-for-${projectName}`, {
         statements: [bedrockRetrievePolicy],
+      }),
+    );  
+
+    const agentInferencePolicy = new iam.PolicyStatement({ 
+      effect: iam.Effect.ALLOW,
+      resources: [
+        `arn:aws:bedrock:${region}:${accountId}:inference-profile/*`,
+        `arn:aws:bedrock:*::foundation-model/*`
+      ],
+      actions: [
+        "bedrock:InvokeModel",
+        "bedrock:GetInferenceProfile",
+        "bedrock:GetFoundationModel"
+      ],
+    });        
+    agent_role.attachInlinePolicy( 
+      new iam.Policy(this, `agent-inference-policy-for-${projectName}`, {
+        statements: [agentInferencePolicy],
       }),
     );  
 
