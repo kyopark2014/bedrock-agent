@@ -160,3 +160,5 @@ cd ~/bedrock-agent/cdk-bedrock-agent && cdk destroy --all
 [AWS re:Invent 2024 - Building an AWS solutions architect agentic app with Amazon Bedrock (DEV331)](https://www.youtube.com/watch?v=XPHOybnXCd4&t=1589s)
 
 [Building Agentic Workflows on AWS](https://catalog.workshops.aws/building-agentic-workflows/en-US)
+
+[Building an AWS Solutions Architect Agentic App with Amazon Bedrock](https://github.com/build-on-aws/agentic-workshop/tree/main/reinvent_2024_agentic)
