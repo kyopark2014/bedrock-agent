@@ -5,9 +5,6 @@ mode_descriptions = {
     "일상적인 대화": [
         "대화이력을 바탕으로 챗봇과 일상의 대화를 편안히 즐길수 있습니다."
     ],
-    "Agentic Workflow (Tool Use)": [
-        "Agent를 이용해 다양한 툴을 사용할 수 있습니다. 여기에서는 날씨, 시간, 도서추천, 인터넷 검색을 제공합니다."
-    ],
     "RAG": [
         "Bedrock Knowledge Base를 이용해 구현한 RAG로 필요한 정보를 검색합니다."
     ],
@@ -22,9 +19,6 @@ mode_descriptions = {
     ],
     "문법 검토하기": [
         "영어와 한국어 문법의 문제점을 설명하고, 수정된 결과를 함께 제공합니다."
-    ],
-    "이미지 분석": [
-        "이미지를 업로드하면 이미지의 내용을 요약할 수 있습니다."
     ]
 }
 
@@ -43,21 +37,9 @@ with st.sidebar:
     
     # radio selection
     mode = st.radio(
-        label="원하는 대화 형태를 선택하세요. ",options=["일상적인 대화", "RAG", "Flow", "Agent", "번역하기", "문법 검토하기", '이미지 분석'], index=0
+        label="원하는 대화 형태를 선택하세요. ",options=["일상적인 대화", "RAG", "Flow", "Agent", "번역하기", "문법 검토하기"], index=0
     )   
     st.info(mode_descriptions[mode][0])
-    # limit = st.slider(
-    #     label="Number of cards",
-    #     min_value=1,
-    #     max_value=mode_descriptions[mode][2],
-    #     value=6,
-    # )
-
-    # selectionbox
-    # option = st.selectbox(
-    #     '🖊️ 대화 형태를 선택하세요. ',
-    #     ('일상적인 대화', 'Agentic Workflow (Tool Use)', 'Flow', 'Agent', '번역하기', '문법 검토하기', '이미지 분석')
-    # )
 
     print('mode: ', mode)
 
