@@ -1278,6 +1278,9 @@ def run_bedrock_agent(text, st):
                 break
 
         if not agent_id:
+            if debug_mode=="Enable":
+                st.info("Agent를 생성합니다.")
+
             # create agent
             agent_instruction = (
                 "당신의 이름은 서연이고, 질문에 친근한 방식으로 대답하도록 설계된 대화형 AI입니다. "
@@ -1304,6 +1307,9 @@ def run_bedrock_agent(text, st):
             
             # associate knowledge base            
             if knowledge_base_id:
+                if debug_mode=="Enable":
+                    st.info("Agent에서 Knowledge Base를 사용할 수 있도록 설정합니다.")
+
                 rag_prompt = (
                     "당신의 이름은 서연이고, 질문에 대해 친절하게 답변하는 사려깊은 인공지능 도우미입니다."
                     "다음의 Reference texts을 이용하여 user의 질문에 답변합니다."
@@ -1326,6 +1332,9 @@ def run_bedrock_agent(text, st):
 
             # preparing
             try:
+                if debug_mode=="Enable":
+                    st.info('Agent를 사용할 수 있도록 "Prepare"로 설정합니다.')
+
                 response = client.prepare_agent(
                     agentId=agent_id
                 )
@@ -1343,6 +1352,9 @@ def run_bedrock_agent(text, st):
         #     print('response of get_agent(): ', response)
     
     if not agent_alias_id and agent_id:
+        if debug_mode=="Enable":
+            st.info('Agent의 alias를 검색합니다.')
+
         response_agent_alias = client.list_agent_aliases(
             agentId = agent_id,
             maxResults=10
@@ -1356,6 +1368,9 @@ def run_bedrock_agent(text, st):
 
                 print('agentAliasStatus: ', summary["agentAliasStatus"])
                 if not summary["agentAliasStatus"] == "PREPARED":
+                    if debug_mode=="Enable":
+                        st.info('Agent를 사용할 수 있도록 "Prepare"로 다시 설정합니다.')
+
                     try: # preparing                        
                         response = client.prepare_agent(
                             agentId=agent_id
@@ -1368,6 +1383,9 @@ def run_bedrock_agent(text, st):
                 break
         
         if not agent_alias_id:
+            if debug_mode=="Enable":
+                st.info('Agent의 alias를 생성합니다.')
+
             response = client.create_agent_alias(
                 agentAliasName=agent_alias_name,
                 agentId=agent_id,
@@ -1384,6 +1402,9 @@ def run_bedrock_agent(text, st):
         sessionId[userId] = str(uuid.uuid4())
 
     if agent_alias_id and agent_id:
+        if debug_mode=="Enable":
+            st.info('답변을 기다립니다.')
+
         client_runtime = boto3.client(            
             service_name='bedrock-agent-runtime',
             region_name=bedrock_region
@@ -1409,7 +1430,7 @@ def run_bedrock_agent(text, st):
             print('response of invoke_agent(): ', response)
             
             response_stream = response['completion']
-            print('response_stream: ', response_stream)
+            # print('response_stream: ', response_stream)
 
             result = ""
             for event in response_stream:
