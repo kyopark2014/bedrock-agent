@@ -35,15 +35,14 @@ export class CdkBedrockAgentStack extends cdk.Stack {
     const bedrockInvokePolicy = new iam.PolicyStatement({ 
       effect: iam.Effect.ALLOW,
       resources: [
-        `arn:aws:bedrock:${region}::foundation-model/anthropic.claude-3-haiku-20240307-v1:0`,
-        `arn:aws:bedrock:${region}::foundation-model/anthropic.claude-3-sonnet-20240229-v1:0`,
-        `arn:aws:bedrock:${region}::foundation-model/amazon.titan-embed-text-v1`,
-        `arn:aws:bedrock:${region}::foundation-model/amazon.titan-embed-text-v2:0`,
-        `arn:aws:bedrock:${region}::foundation-model/amazon.nova-pro-v1:0`
+        `arn:aws:bedrock:us-west-2::foundation-model/*`,
+        `arn:aws:bedrock:us-east-1::foundation-model/*`,
+        `arn:aws:bedrock:us-east-2::foundation-model/*`
       ],
       // resources: ['*'],
       actions: [
         "bedrock:InvokeModel", 
+        "bedrock:Retrieve", 
         "bedrock:InvokeModelEndpoint", 
         "bedrock:InvokeModelEndpointAsync",        
       ],
