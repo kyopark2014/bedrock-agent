@@ -488,6 +488,21 @@ export class CdkBedrockAgentStack extends cdk.Stack {
       }),
     );  
 
+    const bedrockRetrievePolicy = new iam.PolicyStatement({ 
+      effect: iam.Effect.ALLOW,
+      resources: [
+        `"arn:aws:bedrock:${region}:${accountId}:knowledge-base/*"`
+      ],
+      actions: [
+        "bedrock:Retrieve"
+      ],
+    });        
+    agent_role.attachInlinePolicy( 
+      new iam.Policy(this, `bedrock-retrieve-policy-for-${projectName}`, {
+        statements: [bedrockRetrievePolicy],
+      }),
+    );  
+
     // user data for setting EC2
     const userData = ec2.UserData.forLinux();
 
