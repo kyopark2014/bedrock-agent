@@ -1385,7 +1385,10 @@ def run_bedrock_agent(text):
         
     msg = msg_contents = ""
     if agent_alias_id and agent_id:
-        client_runtime = boto3.client('bedrock-agent-runtime')
+        client_runtime = boto3.client(            
+            service_name='bedrock-agent-runtime',
+            region_name=bedrock_region
+        )
         try:
             if sessionState:
                 response = client_runtime.invoke_agent( 
