@@ -1402,8 +1402,8 @@ def run_bedrock_agent(text, st):
         sessionId[userId] = str(uuid.uuid4())
 
     if agent_alias_id and agent_id:
-        if debug_mode=="Enable":
-            st.info('답변을 기다립니다.')
+        # if debug_mode=="Enable":
+        #     st.info('답변을 기다립니다.')
 
         client_runtime = boto3.client(            
             service_name='bedrock-agent-runtime',
