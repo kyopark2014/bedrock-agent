@@ -16,7 +16,66 @@
 ### RAG
 
 
-### Agentic Workflow
+### Bedrock Agent
+
+Agent를 위해서는 [cdk-bedrock-agent-stack.ts](./cdk-bedrock-agent/lib/cdk-bedrock-agent-stack.ts)와 같이 Bedrock에 대한 invoke, retrieve, inference를 허용하도록 하여야 합니다.
+
+```python
+const agent_role = new iam.Role(this,  `role-agent-for-${projectName}`, {
+  roleName: `role-agent-for-${projectName}-${region}`,
+  assumedBy: new iam.CompositePrincipal(
+    new iam.ServicePrincipal("bedrock.amazonaws.com")
+  )
+});
+
+const agentInvokePolicy = new iam.PolicyStatement({ 
+  effect: iam.Effect.ALLOW,
+  resources: [
+    `arn:aws:bedrock:*::foundation-model/*`
+  ],
+  actions: [
+    "bedrock:InvokeModel"
+  ],
+});        
+agent_role.attachInlinePolicy( 
+  new iam.Policy(this, `agent-invoke-policy-for-${projectName}`, {
+    statements: [agentInvokePolicy],
+  }),
+);  
+
+const bedrockRetrievePolicy = new iam.PolicyStatement({ 
+  effect: iam.Effect.ALLOW,
+  resources: [
+    `arn:aws:bedrock:${region}:${accountId}:knowledge-base/*`
+  ],
+  actions: [
+    "bedrock:Retrieve"
+  ],
+});        
+agent_role.attachInlinePolicy( 
+  new iam.Policy(this, `bedrock-retrieve-policy-for-${projectName}`, {
+    statements: [bedrockRetrievePolicy],
+  }),
+);  
+
+const agentInferencePolicy = new iam.PolicyStatement({ 
+  effect: iam.Effect.ALLOW,
+  resources: [
+    `arn:aws:bedrock:${region}:${accountId}:inference-profile/*`,
+    `arn:aws:bedrock:*::foundation-model/*`
+  ],
+  actions: [
+    "bedrock:InvokeModel",
+    "bedrock:GetInferenceProfile",
+    "bedrock:GetFoundationModel"
+  ],
+});        
+agent_role.attachInlinePolicy( 
+  new iam.Policy(this, `agent-inference-policy-for-${projectName}`, {
+    statements: [agentInferencePolicy],
+  }),
+);
+```
 
 
 ### 활용 방법
