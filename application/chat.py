@@ -1256,7 +1256,7 @@ sessionId = dict()
 agent_name = projectName
 sessionState = ""
 agent_alias_name = "latest_version"
-def run_bedrock_agent(text):
+def run_bedrock_agent(text, st):
     global agent_id, agent_alias_id
     print('agent_id: ', agent_id)
     print('agent_alias_id: ', agent_alias_id)
@@ -1299,42 +1299,42 @@ def run_bedrock_agent(text):
             print('response of create_agent(): ', response)
 
             agent_id = response['agent']['agentId']
-            print('agent_id: ', agent_id)
+            print('agent_id: ', agent_id)            
             time.sleep(5)            
-
+            
             # associate knowledge base            
-            if knowledge_base_id:
-                rag_prompt = (
-                    "당신의 이름은 서연이고, 질문에 대해 친절하게 답변하는 사려깊은 인공지능 도우미입니다."
-                    "다음의 Reference texts을 이용하여 user의 질문에 답변합니다."
-                    "모르는 질문을 받으면 솔직히 모른다고 말합니다."
-                    "답변의 이유를 풀어서 명확하게 설명합니다."
+            # if knowledge_base_id:
+            #     rag_prompt = (
+            #         "당신의 이름은 서연이고, 질문에 대해 친절하게 답변하는 사려깊은 인공지능 도우미입니다."
+            #         "다음의 Reference texts을 이용하여 user의 질문에 답변합니다."
+            #         "모르는 질문을 받으면 솔직히 모른다고 말합니다."
+            #         "답변의 이유를 풀어서 명확하게 설명합니다."
+            #     )
+            #     try: 
+            #         response = client.associate_agent_knowledge_base(
+            #             agentId=agent_id,
+            #             agentVersion='DRAFT',
+            #             description=rag_prompt,
+            #             knowledgeBaseId=knowledge_base_id,
+            #             knowledgeBaseState='ENABLED'
+            #         )
+            #         print(f'response of associate_agent_knowledge_base(): {response}')
+            #         time.sleep(5) # delay 5 seconds
+            #     except Exception:
+            #         err_msg = traceback.format_exc()
+            #         print(f'error message: {err_msg}')  
+
+            # preparing
+            try:
+                response = client.prepare_agent(
+                    agentId=agent_id
                 )
-                try: 
-                    response = client.associate_agent_knowledge_base(
-                        agentId=agent_id,
-                        agentVersion='DRAFT',
-                        description=rag_prompt,
-                        knowledgeBaseId=knowledge_base_id,
-                        knowledgeBaseState='ENABLED'
-                    )
-                    print(f'response of associate_agent_knowledge_base(): {response}')
-                    time.sleep(5) # delay 5 seconds
-                except Exception:
-                    err_msg = traceback.format_exc()
-                    print(f'error message: {err_msg}')  
+                print('response of prepare_agent(): ', response)      
+                time.sleep(5) # delay 5 seconds
 
-                # preparing
-                try:
-                    response = client.prepare_agent(
-                        agentId=agent_id
-                    )
-                    print('response of prepare_agent(): ', response)      
-                    time.sleep(5) # delay 5 seconds
-
-                except Exception:
-                    err_msg = traceback.format_exc()
-                    print(f'error message: {err_msg}')                      
+            except Exception:
+                err_msg = traceback.format_exc()
+                print(f'error message: {err_msg}')                      
                                 
         # else:
         #     response = client.get_agent(
@@ -1382,8 +1382,7 @@ def run_bedrock_agent(text):
     global sessionId
     if not userId in sessionId:
         sessionId[userId] = str(uuid.uuid4())
-        
-    msg = msg_contents = ""
+
     if agent_alias_id and agent_id:
         client_runtime = boto3.client(            
             service_name='bedrock-agent-runtime',
@@ -1412,63 +1411,31 @@ def run_bedrock_agent(text):
             response_stream = response['completion']
             print('response_stream: ', response_stream)
 
-            if response_stream:
-                for event in response_stream:
+            result = ""
+            for event in response_stream:
+                if "chunk" in event:
                     chunk = event.get('chunk')
-                    print(f"Agent Chunks: {chunk}")
-                    # if chunk:
-                    #     yield chunk.get('bytes').decode()
+                    answer = chunk["bytes"].decode()
+                    st.markdown(answer)
 
-            #return response_stream
-            
-            # for event in response_stream:
-            #     chunk = event.get('chunk')
-            #     if chunk:
-            #         msg += chunk.get('bytes').decode()
-            #         print('event: ', chunk.get('bytes').decode())
+                    result += answer
                         
-            #         print('msg: ', msg)
-                    
-            #     # files generated by code interpreter
-            #     if 'files' in event:
-            #         files = event['files']['files']
-            #         for file in files:
-            #             objectName = file['name']
-            #             print('objectName: ', objectName)
-            #             contentType = file['type']
-            #             print('contentType: ', contentType)
-            #             bytes_data = file['bytes']
-                                                
-            #             pixels = BytesIO(bytes_data)
-            #             pixels.seek(0, 0)
-                                    
-            #             img_key = 'agent/contents/'+objectName
-                        
-            #             s3_client = boto3.client('s3')  
-            #             response = s3_client.put_object(
-            #                 Bucket=s3_bucket,
-            #                 Key=img_key,
-            #                 ContentType=contentType,
-            #                 Body=pixels
-            #             )
-            #             print('response: ', response)
-                        
-            #             url = path+'agent/contents/'+parse.quote(objectName)
-            #             print('url: ', url)
-                        
-            #             if contentType == 'application/json':
-            #                 msg_contents = f"\n\n<a href={url} target=_blank>{objectName}</a>"
-            #             elif contentType == 'application/csv':
-            #                 msg_contents = f"\n\n<a href={url} target=_blank>{objectName}</a>"
-            #             else:
-            #                 width = 600            
-            #                 msg_contents = f'\n\n<img src=\"{url}\" alt=\"{objectName}\" width=\"{width}\">'
-            #                 print('msg_contents: ', msg_contents)
-                                                            
+                if 'files' in event:
+                    files = event['files']['files']
+                    for file in files:
+                        st.image(file["bytes"], caption=file["name"])
+
+                        result.append(
+                            {
+                                "type": "file",
+                                "name": file["name"],
+                                "bytes": file["bytes"],
+                            }
+                        )                                                            
         except Exception as e:
             raise Exception("unexpected event.",e)
         
-    return msg+msg_contents
+    return result
 
 def upload_to_s3(file_bytes, file_name):
     """

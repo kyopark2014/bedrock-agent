@@ -469,7 +469,7 @@ export class CdkBedrockAgentStack extends cdk.Stack {
         new iam.ServicePrincipal("bedrock.amazonaws.com")
       )
     });
-    
+
     const agentInvokePolicy = new iam.PolicyStatement({ 
       effect: iam.Effect.ALLOW,
       resources: [

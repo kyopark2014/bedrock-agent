@@ -209,15 +209,23 @@ if prompt := st.chat_input("메시지를 입력하세요."):
                 chat.save_chat_history(prompt, response)
         
         elif mode == 'Agent':
-            with st.status("thinking...", expanded=True, state="running") as status:
-                response = chat.run_bedrock_agent(prompt)        
-                st.write(response)
-                print('response: ', response)
+            # with st.status("thinking...", expanded=True, state="running") as status:
+            #     response = chat.run_bedrock_agent(prompt, st)        
+            #     #st.write(response)
+            #     #print('response: ', response)
+                
+            #     st.session_state.messages.append({"role": "assistant", "content": response})
+            #     #st.rerun()
 
-                st.session_state.messages.append({"role": "assistant", "content": response})
-                st.rerun()
-
-                chat.save_chat_history(prompt, response)
+            #     chat.save_chat_history(prompt, response)
+            
+            response = chat.run_bedrock_agent(prompt, st)        
+            #st.write(response)
+            #print('response: ', response)
+                
+            st.session_state.messages.append({"role": "assistant", "content": response})
+            # st.rerun()
+            # chat.save_chat_history(prompt, response)
         
         elif mode == '번역하기':
             response = chat.translate_text(prompt)
