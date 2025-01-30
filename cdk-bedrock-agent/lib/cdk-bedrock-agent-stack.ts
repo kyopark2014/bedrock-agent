@@ -480,6 +480,7 @@ export class CdkBedrockAgentStack extends cdk.Stack {
         `arn:aws:bedrock:${region}::foundation-model/amazon.nova-pro-v1:0`,
         `arn:aws:bedrock:${region}::foundation-model/amazon.nova-lite-v1:0`,
         `arn:aws:bedrock:${region}::foundation-model/amazon.nova-micro-v1:0`,
+        `arn:aws:bedrock:${region}:${accountId}:inference-profile/us.amazon.nova-pro-v1:0`,
         `arn:aws:bedrock:${region}::foundation-model/us.anthropic.claude-3-5-sonnet-20241022-v2:0`,
         `arn:aws:bedrock:${region}::foundation-model/us.anthropic.claude-3-sonnet-20240229-v1:0`,
         `arn:aws:bedrock:${region}::foundation-model/us.anthropic.claude-3-5-haiku-20241022-v1:0`,
