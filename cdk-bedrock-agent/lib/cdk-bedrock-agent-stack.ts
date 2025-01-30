@@ -474,6 +474,7 @@ export class CdkBedrockAgentStack extends cdk.Stack {
     const agentInvokePolicy = new iam.PolicyStatement({ 
       effect: iam.Effect.ALLOW,
       resources: [
+        "*",
         `arn:aws:bedrock:${region}::foundation-model/us.amazon.nova-pro-v1:0`,
         `arn:aws:bedrock:${region}::foundation-model/us.amazon.nova-lite-v1:0`,
         `arn:aws:bedrock:${region}::foundation-model/us.amazon.nova-micro-v1:0`,
