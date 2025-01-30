@@ -34,12 +34,12 @@ export class CdkBedrockAgentStack extends cdk.Stack {
     
     const bedrockInvokePolicy = new iam.PolicyStatement({ 
       effect: iam.Effect.ALLOW,
-      resources: [
-        `arn:aws:bedrock:us-west-2::foundation-model/*`,
-        `arn:aws:bedrock:us-east-1::foundation-model/*`,
-        `arn:aws:bedrock:us-east-2::foundation-model/*`
-      ],
-      // resources: ['*'],
+      // resources: [
+      //   `arn:aws:bedrock:us-west-2::foundation-model/*`,
+      //   `arn:aws:bedrock:us-east-1::foundation-model/*`,
+      //   `arn:aws:bedrock:us-east-2::foundation-model/*`
+      // ],
+      resources: ['*'],
       actions: [
         "bedrock:InvokeModel", 
         "bedrock:Retrieve", 
@@ -479,7 +479,8 @@ export class CdkBedrockAgentStack extends cdk.Stack {
       ],
       actions: [
         "bedrock:InvokeModel", 
-        "bedrock:*"      
+        "bedrock:*",      
+        "bedrock:Retrieve",
       ],
     });        
     agent_role.attachInlinePolicy( 
