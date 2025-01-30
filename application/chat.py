@@ -1250,12 +1250,238 @@ def run_RAG_prompt_flow(text, connectionId, requestId):
 ####################### Bedrock Agent #######################
 # Agentic Workflow: Bedrock Agent
 ########################################################### 
-
 agent_id = agent_alias_id = None
 sessionId = dict() 
 agent_name = projectName
 sessionState = ""
 agent_alias_name = "latest_version"
+
+def show_output(event_stream, st):
+    global reference_docs
+
+    stream_result = final_result = ""    
+    for index, event in enumerate(event_stream):
+        print(f"Event {index}:")
+        print(str(event))
+        print("\n")
+            
+        # Handle text chunks
+        if "chunk" in event:
+            chunk = event["chunk"]
+            if "bytes" in chunk:
+                text = chunk["bytes"].decode("utf-8")
+                print(f"Chunk: {text}")
+                stream_result += text
+
+        # Handle file outputs
+        if "files" in event:
+            print("Files received")
+            files = event["files"]["files"]
+
+            for file in files:
+                st.image(file["bytes"], caption=file["name"])
+
+        # Check trace
+        if "trace" in event:
+            if ("trace" in event["trace"] and "orchestrationTrace" in event["trace"]["trace"]):
+                trace_event = event["trace"]["trace"]["orchestrationTrace"]
+                if "rationale" in trace_event:
+                    trace_text = trace_event["rationale"]["text"]
+                    st.info(f"rationale: {trace_text}")
+
+                if "modelInvocationInput" in trace_event:
+                    if "text" in trace_event["modelInvocationInput"]:
+                        trace_text = trace_event["modelInvocationInput"]["text"]
+                        print("trace_text: ", trace_text)
+                        # st.info(f"modelInvocationInput: {trace_text}")
+                    if "rawResponse" in trace_event["modelInvocationInput"]:
+                        rawResponse = trace_event["modelInvocationInput"]["rawResponse"]                        
+                        print("rawResponse: ", rawResponse)
+                        # st.info(f"modelInvocationInput: {rawResponse}")
+
+                if "modelInvocationOutput" in trace_event:
+                    if "rawResponse" in trace_event["modelInvocationOutput"]:
+                        trace_text = trace_event["modelInvocationOutput"]["rawResponse"]["content"]
+                        print("trace_text: ", trace_text)
+                        # st.info(f"modelInvocationOutput: {trace_text}")
+
+                if "invocationInput" in trace_event:
+                    if "codeInterpreterInvocationInput" in trace_event["invocationInput"]:
+                        trace_code = trace_event["invocationInput"]["codeInterpreterInvocationInput"]["code"]
+                        print("trace_code: ", trace_code)
+                        st.info(f"codeInterpreter: {trace_code}")
+
+                    if "knowledgeBaseLookupInput" in trace_event["invocationInput"]:
+                        trace_text = trace_event["invocationInput"]["knowledgeBaseLookupInput"]["text"]
+                        print("trace_text: ", trace_text)
+                        # st.info(f"knowledgeBaseLookup: {trace_text}")
+                        st.info(f"RAG를 검색합니다. 검색어: {trace_text}")
+
+                    if "actionGroupInvocationInput" in trace_event["invocationInput"]:
+                        trace_function = trace_event["invocationInput"]["actionGroupInvocationInput"]["function"]
+                        print("trace_function: ", trace_function)
+                        st.info(f"actionGroupInvocation: {trace_function}")
+
+                if "observation" in trace_event:
+                    if "finalResponse" in trace_event["observation"]:
+                        trace_resp = trace_event["observation"]["finalResponse"]["text"]
+                        print('final response: ', trace_resp)                            
+                        st.info(f"finalResponse: {trace_resp}")
+                        final_result = trace_resp
+
+                    if ("codeInterpreterInvocationOutput" in trace_event["observation"]):
+                        if "executionOutput" in trace_event["observation"]["codeInterpreterInvocationOutput"]:
+                            trace_resp = trace_event["observation"]["codeInterpreterInvocationOutput"]["executionOutput"]
+                            st.info(f"observation: {trace_resp}")
+
+                        if "executionError" in trace_event["observation"]["codeInterpreterInvocationOutput"]:
+                            trace_resp = trace_event["observation"]["codeInterpreterInvocationOutput"]["executionError"]
+                            st.error(f"observation: {trace_resp}")
+
+                            if "image_url" in trace_resp:
+                                print("got image")
+                                image_url = trace_resp["image_url"]
+                                st.image(image_url)
+                                
+                    if "knowledgeBaseLookupOutput" in trace_event["observation"]:
+                        # st.info(f"knowledgeBaseLookupOutput: {trace_event["observation"]["knowledgeBaseLookupOutput"]["retrievedReferences"]}")
+                        if "retrievedReferences" in trace_event["observation"]["knowledgeBaseLookupOutput"]:
+                            references = trace_event["observation"]["knowledgeBaseLookupOutput"]["retrievedReferences"]
+                            st.info(f"{len(references)}의 문서가 검색되었습니다.")
+
+                            print('references: ', references)
+                            for i, reference in enumerate(references):
+                                content = reference['content']['text']
+                                # print('content: ', content)
+                                uri = reference['location']['s3Location']['uri']
+                                # print('uri: ', uri)
+
+                                name = uri.split('/')[-1]
+                                encoded_name = parse.quote(name)
+                                url = f"{path}/{doc_prefix}{encoded_name}"
+                                # print('url: ', url)
+
+                                print(f"--> {i}: {content[:50]}, {name}, {url}")
+
+                                reference_docs.append(
+                                    Document(
+                                        page_content=content,
+                                        metadata={
+                                            'name': name,
+                                            'url': url,
+                                            'from': 'RAG'
+                                        },
+                                    )
+                                )    
+
+                    if "actionGroupInvocationOutput" in trace_event["observation"]:
+                        trace_resp = trace_event["observation"]["actionGroupInvocationOutput"]["text"]
+                        st.info(f"actionGroupInvocationOutput: {trace_resp}")
+
+                        print("checking trace resp")
+                        print(trace_resp)
+
+                        # try to covnert to json
+                        try:
+                            trace_resp = trace_resp.replace("'", '"')
+                            trace_resp = json.loads(trace_resp)
+                            print("converted to json")
+                            print(trace_resp)
+
+                            # check if image_url is in trace_response, if it is download the image and add it to the images object of mdoel response
+                            if "image_url" in trace_resp:
+                                print("got image")
+                                image_url = trace_resp["image_url"]
+                                st.image(image_url)
+                                
+                        except:
+                            print("not json")
+                            pass
+
+            elif "guardrailTrace" in event["trace"]["trace"]:
+                guardrail_trace = event["trace"]["trace"]["guardrailTrace"]
+                if "inputAssessments" in guardrail_trace:
+                    assessments = guardrail_trace["inputAssessments"]
+                    for assessment in assessments:
+                        if "contentPolicy" in assessment:
+                            filters = assessment["contentPolicy"]["filters"]
+                            for filter in filters:
+                                if filter["action"] == "BLOCKED":
+                                    st.error(f"Guardrail blocked {filter['type']} confidence: {filter['confidence']}")
+                        if "topicPolicy" in assessment:
+                            topics = assessment["topicPolicy"]["topics"]
+                            for topic in topics:
+                                if topic["action"] == "BLOCKED":
+                                    st.error(f"Guardrail blocked topic {topic['name']}")            
+                
+    if final_result:
+        return final_result
+    else:
+        return stream_result
+
+def show_output2(response_stream, st):
+    global reference_docs
+
+    result = ""
+    for event in response_stream:
+        if "chunk" in event:
+            chunk = event.get('chunk')
+            answer = chunk["bytes"].decode()
+
+            result += answer
+                
+        if 'files' in event:
+            files = event['files']['files']
+            for file in files:
+                st.image(file["bytes"], caption=file["name"])
+
+                result.append(
+                    {
+                        "type": "file",
+                        "name": file["name"],
+                        "bytes": file["bytes"],
+                    }
+                ) 
+                    
+        if 'trace' in event:
+            trace = event['trace']['trace']
+            # print('trace: ', trace)
+
+            if 'orchestrationTrace' in trace:                        
+                orchestrationTrace = trace['orchestrationTrace']
+                # print('orchestrationTrace: ', orchestrationTrace)
+
+                if "observation" in orchestrationTrace:
+                    observation = orchestrationTrace['observation']
+                    # print('observation: ', observation)
+                    
+                    if 'knowledgeBaseLookupOutput' in observation:
+                        retrievedReferences = observation['knowledgeBaseLookupOutput']['retrievedReferences']
+                        # print('retrievedReferences: ', retrievedReferences)
+                        
+                        for ref in retrievedReferences:
+                            content = ref['content']['text']
+                            # print('content: ', content)
+                            uri = ref['location']['s3Location']['uri']
+                            # print('uri: ', uri)
+
+                            name = uri.split('/')[-1]
+                            encoded_name = parse.quote(name)
+                            url = f"{path}/{doc_prefix}{encoded_name}"
+                            # print('url: ', url)
+
+                            reference_docs.append(
+                                Document(
+                                    page_content=content,
+                                    metadata={
+                                        'name': name,
+                                        'url': url,
+                                        'from': 'RAG'
+                                    },
+                                )
+                            )    
+    print('reference_docs: ', reference_docs)
+    
 def run_bedrock_agent(text, st):
     global agent_id, agent_alias_id
     print('agent_id: ', agent_id)
@@ -1405,8 +1631,8 @@ def run_bedrock_agent(text, st):
         sessionId[userId] = str(uuid.uuid4())
 
     if agent_alias_id and agent_id:
-        if debug_mode=="Enable":
-            st.info('답변을 생성하고 있습니다.')
+        #if debug_mode=="Enable":
+        #    st.info('답변을 생성하고 있습니다.')
 
         client_runtime = boto3.client(            
             service_name='bedrock-agent-runtime',
@@ -1435,68 +1661,8 @@ def run_bedrock_agent(text, st):
             print('response of invoke_agent(): ', response)
             
             response_stream = response['completion']
-            # print('response_stream: ', response_stream)
-
-            result = ""
-            for event in response_stream:
-                if "chunk" in event:
-                    chunk = event.get('chunk')
-                    answer = chunk["bytes"].decode()
-
-                    result += answer
-                        
-                if 'files' in event:
-                    files = event['files']['files']
-                    for file in files:
-                        st.image(file["bytes"], caption=file["name"])
-
-                        result.append(
-                            {
-                                "type": "file",
-                                "name": file["name"],
-                                "bytes": file["bytes"],
-                            }
-                        ) 
-                         
-                if 'trace' in event:
-                    trace = event['trace']['trace']
-                    # print('trace: ', trace)
-
-                    if 'orchestrationTrace' in trace:                        
-                        orchestrationTrace = trace['orchestrationTrace']
-                        # print('orchestrationTrace: ', orchestrationTrace)
-
-                        if "observation" in orchestrationTrace:
-                            observation = orchestrationTrace['observation']
-                            # print('observation: ', observation)
-                            
-                            if 'knowledgeBaseLookupOutput' in observation:
-                                retrievedReferences = observation['knowledgeBaseLookupOutput']['retrievedReferences']
-                                # print('retrievedReferences: ', retrievedReferences)
-                                
-                                for ref in retrievedReferences:
-                                    content = ref['content']['text']
-                                    # print('content: ', content)
-                                    uri = ref['location']['s3Location']['uri']
-                                    # print('uri: ', uri)
-
-                                    name = uri.split('/')[-1]
-                                    encoded_name = parse.quote(name)
-                                    url = f"{path}/{doc_prefix}{encoded_name}"
-                                    # print('url: ', url)
-
-                                    reference_docs.append(
-                                        Document(
-                                            page_content=content,
-                                            metadata={
-                                                'name': name,
-                                                'url': url,
-                                                'from': 'RAG'
-                                            },
-                                        )
-                                    )    
-            print('reference_docs: ', reference_docs)
-            
+            result = show_output(response_stream, st)
+            # print('response_stream: ', response_stream)            
         except Exception as e:
             raise Exception("unexpected event.",e)
         
