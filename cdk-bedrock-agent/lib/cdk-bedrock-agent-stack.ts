@@ -474,26 +474,13 @@ export class CdkBedrockAgentStack extends cdk.Stack {
     const agentInvokePolicy = new iam.PolicyStatement({ 
       effect: iam.Effect.ALLOW,
       resources: [
-        "*",
-        `arn:aws:bedrock:${region}::foundation-model/us.amazon.nova-pro-v1:0`,
-        `arn:aws:bedrock:${region}::foundation-model/us.amazon.nova-lite-v1:0`,
-        `arn:aws:bedrock:${region}::foundation-model/us.amazon.nova-micro-v1:0`,
-        `arn:aws:bedrock:${region}::foundation-model/amazon.nova-pro-v1:0`,
-        `arn:aws:bedrock:${region}::foundation-model/amazon.nova-lite-v1:0`,
-        `arn:aws:bedrock:${region}::foundation-model/amazon.nova-micro-v1:0`,
-        `arn:aws:bedrock:${region}:${accountId}:inference-profile/us.amazon.nova-pro-v1:0`,
-        `arn:aws:bedrock:${region}::foundation-model/us.anthropic.claude-3-5-sonnet-20241022-v2:0`,
-        `arn:aws:bedrock:${region}::foundation-model/us.anthropic.claude-3-sonnet-20240229-v1:0`,
-        `arn:aws:bedrock:${region}::foundation-model/us.anthropic.claude-3-5-haiku-20241022-v1:0`,
-        `arn:aws:bedrock:${region}::foundation-model/anthropic.claude-3-5-sonnet-20241022-v2:0`,
-        `arn:aws:bedrock:${region}::foundation-model/anthropic.claude-3-sonnet-20240229-v1:0`,
-        `arn:aws:bedrock:${region}::foundation-model/anthropic.claude-3-5-haiku-20241022-v1:0`
+        `arn:aws:bedrock:us-west-2::foundation-model/*`,
+        `arn:aws:bedrock:us-east-1::foundation-model/*`,
+        `arn:aws:bedrock:us-east-2::foundation-model/*`,
       ],
-      // resources: ['*'],
       actions: [
         "bedrock:InvokeModel", 
-        "bedrock:InvokeModelEndpoint", 
-        "bedrock:InvokeModelEndpointAsync",        
+        "bedrock:*"      
       ],
     });        
     agent_role.attachInlinePolicy( 
