@@ -561,10 +561,9 @@ export class CdkBedrockAgentStack extends cdk.Stack {
       environment: {}
     });
 
-    lambdaTools.addPermission(`lambda-tools-permission-for-${projectName}`, {
+    lambdaTools.addPermission(`lambda-tools-permission-for-${projectName}`, {      
       principal: new iam.ServicePrincipal('bedrock.amazonaws.com'),
-      action: 'lambda:InvokeFunction',
-      sourceAccount: accountId
+      action: 'lambda:InvokeFunction'
     })
 
     // user data for setting EC2
