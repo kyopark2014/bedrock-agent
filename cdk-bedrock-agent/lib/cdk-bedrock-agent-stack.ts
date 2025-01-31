@@ -521,13 +521,13 @@ export class CdkBedrockAgentStack extends cdk.Stack {
     );  
 
     // lambda-tool
-    const roleLambdaTools = new iam.Role(this, `role-lambda-tools-for-${projectName}`, {
+  /*  const roleLambdaTools = new iam.Role(this, `role-lambda-tools-for-${projectName}`, {
       roleName: `role-lambda-tools-for-${projectName}-${region}`,
       assumedBy: new iam.CompositePrincipal(
         new iam.ServicePrincipal("lambda.amazonaws.com"),
         new iam.ServicePrincipal("bedrock.amazonaws.com"),
       ),
-      managedPolicies: [cdk.aws_iam.ManagedPolicy.fromAwsManagedPolicyName('CloudWatchLogsFullAccess')]
+      // managedPolicies: [cdk.aws_iam.ManagedPolicy.fromAwsManagedPolicyName('CloudWatchLogsFullAccess')] 
     });
     // roleLambdaTools.addManagedPolicy({  // grant log permission
     //   managedPolicyArn: 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole',
@@ -555,7 +555,7 @@ export class CdkBedrockAgentStack extends cdk.Stack {
       description: 'action group - tools',
       functionName: `lambda-tools-for-${projectName}`,
       handler: 'dummy_lambda.lambda_handler',
-      runtime: lambda.Runtime.PYTHON_3_13,
+      runtime: lambda.Runtime.PYTHON_3_12,
       role: roleLambdaTools,
       code: lambda.Code.fromAsset(path.join(__dirname, '../../lambda-tools')),
       timeout: cdk.Duration.seconds(60),
@@ -566,7 +566,7 @@ export class CdkBedrockAgentStack extends cdk.Stack {
     //   principal: new iam.ServicePrincipal('bedrock.amazonaws.com'),
     //   action: 'lambda:InvokeFunction'
     // })
-    lambdaTools.grantInvoke(new cdk.aws_iam.ServicePrincipal("bedrock.amazonaws.com"));
+    lambdaTools.grantInvoke(new cdk.aws_iam.ServicePrincipal("bedrock.amazonaws.com")); */
 
     // user data for setting EC2
     const userData = ec2.UserData.forLinux();
