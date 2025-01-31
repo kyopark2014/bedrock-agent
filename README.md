@@ -163,3 +163,6 @@ cd ~/bedrock-agent/cdk-bedrock-agent && cdk destroy --all
 [Building Agentic Workflows on AWS](https://catalog.workshops.aws/building-agentic-workflows/en-US)
 
 [Building an AWS Solutions Architect Agentic App with Amazon Bedrock](https://github.com/build-on-aws/agentic-workshop/tree/main/reinvent_2024_agentic)
+
+[종속 항목이 있는 .zip 배포 패키지 생성](https://docs.aws.amazon.com/ko_kr/lambda/latest/dg/python-package.html#python-package-create-dependencies)
+
