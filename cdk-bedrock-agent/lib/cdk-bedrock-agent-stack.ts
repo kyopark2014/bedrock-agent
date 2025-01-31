@@ -545,7 +545,7 @@ export class CdkBedrockAgentStack extends cdk.Stack {
       actions: ["logs:CreateLogStream","logs:PutLogEvents"],
     });        
     roleLambdaTools.attachInlinePolicy( 
-      new iam.Policy(this, `create-log-policy-lambda-tools-for-${projectName}`, {
+      new iam.Policy(this, `create-stream-log-policy-lambda-tools-for-${projectName}`, {
         statements: [CreateLogStreamPolicy],
       }),
     );      
