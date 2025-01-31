@@ -115,20 +115,70 @@ map_chain = dict()
 
 model_name = "Nova Pro"
 model_type = "nova"
+models = info.get_model_info(model_name)
+model_id = models[0]["model_id"]
 debug_mode = "Enable"
 
-models = info.get_model_info(model_name)
+agent_id = agent_alias_id = None
+agent_name = projectName
+agent_alias_name = "latest_version"
 
-def update(modelName, debugMode):    
-    global model_name, debug_mode
-    global models
+agent_kb_id = agent_kb_alias_id = None
+agent_kb_name = projectName+'-knowledge-base'
+agent_kb_alias_name = "latest_version"
+
+def update(modelName, debugMode, st):    
+    global model_name, model_id, model_type, debug_mode
+    global models, agent_id, agent_kb_id
     
     if model_name != modelName:
         model_name = modelName
         print('model_name: ', model_name)
         
         models = info.get_model_info(model_name)
+        model_id = models[0]["model_id"]
+        model_type = models[0]["model_type"]
+
+        # retrieve agent_id
+        client = boto3.client(
+            service_name='bedrock-agent',
+            region_name=bedrock_region
+        )  
+
+        print('agent_id: ', agent_id)
+        if not agent_id:
+            response_agent = client.list_agents(
+                maxResults=10
+            )
+            print('response of list_agents(): ', response_agent)
+            
+            for summary in response_agent["agentSummaries"]:
+                if summary["agentName"] == agent_name:
+                    agent_id = summary["agentId"]
+                    print('agent_id: ', agent_id)
+                    break
+
+        # update agent
+        if agent_id: 
+            update_agent(model_id, model_name, agent_id, agent_name, st)
+        else:
+            agent_id = create_agent(model_id, model_name, "Disable", agent_name, st)
         
+        # retrieve agent_kb_id
+        print('agent_kb_id: ', agent_kb_id)
+        if not agent_kb_id:
+            for summary in response_agent["agentSummaries"]:
+                if summary["agentName"] == agent_kb_name:
+                    agent_kb_id = summary["agentId"]
+                    print('agent_kb_id: ', agent_kb_id)
+                    break
+
+        # update agent (kb)
+        if agent_kb_id: 
+            update_agent(model_id, model_name, agent_kb_id, agent_kb_name, st)
+        else:
+            agent_kb_id = create_agent(model_id, model_name, "Enable", agent_kb_name, st)
+                                
     if debug_mode != debugMode:
         debug_mode = debugMode
         print('debug_mode: ', debug_mode)
@@ -1250,11 +1300,8 @@ def run_RAG_prompt_flow(text, connectionId, requestId):
 ####################### Bedrock Agent #######################
 # Agentic Workflow: Bedrock Agent
 ########################################################### 
-agent_id = agent_alias_id = None
 sessionId = dict() 
-agent_name = projectName
 sessionState = ""
-agent_alias_name = "latest_version"
 
 def show_output(event_stream, st):
     global reference_docs
@@ -1347,7 +1394,7 @@ def show_output(event_stream, st):
                         # st.info(f"knowledgeBaseLookupOutput: {trace_event["observation"]["knowledgeBaseLookupOutput"]["retrievedReferences"]}")
                         if "retrievedReferences" in trace_event["observation"]["knowledgeBaseLookupOutput"]:
                             references = trace_event["observation"]["knowledgeBaseLookupOutput"]["retrievedReferences"]
-                            st.info(f"{len(references)}의 문서가 검색되었습니다.")
+                            st.info(f"{len(references)}개의 문서가 검색되었습니다.")
 
                             print('references: ', references)
                             for i, reference in enumerate(references):
@@ -1481,119 +1528,175 @@ def show_output2(response_stream, st):
                                 )
                             )    
     print('reference_docs: ', reference_docs)
-    
-def run_bedrock_agent(text, st):
-    global agent_id, agent_alias_id
-    print('agent_id: ', agent_id)
-    print('agent_alias_id: ', agent_alias_id)
 
-    global reference_docs
-    reference_docs = []
-    
+def update_agent(modelId, modelName, agentId, agentName, st):
     client = boto3.client(
         service_name='bedrock-agent',
         region_name=bedrock_region
     )  
-    if not agent_id:
-        response_agent = client.list_agents(
-            maxResults=10
-        )
-        print('response of list_agents(): ', response_agent)
-        
-        for summary in response_agent["agentSummaries"]:
-            if summary["agentName"] == agent_name:
-                agent_id = summary["agentId"]
-                print('agent_id: ', agent_id)
-                break
 
-        if not agent_id:
-            if debug_mode=="Enable":
-                st.info("Agent를 생성합니다.")
+    if debug_mode=="Enable":
+        st.info(f"{agentName}의 모델을 {modelName}로 업데이트합니다.")
 
-            # create agent
-            agent_instruction = (
-                "당신의 이름은 서연이고, 질문에 친근한 방식으로 대답하도록 설계된 대화형 AI입니다. "
-                "상황에 맞는 구체적인 세부 정보를 충분히 제공합니다. "
-                "모르는 질문을 받으면 솔직히 모른다고 말합니다. "
-            )
-            # modelId = "us.amazon.nova-pro-v1:0"
-            modelId = 'anthropic.claude-3-5-sonnet-20241022-v2:0'
-            print('modelId: ', modelId)
+    # create agent
+    agent_instruction = (
+        "당신의 이름은 서연이고, 질문에 친근한 방식으로 대답하도록 설계된 대화형 AI입니다. "
+        "상황에 맞는 구체적인 세부 정보를 충분히 제공합니다. "
+        "모르는 질문을 받으면 솔직히 모른다고 말합니다. "
+    )
+    print('modelId: ', modelId)
 
-            response = client.create_agent(
-                agentResourceRoleArn=agent_role_arn,
-                instruction=agent_instruction,
-                foundationModel=modelId,
-                description="Bedrock Agent (Single) 입니다.",
-                agentName=agent_name,
-                idleSessionTTLInSeconds=600
-            )
-            print('response of create_agent(): ', response)
-
-            agent_id = response['agent']['agentId']
-            print('agent_id: ', agent_id)            
-            time.sleep(5)            
-            
-            # associate knowledge base            
-            if knowledge_base_id:
-                if debug_mode=="Enable":
-                    st.info("Agent에서 Knowledge Base를 사용할 수 있도록 설정합니다.")
-
-                rag_prompt = (
-                    "당신의 이름은 서연이고, 질문에 대해 친절하게 답변하는 사려깊은 인공지능 도우미입니다."
-                    "다음의 Reference texts을 이용하여 user의 질문에 답변합니다."
-                    "모르는 질문을 받으면 솔직히 모른다고 말합니다."
-                    "답변의 이유를 풀어서 명확하게 설명합니다."
-                )
-                try: 
-                    response = client.associate_agent_knowledge_base(
-                        agentId=agent_id,
-                        agentVersion='DRAFT',
-                        description=rag_prompt,
-                        knowledgeBaseId=knowledge_base_id,
-                        knowledgeBaseState='ENABLED'
-                    )
-                    print(f'response of associate_agent_knowledge_base(): {response}')
-                    time.sleep(5) # delay 5 seconds
-                except Exception:
-                    err_msg = traceback.format_exc()
-                    print(f'error message: {err_msg}')  
-
-            # preparing
-            try:
-                if debug_mode=="Enable":
-                    st.info('Agent를 사용할 수 있도록 "Prepare"로 설정합니다.')
-
-                response = client.prepare_agent(
-                    agentId=agent_id
-                )
-                print('response of prepare_agent(): ', response)      
-                time.sleep(5) # delay 5 seconds
-
-            except Exception:
-                err_msg = traceback.format_exc()
-                print(f'error message: {err_msg}')                      
-                                
-        # else:
-        #     response = client.get_agent(
-        #         agentId=agent_id
-        #     )
-        #     print('response of get_agent(): ', response)
+    response = client.update_agent(
+        agentId=agentId,
+        agentName=agentName,
+        agentResourceRoleArn=agent_role_arn,
+        instruction=agent_instruction,
+        foundationModel=modelId,
+        description=f"Agent의 이름은 {agentName} 입니다. 사용 모델은 {modelName}입니다.",
+        idleSessionTTLInSeconds=600
+    )
+    print('response of update_agent(): ', response)
+    time.sleep(5)            
     
-    if not agent_alias_id and agent_id:
+    # preparing
+    try:
+        if debug_mode=="Enable":
+            st.info(f'{agentName}를 사용할 수 있도록 "Prepare"로 설정합니다.')
+
+        response = client.prepare_agent(
+            agentId=agentId
+        )
+        print('response of prepare_agent(): ', response)      
+        time.sleep(5) # delay 5 seconds
+
+    except Exception:
+        err_msg = traceback.format_exc()
+        print(f'error message: {err_msg}')         
+
+def create_agent(modelId, modelName, enable_knowledge_base, agentName, st):
+    client = boto3.client(
+        service_name='bedrock-agent',
+        region_name=bedrock_region
+    )  
+
+    if debug_mode=="Enable":
+        st.info(f"Agent를 생성합니다. 사용 모델은 {modelName}입니다.")
+
+    # create agent
+    agent_instruction = (
+        "당신의 이름은 서연이고, 질문에 친근한 방식으로 대답하도록 설계된 대화형 AI입니다. "
+        "상황에 맞는 구체적인 세부 정보를 충분히 제공합니다. "
+        "모르는 질문을 받으면 솔직히 모른다고 말합니다. "
+    )
+    print('modelId: ', modelId)
+
+    response = client.create_agent(
+        agentResourceRoleArn=agent_role_arn,
+        instruction=agent_instruction,
+        foundationModel=modelId,
+        description=f"Bedrock Agent (Knowledge Base) 입니다. 사용 모델은 {modelName}입니다.",
+        agentName=agentName,
+        idleSessionTTLInSeconds=600
+    )
+    print('response of create_agent(): ', response)
+
+    agentId = response['agent']['agentId']
+    print('agentId: ', agentId)
+    time.sleep(5)            
+    
+    # associate knowledge base            
+    if knowledge_base_id and enable_knowledge_base == "Enable":
+        if debug_mode=="Enable":
+            st.info("Agent에서 Knowledge Base를 사용할 수 있도록 설정합니다.")
+
+        rag_prompt = (
+            "당신의 이름은 서연이고, 질문에 대해 친절하게 답변하는 사려깊은 인공지능 도우미입니다."
+            "다음의 Reference texts을 이용하여 user의 질문에 답변합니다."
+            "모르는 질문을 받으면 솔직히 모른다고 말합니다."
+            "답변의 이유를 풀어서 명확하게 설명합니다."
+        )
+        try: 
+            response = client.associate_agent_knowledge_base(
+                agentId=agentId,
+                agentVersion='DRAFT',
+                description=rag_prompt,
+                knowledgeBaseId=knowledge_base_id,
+                knowledgeBaseState='ENABLED'
+            )
+            print(f'response of associate_agent_knowledge_base(): {response}')
+            time.sleep(5) # delay 5 seconds
+        except Exception:
+            err_msg = traceback.format_exc()
+            print(f'error message: {err_msg}')  
+
+    # preparing
+    try:
+        if debug_mode=="Enable":
+            st.info('Agent를 사용할 수 있도록 "Prepare"로 설정합니다.')
+
+        response = client.prepare_agent(
+            agentId=agentId
+        )
+        print('response of prepare_agent(): ', response)      
+        time.sleep(5) # delay 5 seconds
+
+    except Exception:
+        err_msg = traceback.format_exc()
+        print(f'error message: {err_msg}')         
+
+    return agentId           
+
+def retrieve_agent_id(agentName):
+    client = boto3.client(
+        service_name='bedrock-agent',
+        region_name=bedrock_region
+    )
+
+    response_agent = client.list_agents(
+        maxResults=10
+    )
+    print('response of list_agents(): ', response_agent)
+
+    agentId = ""
+    for summary in response_agent["agentSummaries"]:
+        if summary["agentName"] == agentName:
+            agentId = summary["agentId"]
+            print('agentId: ', agentId)
+            break
+
+    return agentId  
+
+def check_agent_status(agentName, agentAliasId, agentAliasName, enable_knowledge_base, st):
+    client = boto3.client(
+        service_name='bedrock-agent',
+        region_name=bedrock_region
+    )
+    agentId = retrieve_agent_id(agentName)  
+    
+    # create agent if no agent
+    if not agentId:
+        agentId = create_agent(model_id, model_name, enable_knowledge_base, agentName, st)                
+    # else:
+    #     response = client.get_agent(
+    #         agentId=agentId
+    #     )
+    #     print('response of get_agent(): ', response)
+
+    if not agentAliasId and agentId:
         if debug_mode=="Enable":
             st.info('Agent의 alias를 검색합니다.')
 
+        # retrieve agent alias
         response_agent_alias = client.list_agent_aliases(
-            agentId = agent_id,
+            agentId = agentId,
             maxResults=10
         )
         print('response of list_agent_aliases(): ', response_agent_alias)   
 
         for summary in response_agent_alias["agentAliasSummaries"]:
-            if summary["agentAliasName"] == agent_alias_name:                
-                agent_alias_id = summary["agentAliasId"]
-                print('agent_alias_id: ', agent_alias_id) 
+            if summary["agentAliasName"] == agentAliasName:
+                agentAliasId = summary["agentAliasId"]
+                print('agentAliasId: ', agentAliasId) 
 
                 print('agentAliasStatus: ', summary["agentAliasStatus"])
                 if not summary["agentAliasStatus"] == "PREPARED":
@@ -1602,7 +1705,7 @@ def run_bedrock_agent(text, st):
 
                     try: # preparing                        
                         response = client.prepare_agent(
-                            agentId=agent_id
+                            agentId=agentId
                         )
                         print('response of prepare_agent(): ', response)
                         time.sleep(5) # delay 5 seconds
@@ -1611,38 +1714,70 @@ def run_bedrock_agent(text, st):
                         print(f'error message: {err_msg}')
                 break
         
-        if not agent_alias_id:
+        # creat agent alias if no alias
+        if not agentAliasId:
             if debug_mode=="Enable":
                 st.info('Agent의 alias를 생성합니다.')
 
             response = client.create_agent_alias(
-                agentAliasName=agent_alias_name,
-                agentId=agent_id,
-                description='lastest deployment'
+                agentAliasName=agentAliasName,
+                agentId=agentId,
+                description='the lastest deployment'
             )
             print('response of create_agent_alias(): ', response)
 
-            agent_alias_id = response['agentAlias']['agentAliasId']
-            print('agent_alias_id: ', agent_alias_id)
+            agentAliasId = response['agentAlias']['agentAliasId']
+            print('agentAliasId: ', agentAliasId)
             time.sleep(5) # delay 5 seconds
+
+    return agentId, agentAliasId
+
+def run_bedrock_agent(text, agentName, st):   
+    global  agent_id, agent_alias_id, agent_kb_id, agent_kb_alias_id    
+    if agentName == agent_name:
+        agentId = agent_id
+        agentAliasId = agent_alias_id
+        agentAliasName = agent_alias_name
+        enable_knowledge_base = "Disable"
+    else:
+        agentId = agent_kb_id
+        agentAliasId = agent_kb_alias_id
+        agentAliasName = agent_kb_alias_name
+        enable_knowledge_base = "Enable"
+
+    print(f"agentId: {agentId} agentAliasId: {agentAliasId}")
+
+    if not agentId or not agentAliasId:        
+        agentId, agentAliasId = check_agent_status(agentName, agentAliasId, agentAliasName, enable_knowledge_base, st)
+        print(f"agentId: {agentId} agentAliasId: {agentAliasId}")
+
+        if agentName == agent_name:
+            agent_id = agentId
+            agent_alias_id = agentAliasId
+        else:
+            agent_kb_id = agentId
+            agent_kb_alias_id = agentAliasId
+
+    global reference_docs
+    reference_docs = []
 
     global sessionId
     if not userId in sessionId:
         sessionId[userId] = str(uuid.uuid4())
 
-    if agent_alias_id and agent_id:
+    if agentAliasId and agentId:
         #if debug_mode=="Enable":
         #    st.info('답변을 생성하고 있습니다.')
 
-        client_runtime = boto3.client(            
+        client_runtime = boto3.client(
             service_name='bedrock-agent-runtime',
             region_name=bedrock_region
         )
         try:
             if sessionState:
                 response = client_runtime.invoke_agent( 
-                    agentAliasId=agent_alias_id,
-                    agentId=agent_id,
+                    agentAliasId=agentAliasId,
+                    agentId=agentId,
                     inputText=text, 
                     enableTrace=True,
                     sessionId=sessionId[userId], 
@@ -1651,8 +1786,8 @@ def run_bedrock_agent(text, st):
                 )
             else:
                 response = client_runtime.invoke_agent( 
-                    agentAliasId=agent_alias_id,
-                    agentId=agent_id,
+                    agentAliasId=agentAliasId,
+                    agentId=agentId,
                     inputText=text, 
                     enableTrace=True,
                     sessionId=sessionId[userId], 
@@ -1669,7 +1804,7 @@ def run_bedrock_agent(text, st):
         reference = ""
         if reference_docs:
             reference = get_references(reference_docs)
-        print('reference: ', reference)        
+        print('reference: ', reference)
     
     return result+reference, reference_docs
 

@@ -12,7 +12,10 @@ mode_descriptions = {
         "Bedrock Flow를 이용하여 Workflow를 구현합니다."
     ],
     "Agent": [
-        "Bedrock Agent를 이용하여 RAG를 포함한 Workflow를 구현합니다."
+        "Bedrock Agent를 이용하여 Workflow를 구현합니다."
+    ],
+    "Agent with Knowlege Base": [
+        "Bedrock Agent와 Knowledge Base를 이용하여 Workflow를 구현합니다."
     ],
     "번역하기": [
         "한국어와 영어에 대한 번역을 제공합니다. 한국어로 입력하면 영어로, 영어로 입력하면 한국어로 번역합니다."        
@@ -38,7 +41,7 @@ with st.sidebar:
     # radio selection
     mode = st.radio(
         # label="원하는 대화 형태를 선택하세요. ",options=["일상적인 대화", "RAG", "Flow", "Agent", "번역하기", "문법 검토하기"], index=0
-        label="원하는 대화 형태를 선택하세요. ",options=["일상적인 대화", "RAG", "Agent", "번역하기", "문법 검토하기"], index=0
+        label="원하는 대화 형태를 선택하세요. ",options=["일상적인 대화", "RAG", "Agent", "Agent with Knowlege Base", "번역하기", "문법 검토하기"], index=0
     )   
     st.info(mode_descriptions[mode][0])
 
@@ -55,7 +58,7 @@ with st.sidebar:
     debugMode = 'Enable' if select_debugMode else 'Disable'
     #print('debugMode: ', debugMode)
 
-    chat.update(modelName, debugMode)
+    chat.update(modelName, debugMode, st)
 
     st.subheader("📋 문서 업로드")
     # print('fileId: ', chat.fileId)
@@ -193,7 +196,8 @@ if prompt := st.chat_input("메시지를 입력하세요."):
         
         elif mode == 'Agent':
             with st.status("thinking...", expanded=True, state="running") as status:
-                response, reference_docs = chat.run_bedrock_agent(prompt, st)        
+
+                response, reference_docs = chat.run_bedrock_agent(prompt, chat.agent_name, st)
                 st.write(response)
                 print('response: ', response)
                 
@@ -205,6 +209,20 @@ if prompt := st.chat_input("메시지를 입력하세요."):
             
             show_references(reference_docs) 
         
+        elif mode == 'Agent with Knowlege Base':
+            with st.status("thinking...", expanded=True, state="running") as status:
+                response, reference_docs = chat.run_bedrock_agent(prompt, chat.agent_kb_name, st)
+                st.write(response)
+                print('response: ', response)
+                
+                st.session_state.messages.append({"role": "assistant", "content": response})
+                if debugMode != "Enable":
+                    st.rerun()
+
+                chat.save_chat_history(prompt, response)
+            
+            show_references(reference_docs) 
+
         elif mode == '번역하기':
             response = chat.translate_text(prompt)
             st.write(response)
