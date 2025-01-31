@@ -521,7 +521,7 @@ export class CdkBedrockAgentStack extends cdk.Stack {
     );  
 
     // lambda-tool
-    const roleLambdaTools = new iam.Role(this, `role-lambda-tools-for-${projectName}`, {
+  /*  const roleLambdaTools = new iam.Role(this, `role-lambda-tools-for-${projectName}`, {
       roleName: `role-lambda-tools-for-${projectName}-${region}`,
       assumedBy: new iam.CompositePrincipal(
         new iam.ServicePrincipal("lambda.amazonaws.com"),
@@ -564,7 +564,7 @@ export class CdkBedrockAgentStack extends cdk.Stack {
     lambdaTools.addPermission(`lambda-tools-permission-for-${projectName}`, {      
       principal: new iam.ServicePrincipal('bedrock.amazonaws.com'),
       action: 'lambda:InvokeFunction'
-    })
+    }) */
 
     // user data for setting EC2
     const userData = ec2.UserData.forLinux();
