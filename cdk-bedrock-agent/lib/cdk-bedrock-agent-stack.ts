@@ -553,7 +553,7 @@ export class CdkBedrockAgentStack extends cdk.Stack {
     const lambdaTools = new lambda.Function(this, `lambda-tools-for-${projectName}`, {
       description: 'action group - tools',
       functionName: `lambda-tools-for-${projectName}`,
-      handler: 'lambda_handler.lambda_handler',
+      handler: 'dummy_lambda.lambda_handler',
       runtime: lambda.Runtime.PYTHON_3_13,
       role: roleLambdaTools,
       code: lambda.Code.fromAsset(path.join(__dirname, '../../lambda-tools')),
@@ -561,11 +561,10 @@ export class CdkBedrockAgentStack extends cdk.Stack {
       environment: {}
     });
 
-    lambdaTools.addPermission(`lambda-tools-permission-for-${projectName}`, {      
-      principal: new iam.ServicePrincipal('bedrock.amazonaws.com'),
-      action: 'lambda:InvokeFunction'
-    })
-
+    // lambdaTools.addPermission(`lambda-tools-permission-for-${projectName}`, {      
+    //   principal: new iam.ServicePrincipal('bedrock.amazonaws.com'),
+    //   action: 'lambda:InvokeFunction'
+    // })
     lambdaTools.grantInvoke(new cdk.aws_iam.ServicePrincipal("bedrock.amazonaws.com"));
 
     // user data for setting EC2
