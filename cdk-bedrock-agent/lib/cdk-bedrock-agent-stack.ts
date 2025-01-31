@@ -564,7 +564,7 @@ export class CdkBedrockAgentStack extends cdk.Stack {
 
     const lambdaTools = new lambda.DockerImageFunction(this, `lambda-tools-for-${projectName}`, {
       description: 'action group - tools',
-      functionName: `lambda-tools-${projectName}`,
+      functionName: `lambda-tools-for-${projectName}`,
       code: lambda.DockerImageCode.fromImageAsset(path.join(__dirname, '../../lambda-tools')),
       timeout: cdk.Duration.seconds(60),
       role: roleLambdaTools,
