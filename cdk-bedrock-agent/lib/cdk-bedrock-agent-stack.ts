@@ -549,13 +549,6 @@ export class CdkBedrockAgentStack extends cdk.Stack {
         statements: [CreateLogStreamPolicy],
       }),
     );      
-    roleLambdaTools.addToPolicy(new iam.PolicyStatement({
-      resources: ['*'],
-      actions: [
-        'lambda:InvokeFunction',
-        'cloudwatch:*'
-      ]
-    }));
     // lambda - tools
     const lambdaTools = new lambda.Function(this, `lambda-tools-for-${projectName}`, {
       description: 'action group - tools',
@@ -567,6 +560,12 @@ export class CdkBedrockAgentStack extends cdk.Stack {
       timeout: cdk.Duration.seconds(60),
       environment: {}
     });
+
+    lambdaTools.addPermission(`lambda-tools-permission-for-${projectName}`, {
+      principal: new iam.ServicePrincipal('bedrock.amazonaws.com'),
+      action: 'lambda:InvokeFunction',
+      sourceAccount: accountId
+    })
 
     // user data for setting EC2
     const userData = ec2.UserData.forLinux();
