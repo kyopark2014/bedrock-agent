@@ -541,7 +541,7 @@ export class CdkBedrockAgentStack extends cdk.Stack {
       }),
     );
     const CreateLogStreamPolicy = new iam.PolicyStatement({  
-      resources: [`"arn:aws:logs:${region}:${accountId}:log-group:/aws/lambda/*"`],
+      resources: [`arn:aws:logs:${region}:${accountId}:log-group:/aws/lambda/*`],
       actions: ["logs:CreateLogStream","logs:PutLogEvents"],
     });        
     roleLambdaTools.attachInlinePolicy( 
