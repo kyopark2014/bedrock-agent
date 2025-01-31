@@ -575,7 +575,7 @@ export class CdkBedrockAgentStack extends cdk.Stack {
     //   principal: new iam.ServicePrincipal('bedrock.amazonaws.com'),
     //   action: 'lambda:InvokeFunction'
     // })
-    lambdaTools.grantInvoke(new cdk.aws_iam.ServicePrincipal("bedrock.amazonaws.com")); */
+    lambdaTools.grantInvoke(new cdk.aws_iam.ServicePrincipal("bedrock.amazonaws.com")); 
 
     // user data for setting EC2
     const userData = ec2.UserData.forLinux();
