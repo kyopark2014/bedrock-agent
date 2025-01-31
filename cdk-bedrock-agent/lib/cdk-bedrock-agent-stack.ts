@@ -526,7 +526,8 @@ export class CdkBedrockAgentStack extends cdk.Stack {
       assumedBy: new iam.CompositePrincipal(
         new iam.ServicePrincipal("lambda.amazonaws.com"),
         new iam.ServicePrincipal("bedrock.amazonaws.com"),
-      )
+      ),
+      managedPolicies: [cdk.aws_iam.ManagedPolicy.fromAwsManagedPolicyName('CloudWatchLogsFullAccess')]
     });
     // roleLambdaTools.addManagedPolicy({  // grant log permission
     //   managedPolicyArn: 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole',
