@@ -1630,7 +1630,7 @@ def create_action_group(agentId, actionGroupName, st):
                         'parameters': {
                             'keyword': {
                                 'description': 'Search keyword',
-                                'required': 'True',
+                                'required': True,
                                 'type': 'string'
                             }
                         },
