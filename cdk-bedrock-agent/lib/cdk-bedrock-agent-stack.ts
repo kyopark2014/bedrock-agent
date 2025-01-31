@@ -521,7 +521,7 @@ export class CdkBedrockAgentStack extends cdk.Stack {
     );  
 
     // lambda-tool
-  /*  const roleLambdaTools = new iam.Role(this, `role-lambda-tools-for-${projectName}`, {
+    const roleLambdaTools = new iam.Role(this, `role-lambda-tools-for-${projectName}`, {
       roleName: `role-lambda-tools-for-${projectName}-${region}`,
       assumedBy: new iam.CompositePrincipal(
         new iam.ServicePrincipal("lambda.amazonaws.com"),
@@ -551,17 +551,26 @@ export class CdkBedrockAgentStack extends cdk.Stack {
       }),
     );      
     // lambda - tools
-    const lambdaTools = new lambda.Function(this, `lambda-tools-for-${projectName}`, {
-      description: 'action group - tools',
-      functionName: `lambda-tools-for-${projectName}`,
-      handler: 'dummy_lambda.lambda_handler',
-      runtime: lambda.Runtime.PYTHON_3_12,
-      role: roleLambdaTools,
-      code: lambda.Code.fromAsset(path.join(__dirname, '../../lambda-tools')),
-      timeout: cdk.Duration.seconds(60),
-      environment: {}
-    });
+    // const lambdaTools = new lambda.Function(this, `lambda-tools-for-${projectName}`, {
+    //   description: 'action group - tools',
+    //   functionName: `lambda-tools-for-${projectName}`,
+    //   handler: 'dummy_lambda.lambda_handler',
+    //   runtime: lambda.Runtime.PYTHON_3_12,
+    //   role: roleLambdaTools,
+    //   code: lambda.Code.fromAsset(path.join(__dirname, '../../lambda-tools')),
+    //   timeout: cdk.Duration.seconds(60),
+    //   environment: {}
+    // });
 
+    const lambdaTools = new lambda.DockerImageFunction(this, `lambda-tools-for-${projectName}`, {
+      description: 'action group - tools',
+      functionName: `lambda-tools-${projectName}`,
+      code: lambda.DockerImageCode.fromImageAsset(path.join(__dirname, '../../lambda-tools')),
+      timeout: cdk.Duration.seconds(60),
+      role: roleLambdaTools,
+      environment: {}
+    });     
+    
     // lambdaTools.addPermission(`lambda-tools-permission-for-${projectName}`, {      
     //   principal: new iam.ServicePrincipal('bedrock.amazonaws.com'),
     //   action: 'lambda:InvokeFunction'
@@ -582,7 +591,7 @@ export class CdkBedrockAgentStack extends cdk.Stack {
       "s3_bucket": s3Bucket.bucketName,      
       "s3_arn": s3Bucket.bucketArn,
       "sharing_url": 'https://'+distribution_sharing.domainName,
-   //   "lambda-tools": lambdaTools.functionArn
+      "lambda-tools": lambdaTools.functionArn
     }    
     new cdk.CfnOutput(this, `environment-for-${projectName}`, {
       value: JSON.stringify(environment),
