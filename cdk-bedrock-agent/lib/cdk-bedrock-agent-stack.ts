@@ -550,26 +550,27 @@ export class CdkBedrockAgentStack extends cdk.Stack {
         statements: [CreateLogStreamPolicy],
       }),
     );      
+    
     // lambda - tools
-    // const lambdaTools = new lambda.Function(this, `lambda-tools-for-${projectName}`, {
-    //   description: 'action group - tools',
-    //   functionName: `lambda-tools-for-${projectName}`,
-    //   handler: 'dummy_lambda.lambda_handler',
-    //   runtime: lambda.Runtime.PYTHON_3_12,
-    //   role: roleLambdaTools,
-    //   code: lambda.Code.fromAsset(path.join(__dirname, '../../lambda-tools')),
-    //   timeout: cdk.Duration.seconds(60),
-    //   environment: {}
-    // });
-
-    const lambdaTools = new lambda.DockerImageFunction(this, `lambda-tools-for-${projectName}`, {
+    const lambdaTools = new lambda.Function(this, `lambda-tools-for-${projectName}`, {
       description: 'action group - tools',
       functionName: `lambda-tools-for-${projectName}`,
-      code: lambda.DockerImageCode.fromImageAsset(path.join(__dirname, '../../lambda-tools')),
-      timeout: cdk.Duration.seconds(60),
+      handler: 'dummy_lambda.lambda_handler',
+      runtime: lambda.Runtime.PYTHON_3_12,
       role: roleLambdaTools,
+      code: lambda.Code.fromAsset(path.join(__dirname, '../../lambda-tools')),
+      timeout: cdk.Duration.seconds(60),
       environment: {}
-    });     
+    });
+
+    // const lambdaTools = new lambda.DockerImageFunction(this, `lambda-tools-for-${projectName}`, {
+    //   description: 'action group - tools',
+    //   functionName: `lambda-tools-for-${projectName}`,
+    //   code: lambda.DockerImageCode.fromImageAsset(path.join(__dirname, '../../lambda-tools')),
+    //   timeout: cdk.Duration.seconds(60),
+    //   role: roleLambdaTools,
+    //   environment: {}
+    // });     
     
     // lambdaTools.addPermission(`lambda-tools-permission-for-${projectName}`, {      
     //   principal: new iam.ServicePrincipal('bedrock.amazonaws.com'),
