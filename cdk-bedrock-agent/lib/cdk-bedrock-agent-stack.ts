@@ -9,6 +9,8 @@ import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as opensearchserverless from 'aws-cdk-lib/aws-opensearchserverless';
 import * as cloudFront from 'aws-cdk-lib/aws-cloudfront';
 import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
+import * as lambda from "aws-cdk-lib/aws-lambda";
+import * as path from "path";
 
 const projectName = `bedrock-agent`; 
 const region = process.env.CDK_DEFAULT_REGION;    
@@ -518,6 +520,46 @@ export class CdkBedrockAgentStack extends cdk.Stack {
       }),
     );  
 
+    // lambda-tool
+    const roleLambdaTools = new iam.Role(this, `role-lambda-tools-for-${projectName}`, {
+      roleName: `role-lambda-tools-for-${projectName}-${region}`,
+      assumedBy: new iam.CompositePrincipal(
+        new iam.ServicePrincipal("lambda.amazonaws.com"),
+        new iam.ServicePrincipal("bedrock.amazonaws.com"),
+      )
+    });
+    roleLambdaTools.addManagedPolicy({
+      managedPolicyArn: 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole',
+    });
+    const CreateLogPolicy = new iam.PolicyStatement({  
+      resources: [`arn:aws:logs:${region}:${accountId}:*`],
+      actions: ['logs:CreateLogGroup'],
+    });        
+    roleLambdaTools.attachInlinePolicy( 
+      new iam.Policy(this, `create-log-policy-lambda-tools-for-${projectName}`, {
+        statements: [CreateLogPolicy],
+      }),
+    );
+    const CreateLogStreamPolicy = new iam.PolicyStatement({  
+      resources: [`"arn:aws:logs:${region}:${accountId}:log-group:/aws/lambda/*"`],
+      actions: ["logs:CreateLogStream","logs:PutLogEvents"],
+    });        
+    roleLambdaTools.attachInlinePolicy( 
+      new iam.Policy(this, `create-log-policy-lambda-tools-for-${projectName}`, {
+        statements: [CreateLogStreamPolicy],
+      }),
+    );      
+    // lambda - tools
+    const lambdaTools = new lambda.Function(this, `lambda-tools-for-${projectName}`, {
+      description: 'lambda tools',
+      functionName: `lambda-tools-for-${projectName}`,
+      handler: 'lambda_function.lambda_handler',
+      runtime: lambda.Runtime.PYTHON_3_13,
+      code: lambda.Code.fromAsset(path.join(__dirname, '../../lambda-tools')),
+      timeout: cdk.Duration.seconds(30),
+      environment: {}
+    });
+
     // user data for setting EC2
     const userData = ec2.UserData.forLinux();
 
@@ -531,7 +573,8 @@ export class CdkBedrockAgentStack extends cdk.Stack {
       "opensearch_url": OpenSearchCollection.attrCollectionEndpoint,
       "s3_bucket": s3Bucket.bucketName,      
       "s3_arn": s3Bucket.bucketArn,
-      "sharing_url": 'https://'+distribution_sharing.domainName
+      "sharing_url": 'https://'+distribution_sharing.domainName,
+      "lambda-tools": lambdaTools.functionArn
     }    
     new cdk.CfnOutput(this, `environment-for-${projectName}`, {
       value: JSON.stringify(environment),

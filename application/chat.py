@@ -222,14 +222,14 @@ def get_chat():
     model_type = profile['model_type']
     if model_type == 'claude':
         maxOutputTokens = 4096 # 4k
-    else:
+    else: # nova
         maxOutputTokens = 5120 # 5k
     
     print(f'LLM: bedrock_region: {bedrock_region}, modelId: {modelId}, model_type: {model_type}')
 
-    if profile['model_type'] == 'nova':
+    if model_type == 'nova':
         STOP_SEQUENCE = '"\n\n<thinking>", "\n<thinking>", " <thinking>"'
-    elif profile['model_type'] == 'claude':
+    elif model_type == 'claude':
         STOP_SEQUENCE = "\n\nHuman:" 
                           
     # bedrock   
@@ -1576,6 +1576,42 @@ def update_agent(modelId, modelName, agentId, agentName, st):
     except Exception:
         err_msg = traceback.format_exc()
         print(f'error message: {err_msg}')         
+
+def create_action_group(agentId):
+    client = boto3.client(
+        service_name='bedrock-agent',
+        region_name=bedrock_region
+    )  
+
+    response = client.list_agent_action_groups(
+        agentId=agentId,
+        agentVersion='DRAFT',
+        maxResults=10
+    )
+    print('response of list_agent_action_groups(): ', response)
+
+    actionGroupSummaries = response['actionGroupSummaries']
+
+    for actionGroup in actionGroupSummaries:
+        actionGroupName = actionGroup['actionGroupId']
+        print('actionGroupName: ', actionGroupName)
+
+        
+
+    # action group: get_book_list
+    # action_group_name = "get_book_list"
+    # response = client.create_action_group(
+    #     actionGroupName=action_group_name,
+    #     actionGroupExecutor={'lambda': lambda_arn},
+    #     actionGroupState='ENABLED',
+    #     apiSchema={
+    #         's3': {
+    #             's3BucketName': s3_bucket,
+    #             's3ObjectKey': s3_object_key
+    #         }
+    #     },
+    #     description=f"Action Group의 이름은 {action_group_name} 입니다."
+    # )
 
 def create_agent(modelId, modelName, enable_knowledge_base, agentName, st):
     client = boto3.client(
