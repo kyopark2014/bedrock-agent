@@ -549,14 +549,22 @@ export class CdkBedrockAgentStack extends cdk.Stack {
         statements: [CreateLogStreamPolicy],
       }),
     );      
+    roleLambdaTools.addToPolicy(new iam.PolicyStatement({
+      resources: ['*'],
+      actions: [
+        'lambda:InvokeFunction',
+        'cloudwatch:*'
+      ]
+    }));
     // lambda - tools
     const lambdaTools = new lambda.Function(this, `lambda-tools-for-${projectName}`, {
-      description: 'lambda tools',
+      description: 'action group - tools',
       functionName: `lambda-tools-for-${projectName}`,
-      handler: 'lambda_function.lambda_handler',
+      handler: 'dummy_lambda.lambda_handler',
       runtime: lambda.Runtime.PYTHON_3_13,
+      role: roleLambdaTools,
       code: lambda.Code.fromAsset(path.join(__dirname, '../../lambda-tools')),
-      timeout: cdk.Duration.seconds(30),
+      timeout: cdk.Duration.seconds(60),
       environment: {}
     });
 

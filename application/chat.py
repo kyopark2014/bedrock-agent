@@ -95,6 +95,10 @@ s3_bucket = config["s3_bucket"] if "s3_bucket" in config else None
 if s3_bucket is None:
     raise Exception ("No storage!")
 
+lambda_tools_arn = config["lambda-tools"] if "lambda-tools" in config else None
+if lambda_tools_arn is None:
+    raise Exception ("No Lambda Tool")
+
 parsingModelArn = f"arn:aws:bedrock:{region}::foundation-model/anthropic.claude-3-haiku-20240307-v1:0"
 embeddingModelArn = f"arn:aws:bedrock:{region}::foundation-model/amazon.titan-embed-text-v2:0"
 
@@ -126,6 +130,8 @@ agent_alias_name = "latest_version"
 agent_kb_id = agent_kb_alias_id = None
 agent_kb_name = projectName+'-knowledge-base'
 agent_kb_alias_name = "latest_version"
+
+action_group_name = f"action_group_tools-for-{projectName}"
 
 def update(modelName, debugMode, st):    
     global model_name, model_id, model_type, debug_mode
@@ -1577,7 +1583,10 @@ def update_agent(modelId, modelName, agentId, agentName, st):
         err_msg = traceback.format_exc()
         print(f'error message: {err_msg}')         
 
-def create_action_group(agentId):
+def create_action_group(agentId, actionGroupName, st):
+    if debug_mode=="Enable":
+        st.info(f"Action Group에 {actionGroupName}이 존재하는지 확인합니다.")
+
     client = boto3.client(
         service_name='bedrock-agent',
         region_name=bedrock_region
@@ -1592,26 +1601,45 @@ def create_action_group(agentId):
 
     actionGroupSummaries = response['actionGroupSummaries']
 
+    isExist = False
     for actionGroup in actionGroupSummaries:
-        actionGroupName = actionGroup['actionGroupId']
-        print('actionGroupName: ', actionGroupName)
+        print('actionGroupName: ', actionGroup['actionGroupId'])
 
-        
+        if actionGroup['actionGroupId'] == actionGroupName:
+            print('action group already exists')
+            isExist = True
+            break
+    
+    print('isExist: ', isExist)
+    if not isExist:
+        if debug_mode=="Enable":
+            st.info(f"{actionGroupName} Action Group을 생성합니다.")
 
-    # action group: get_book_list
-    # action_group_name = "get_book_list"
-    # response = client.create_action_group(
-    #     actionGroupName=action_group_name,
-    #     actionGroupExecutor={'lambda': lambda_arn},
-    #     actionGroupState='ENABLED',
-    #     apiSchema={
-    #         's3': {
-    #             's3BucketName': s3_bucket,
-    #             's3ObjectKey': s3_object_key
-    #         }
-    #     },
-    #     description=f"Action Group의 이름은 {action_group_name} 입니다."
-    # )
+        response = client.create_agent_action_group(
+            actionGroupName=actionGroupName,
+            actionGroupState='ENABLED',
+            agentId=agentId,
+            agentVersion='DRAFT',
+            description=f"Action Group의 이름은 {actionGroupName} 입니다.",
+            actionGroupExecutor={'lambda': lambda_tools_arn},
+            functionSchema={
+                'functions': [
+                    {
+                        'description': 'Search book list by keyword and then return book list',
+                        'name': 'get_book_list',
+                        'parameters': {
+                            'keyword': {
+                                'description': 'Search keyword',
+                                'required': 'True',
+                                'type': 'string'
+                            }
+                        },
+                        'requireConfirmation': 'DISABLED'
+                    },
+                ]
+            },            
+        )
+        print('response of create_action_group(): ', response)
 
 def create_agent(modelId, modelName, enable_knowledge_base, agentName, st):
     client = boto3.client(
@@ -1642,7 +1670,10 @@ def create_agent(modelId, modelName, enable_knowledge_base, agentName, st):
 
     agentId = response['agent']['agentId']
     print('agentId: ', agentId)
-    time.sleep(5)            
+    time.sleep(5)   
+
+    # create action group
+    create_action_group(agentId, action_group_name, st)            
     
     # associate knowledge base            
     if knowledge_base_id and enable_knowledge_base == "Enable":
@@ -1682,7 +1713,7 @@ def create_agent(modelId, modelName, enable_knowledge_base, agentName, st):
 
     except Exception:
         err_msg = traceback.format_exc()
-        print(f'error message: {err_msg}')         
+        print(f'error message: {err_msg}')      
 
     return agentId           
 
