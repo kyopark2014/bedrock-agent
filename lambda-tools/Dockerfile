@@ -1,4 +1,4 @@
-FROM amazon/aws-lambda-python:3.11
+FROM amazon/aws-lambda-python:3.12
 
 WORKDIR /var/task/lambda-tools
 
