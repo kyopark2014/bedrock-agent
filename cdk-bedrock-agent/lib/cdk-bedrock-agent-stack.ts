@@ -553,7 +553,7 @@ export class CdkBedrockAgentStack extends cdk.Stack {
     const lambdaTools = new lambda.Function(this, `lambda-tools-for-${projectName}`, {
       description: 'action group - tools',
       functionName: `lambda-tools-for-${projectName}`,
-      handler: 'dummy_lambda.lambda_handler',
+      handler: 'lambda_handler.lambda_handler',
       runtime: lambda.Runtime.PYTHON_3_13,
       role: roleLambdaTools,
       code: lambda.Code.fromAsset(path.join(__dirname, '../../lambda-tools')),
