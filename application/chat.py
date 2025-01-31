@@ -1625,8 +1625,8 @@ def create_action_group(agentId, actionGroupName, st):
             functionSchema={
                 'functions': [
                     {
-                        'description': 'Search book list by keyword and then return book list',
                         'name': 'get_book_list',
+                        'description': 'Search book list by keyword and then return book list',                        
                         'parameters': {
                             'keyword': {
                                 'description': 'Search keyword',
