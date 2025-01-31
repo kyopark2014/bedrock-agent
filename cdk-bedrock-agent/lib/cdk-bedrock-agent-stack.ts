@@ -528,9 +528,9 @@ export class CdkBedrockAgentStack extends cdk.Stack {
         new iam.ServicePrincipal("bedrock.amazonaws.com"),
       )
     });
-    roleLambdaTools.addManagedPolicy({
-      managedPolicyArn: 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole',
-    });
+    // roleLambdaTools.addManagedPolicy({
+    //   managedPolicyArn: 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole',
+    // });
     const CreateLogPolicy = new iam.PolicyStatement({  
       resources: [`arn:aws:logs:${region}:${accountId}:*`],
       actions: ['logs:CreateLogGroup'],
@@ -566,7 +566,7 @@ export class CdkBedrockAgentStack extends cdk.Stack {
       action: 'lambda:InvokeFunction'
     })
 
-    lambdaTools.grantInvoke(new cdk.aws_iam.ServicePrincipal("bedrock.amazonaws.com"));
+    // lambdaTools.grantInvoke(new cdk.aws_iam.ServicePrincipal("bedrock.amazonaws.com"));
 
     // user data for setting EC2
     const userData = ec2.UserData.forLinux();
