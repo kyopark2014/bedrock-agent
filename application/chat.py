@@ -152,20 +152,9 @@ def update(modelName, debugMode, st):
             region_name=bedrock_region
         )  
 
+        agent_id = retrieve_agent_id(agent_name)
         print('agent_id: ', agent_id)
-        response_agent = ""
-        if not agent_id:
-            response_agent = client.list_agents(
-                maxResults=10
-            )
-            print('response of list_agents(): ', response_agent)
-            
-            for summary in response_agent["agentSummaries"]:
-                if summary["agentName"] == agent_name:
-                    agent_id = summary["agentId"]
-                    print('agent_id: ', agent_id)
-                    break
-
+        
         # update agent
         if agent_id: 
             agent_alias_id = update_agent(model_id, model_name, agent_id, agent_name, agent_alias_id, agent_alias_name, st)
@@ -173,19 +162,8 @@ def update(modelName, debugMode, st):
             agent_id = create_agent(model_id, model_name, "Disable", agent_name, st)
         
         # retrieve agent_kb_id
+        agent_kb_id = retrieve_agent_id(agent_kb_name)
         print('agent_kb_id: ', agent_kb_id)
-        if not agent_kb_id:
-            if not response_agent:
-                response_agent = client.list_agents(
-                    maxResults=10
-                )
-                print('response of list_agents(): ', response_agent)
-
-            for summary in response_agent["agentSummaries"]:
-                if summary["agentName"] == agent_kb_name:
-                    agent_kb_id = summary["agentId"]
-                    print('agent_kb_id: ', agent_kb_id)
-                    break
 
         # update agent (kb)
         if agent_kb_id: 
@@ -498,18 +476,18 @@ try:
     tavily_api_wrapper = TavilySearchAPIWrapper(tavily_api_key=tavily_key)
     #     os.environ["TAVILY_API_KEY"] = tavily_key
 
-    # Tavily Tool Test
-    query = 'what is Amazon Nova Pro?'
-    search = TavilySearchResults(
-        max_results=1,
-        include_answer=True,
-        include_raw_content=True,
-        api_wrapper=tavily_api_wrapper,
-        search_depth="advanced", # "basic"
-        # include_domains=["google.com", "naver.com"]
-    )
-    output = search.invoke(query)
-    print('tavily output: ', output)    
+    # # Tavily Tool Test
+    # query = 'what is Amazon Nova Pro?'
+    # search = TavilySearchResults(
+    #     max_results=1,
+    #     include_answer=True,
+    #     include_raw_content=True,
+    #     api_wrapper=tavily_api_wrapper,
+    #     search_depth="advanced", # "basic"
+    #     # include_domains=["google.com", "naver.com"]
+    # )
+    # output = search.invoke(query)
+    # print('tavily output: ', output)    
 except Exception as e: 
     print('Tavily credential is required: ', e)
     raise e
@@ -1715,8 +1693,8 @@ def create_action_group(agentId, actionGroupName, st):
                     {
                         'name': 'search_by_tavily',
                         'description': "Search general information by keyword and then return the result as a string.",
-                        'keyword': {
-                            'city': {
+                        'parameters': {
+                            'keyword': {
                                 'description': 'search keyword',
                                 'required': True,
                                 'type': 'string'
@@ -1727,8 +1705,8 @@ def create_action_group(agentId, actionGroupName, st):
                     {
                         'name': 'search_by_knowledge_base',
                         'description': "Search technical information by keyword and then return the result as a string.",
-                        'keyword': {
-                            'city': {
+                        'parameters': {
+                            'keyword': {
                                 'description': 'search keyword',
                                 'required': True,
                                 'type': 'string'
