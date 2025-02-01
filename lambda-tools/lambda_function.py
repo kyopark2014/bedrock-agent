@@ -271,7 +271,6 @@ def search_by_tavily(keyword: str) -> str:
     keyword: search keyword
     return: the information of keyword
     """    
-    global reference_docs    
     answer = ""
     
     if tavily_key:
@@ -294,18 +293,7 @@ def search_by_tavily(keyword: str) -> str:
                 print('result: ', result)
                 if result:
                     content = result.get("content")
-                    url = result.get("url")
-                    
-                    reference_docs.append(
-                        Document(
-                            page_content=content,
-                            metadata={
-                                'name': 'WWW',
-                                'url': url,
-                                'from': 'tavily'
-                            },
-                        )
-                    )                
+                    url = result.get("url")                    
                     answer = answer + f"{content}, URL: {url}\n"
         
         except Exception:
