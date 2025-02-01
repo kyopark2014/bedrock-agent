@@ -152,6 +152,7 @@ def update(modelName, debugMode, st):
         )  
 
         print('agent_id: ', agent_id)
+        response_agent = ""
         if not agent_id:
             response_agent = client.list_agents(
                 maxResults=10
@@ -173,6 +174,12 @@ def update(modelName, debugMode, st):
         # retrieve agent_kb_id
         print('agent_kb_id: ', agent_kb_id)
         if not agent_kb_id:
+            if not response_agent:
+                response_agent = client.list_agents(
+                    maxResults=10
+                )
+                print('response of list_agents(): ', response_agent)
+
             for summary in response_agent["agentSummaries"]:
                 if summary["agentName"] == agent_kb_name:
                     agent_kb_id = summary["agentId"]
