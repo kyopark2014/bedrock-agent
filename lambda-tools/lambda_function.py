@@ -16,9 +16,13 @@ from langchain.docstore.document import Document
 from langchain_aws import ChatBedrock
 from langchain_community.utilities.tavily_search import TavilySearchAPIWrapper
 from langchain_community.tools.tavily_search import TavilySearchResults
+from langchain_aws import AmazonKnowledgeBasesRetriever
+from urllib import parse
+from pydantic.v1 import BaseModel, Field
 
 bedrock_region = os.environ.get('bedrock_region')
 projectName = os.environ.get('projectName')
+path = os.environ.get('sharing_url')
 
 model_name = "Nova Lite"
 models = info.get_model_info(model_name)
@@ -54,22 +58,6 @@ try:
     tavily_api_wrapper = TavilySearchAPIWrapper(tavily_api_key=tavily_key)
     #     os.environ["TAVILY_API_KEY"] = tavily_key
 
-    # # Tavily Tool Test
-    # query = 'what is Amazon Nova Pro?'
-    # search = TavilySearchResults(
-    #     max_results=1,
-    #     include_answer=True,
-    #     include_raw_content=True,
-    #     api_wrapper=tavily_api_wrapper,
-    #     search_depth="advanced", # "basic"
-    #     # include_domains=["google.com", "naver.com"]
-    # )
-    # output = search.invoke(query)
-    # print('tavily output: ', output)
-        
-    # for result in output:
-    #     print('result: ', result)
-    #     break
 except Exception as e: 
     print('Tavily credential is required: ', e)
     raise e
@@ -307,6 +295,198 @@ def search_by_tavily(keyword: str) -> str:
 
     return answer
 
+numberOfDocs = 2
+knowledge_base_name = projectName
+s3_prefix = 'docs'
+doc_prefix = s3_prefix+'/'
+knowledge_base_id = ""
+try: 
+    client = boto3.client(
+        service_name='bedrock-agent',
+        region_name=bedrock_region
+    )   
+    response = client.list_knowledge_bases(
+        maxResults=10
+    )
+    print('(list_knowledge_bases) response: ', response)
+    
+    if "knowledgeBaseSummaries" in response:
+        summaries = response["knowledgeBaseSummaries"]
+        for summary in summaries:
+            if summary["name"] == knowledge_base_name:
+                knowledge_base_id = summary["knowledgeBaseId"]
+                print('knowledge_base_id: ', knowledge_base_id)
+except Exception:
+    err_msg = traceback.format_exc()
+    print('error message: ', err_msg)                    
+
+class GradeDocuments(BaseModel):
+    """Binary score for relevance check on retrieved documents."""
+
+    binary_score: str = Field(description="Documents are relevant to the question, 'yes' or 'no'")
+
+def get_retrieval_grader(chat):
+    system = (
+        "You are a grader assessing relevance of a retrieved document to a user question."
+        "If the document contains keyword(s) or semantic meaning related to the question, grade it as relevant."
+        "Give a binary score 'yes' or 'no' score to indicate whether the document is relevant to the question."
+    )
+
+    grade_prompt = ChatPromptTemplate.from_messages(
+        [
+            ("system", system),
+            ("human", "Retrieved document: \n\n {document} \n\n User question: {question}"),
+        ]
+    )    
+    structured_llm_grader = chat.with_structured_output(GradeDocuments)
+    retrieval_grader = grade_prompt | structured_llm_grader
+    return retrieval_grader
+
+def grade_documents(question, documents):
+    print("###### grade_documents ######")
+    
+    print("start grading...")    
+    # Score each doc    
+    filtered_docs = []
+    chat = get_chat()
+    retrieval_grader = get_retrieval_grader(chat)
+    for i, doc in enumerate(documents):
+        # print('doc: ', doc)
+        
+        score = retrieval_grader.invoke({"question": question, "document": doc.page_content})
+        # print("score: ", score)
+        
+        grade = score.binary_score
+        # print("grade: ", grade)
+        # Document relevant
+        if grade.lower() == "yes":
+            print("---GRADE: DOCUMENT RELEVANT---")
+            filtered_docs.append(doc)
+        # Document not relevant
+        else:
+            print("---GRADE: DOCUMENT NOT RELEVANT---")
+            # We do not include the document in filtered_docs
+            # We set a flag to indicate that we want to run web search
+            continue
+
+    return filtered_docs
+
+contentList = []
+def check_duplication(docs):
+    global contentList
+    length_original = len(docs)
+    
+    updated_docs = []
+    print('length of relevant_docs:', len(docs))
+    for doc in docs:            
+        if doc.page_content in contentList:
+            print('duplicated!')
+            continue
+        contentList.append(doc.page_content)
+        updated_docs.append(doc)            
+    length_updated_docs = len(updated_docs)   
+    
+    if length_original == length_updated_docs:
+        print('no duplication')
+    else:
+        print('length of updated relevant_docs: ', length_updated_docs)
+    
+    return updated_docs
+
+def search_by_knowledge_base(keyword: str) -> str:
+    """
+    Search technical information by keyword and then return the result as a string.
+    keyword: search keyword
+    return: the technical information of keyword
+    """    
+    print("###### search_by_knowledge_base ######")    
+    
+    reference_docs = []
+
+    global contentList
+    contentList = []
+ 
+    print('keyword: ', keyword)
+    keyword = keyword.replace('\'','')
+    keyword = keyword.replace('|','')
+    keyword = keyword.replace('\n','')
+    print('modified keyword: ', keyword)
+    
+    top_k = numberOfDocs
+    relevant_docs = []
+    filtered_docs = []
+    if knowledge_base_id:    
+        retriever = AmazonKnowledgeBasesRetriever(
+            knowledge_base_id=knowledge_base_id, 
+            retrieval_config={"vectorSearchConfiguration": {
+                "numberOfResults": top_k,
+                "overrideSearchType": "HYBRID"   # SEMANTIC
+            }},
+        )
+        
+        docs = retriever.invoke(keyword)
+        # print('docs: ', docs)
+        print('--> docs from knowledge base')
+        for i, doc in enumerate(docs):
+            # print_doc(i, doc)
+            
+            content = ""
+            if doc.page_content:
+                content = doc.page_content
+            
+            score = doc.metadata["score"]
+            
+            link = ""
+            if "s3Location" in doc.metadata["location"]:
+                link = doc.metadata["location"]["s3Location"]["uri"] if doc.metadata["location"]["s3Location"]["uri"] is not None else ""
+                
+                # print('link:', link)    
+                pos = link.find(f"/{doc_prefix}")
+                name = link[pos+len(doc_prefix)+1:]
+                encoded_name = parse.quote(name)
+                # print('name:', name)
+                link = f"{path}/{doc_prefix}{encoded_name}"
+                
+            elif "webLocation" in doc.metadata["location"]:
+                link = doc.metadata["location"]["webLocation"]["url"] if doc.metadata["location"]["webLocation"]["url"] is not None else ""
+                name = "WEB"
+
+            url = link
+            # print('url:', url)
+            
+            relevant_docs.append(
+                Document(
+                    page_content=content,
+                    metadata={
+                        'name': name,
+                        'score': score,
+                        'url': url,
+                        'from': 'RAG'
+                    },
+                )
+            )    
+    
+        # grading        
+        filtered_docs = grade_documents(keyword, relevant_docs)
+
+        filtered_docs = check_duplication(filtered_docs) # duplication checker
+
+        relevant_context = ""
+        for i, document in enumerate(filtered_docs):
+            print(f"{i}: {document}")
+            if document.page_content:
+                relevant_context += document.page_content + "\n\n"        
+        print('relevant_context: ', relevant_context)
+    
+    if len(filtered_docs):
+        reference_docs += filtered_docs
+        return relevant_context
+    else:        
+        # relevant_context = "No relevant documents found."
+        relevant_context = "관련된 정보를 찾지 못하였습니다."
+        print(f"--> {relevant_context}")
+        return relevant_context
+
 def lambda_handler(event, context):
     print('event: ', event)
     
@@ -332,7 +512,7 @@ def lambda_handler(event, context):
     elif function == 'search_by_tavily':
         output = search_by_tavily(value)
     elif function == 'search_by_knowledge_base':
-        output = search_by_tavily(value)
+        output = search_by_knowledge_base(value)
 
     responseBody =  {
         "TEXT": {

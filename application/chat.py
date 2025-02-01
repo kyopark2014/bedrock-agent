@@ -1948,8 +1948,9 @@ def run_bedrock_agent(text, agentName, st):
             result = show_output(response_stream, st)
             # print('response_stream: ', response_stream)            
         except Exception as e:
+            agent_id = agent_alias_id = agent_kb_id = agent_kb_alias_id = ""
             raise Exception("unexpected event.",e)
-        
+                
         reference = ""
         if reference_docs:
             reference = get_references(reference_docs)

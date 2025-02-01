@@ -593,7 +593,8 @@ export class CdkBedrockAgentStack extends cdk.Stack {
       role: roleLambdaTools,
       environment: {
         bedrock_region: String(region),
-        projectName: projectName
+        projectName: projectName,
+        "sharing_url": 'https://'+distribution_sharing.domainName,
       }
     });     
     
