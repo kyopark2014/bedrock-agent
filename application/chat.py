@@ -1914,6 +1914,7 @@ def run_bedrock_agent(text, agentName, st):
     if not userId in sessionId:
         sessionId[userId] = str(uuid.uuid4())
 
+    result = ""
     if agentAliasId and agentId:
         #if debug_mode=="Enable":
         #    st.info('답변을 생성하고 있습니다.')
@@ -1949,7 +1950,10 @@ def run_bedrock_agent(text, agentName, st):
             # print('response_stream: ', response_stream)            
         except Exception as e:
             agent_id = agent_alias_id = agent_kb_id = agent_kb_alias_id = ""
-            raise Exception("unexpected event.",e)
+            # raise Exception("unexpected event.",e)
+            st.error('실패하여 agent 정보를 초기화하였습니다. 재시도해주세요.')
+            err_msg = traceback.format_exc()
+            print(f'error message: {err_msg}')
                 
         reference = ""
         if reference_docs:
