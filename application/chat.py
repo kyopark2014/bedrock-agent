@@ -1688,6 +1688,54 @@ def create_action_group(agentId, actionGroupName, st):
                         },
                         'requireConfirmation': 'DISABLED'
                     },
+                    {
+                        'name': 'get_current_time',
+                        'description': "Returns the current date and time in the specified format such as %Y-%m-%d %H:%M:%S",
+                        'parameters': {
+                            'format': {
+                                'description': 'time format of the current time',
+                                'required': True,
+                                'type': 'string'
+                            }
+                        },
+                        'requireConfirmation': 'DISABLED'
+                    },
+                    {
+                        'name': 'get_weather_info',
+                        'description': "Retrieve weather information by city name and then return weather statement.",
+                        'parameters': {
+                            'city': {
+                                'description': 'the name of city to retrieve',
+                                'required': True,
+                                'type': 'string'
+                            }
+                        },
+                        'requireConfirmation': 'DISABLED'
+                    },
+                    {
+                        'name': 'search_by_tavily',
+                        'description': "Search general information by keyword and then return the result as a string.",
+                        'keyword': {
+                            'city': {
+                                'description': 'search keyword',
+                                'required': True,
+                                'type': 'string'
+                            }
+                        },
+                        'requireConfirmation': 'DISABLED'
+                    },
+                    {
+                        'name': 'search_by_knowledge_base',
+                        'description': "Search technical information by keyword and then return the result as a string.",
+                        'keyword': {
+                            'city': {
+                                'description': 'search keyword',
+                                'required': True,
+                                'type': 'string'
+                            }
+                        },
+                        'requireConfirmation': 'DISABLED'
+                    }
                 ]
             },            
         )
