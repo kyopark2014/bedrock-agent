@@ -521,7 +521,6 @@ export class CdkBedrockAgentStack extends cdk.Stack {
     );  
 
     // lambda-tool
-    /*
     const roleLambdaTools = new iam.Role(this, `role-lambda-tools-for-${projectName}`, {
       roleName: `role-lambda-tools-for-${projectName}-${region}`,
       assumedBy: new iam.CompositePrincipal(
@@ -586,7 +585,7 @@ export class CdkBedrockAgentStack extends cdk.Stack {
     //   action: 'lambda:InvokeFunction'
     // })
     lambdaTools.grantInvoke(new cdk.aws_iam.ServicePrincipal("bedrock.amazonaws.com")); 
-*/
+
     // user data for setting EC2
     const userData = ec2.UserData.forLinux();
 
@@ -601,7 +600,7 @@ export class CdkBedrockAgentStack extends cdk.Stack {
       "s3_bucket": s3Bucket.bucketName,      
       "s3_arn": s3Bucket.bucketArn,
       "sharing_url": 'https://'+distribution_sharing.domainName,
-    //  "lambda-tools": lambdaTools.functionArn
+      "lambda-tools": lambdaTools.functionArn
     }    
     new cdk.CfnOutput(this, `environment-for-${projectName}`, {
       value: JSON.stringify(environment),
