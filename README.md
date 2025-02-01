@@ -123,7 +123,7 @@ lambda-tools를 압축해서 올리는 명령어는 아래와 같습니다. 압�
 cd lambda-tools/
 pip install --target ./package requests beautifulsoup4 pytz tavily-python langchain_aws langchain # package 설치
 cd package && zip -r ../my_deployment_package.zip .
-cd .. && zip my_deployment_package.zip lambda_function.py # add lambda_function.py
+cd .. && zip my_deployment_package.zip lambda_function.py info.py # add lambda_function.py
 ```
 
 
