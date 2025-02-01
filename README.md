@@ -146,7 +146,8 @@ cd .. && zip my_deployment_package.zip dummy_lambda.py # add dummy_lambda.py
 
 메뉴에서 "Agent"를 선택하고 "여행과 관련된 책 추천해줘."라고 입력한 후에 결과를 확인합니다. 아래와 같이 action group에서 "get_book_list"를 호출하여 얻은 값을 가지고 답변을 생성하였습니다.
 
-![noname](https://github.com/user-attachments/assets/24924379-29e6-4207-9c82-eff00bae9494)
+
+<img src="https://github.com/user-attachments/assets/b4966b10-1799-4552-8b1e-48bd108dd904" width="600">
 
 
 ## 리소스 정리하기 
