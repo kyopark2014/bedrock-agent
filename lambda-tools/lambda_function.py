@@ -354,10 +354,10 @@ def grade_documents(question, documents):
         # print('doc: ', doc)
         
         score = retrieval_grader.invoke({"question": question, "document": doc.page_content})
-        # print("score: ", score)
+        print("score: ", score)
         
         grade = score.binary_score
-        # print("grade: ", grade)
+        print("grade: ", grade)
         # Document relevant
         if grade.lower() == "yes":
             print("---GRADE: DOCUMENT RELEVANT---")
