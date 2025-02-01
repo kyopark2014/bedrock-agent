@@ -555,17 +555,17 @@ export class CdkBedrockAgentStack extends cdk.Stack {
 
     // bedrock
     roleLambdaTools.attachInlinePolicy( 
-      new iam.Policy(this, `bedrock-invoke-policy-for-${projectName}`, {
+      new iam.Policy(this, `tool-bedrock-invoke-policy-for-${projectName}`, {
         statements: [bedrockInvokePolicy],
       }),
     );  
     roleLambdaTools.attachInlinePolicy( 
-      new iam.Policy(this, `bedrock-agent-opensearch-policy-for-${projectName}`, {
+      new iam.Policy(this, `tool-bedrock-agent-opensearch-policy-for-${projectName}`, {
         statements: [knowledgeBaseOpenSearchPolicy],
       }),
     );  
     roleLambdaTools.attachInlinePolicy( 
-      new iam.Policy(this, `bedrock-agent-bedrock-policy-for-${projectName}`, {
+      new iam.Policy(this, `tool-bedrock-agent-bedrock-policy-for-${projectName}`, {
         statements: [knowledgeBaseBedrockPolicy],
       }),
     );  
