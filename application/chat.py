@@ -136,6 +136,7 @@ action_group_name = f"action_group_tools-for-{projectName}"
 def update(modelName, debugMode, st):    
     global model_name, model_id, model_type, debug_mode
     global models, agent_id, agent_kb_id
+    global agent_alias_id, agent_kb_alias_id
     
     if model_name != modelName:
         model_name = modelName
@@ -167,7 +168,7 @@ def update(modelName, debugMode, st):
 
         # update agent
         if agent_id: 
-            update_agent(model_id, model_name, agent_id, agent_name, st)
+            agent_alias_id = update_agent(model_id, model_name, agent_id, agent_name, agent_alias_id, agent_alias_name, st)
         else:
             agent_id = create_agent(model_id, model_name, "Disable", agent_name, st)
         
@@ -188,7 +189,7 @@ def update(modelName, debugMode, st):
 
         # update agent (kb)
         if agent_kb_id: 
-            update_agent(model_id, model_name, agent_kb_id, agent_kb_name, st)
+            agent_kb_alias_id = update_agent(model_id, model_name, agent_kb_id, agent_kb_name, agent_kb_alias_id, agent_kb_alias_name, st)                        
         else:
             agent_kb_id = create_agent(model_id, model_name, "Enable", agent_kb_name, st)
                                 
@@ -1546,7 +1547,7 @@ def show_output2(response_stream, st):
                             )    
     print('reference_docs: ', reference_docs)
 
-def update_agent(modelId, modelName, agentId, agentName, st):
+def update_agent(modelId, modelName, agentId, agentName, agentAliasId, agentAliasName, st):
     client = boto3.client(
         service_name='bedrock-agent',
         region_name=bedrock_region
@@ -1556,30 +1557,34 @@ def update_agent(modelId, modelName, agentId, agentName, st):
         st.info(f"{agentName}의 모델을 {modelName}로 업데이트합니다.")
 
     # create agent
-    agent_instruction = (
-        "당신의 이름은 서연이고, 질문에 친근한 방식으로 대답하도록 설계된 대화형 AI입니다. "
-        "상황에 맞는 구체적인 세부 정보를 충분히 제공합니다. "
-        "모르는 질문을 받으면 솔직히 모른다고 말합니다. "
-    )
-    print('modelId: ', modelId)
+    try:
+        agent_instruction = (
+            "당신의 이름은 서연이고, 질문에 친근한 방식으로 대답하도록 설계된 대화형 AI입니다. "
+            "상황에 맞는 구체적인 세부 정보를 충분히 제공합니다. "
+            "모르는 질문을 받으면 솔직히 모른다고 말합니다. "
+        )
+        print('modelId: ', modelId)
 
-    response = client.update_agent(
-        agentId=agentId,
-        agentName=agentName,
-        agentResourceRoleArn=agent_role_arn,
-        instruction=agent_instruction,
-        foundationModel=modelId,
-        description=f"Agent의 이름은 {agentName} 입니다. 사용 모델은 {modelName}입니다.",
-        idleSessionTTLInSeconds=600
-    )
-    print('response of update_agent(): ', response)
+        response = client.update_agent(
+            agentId=agentId,
+            agentName=agentName,
+            agentResourceRoleArn=agent_role_arn,
+            instruction=agent_instruction,
+            foundationModel=modelId,
+            description=f"Agent의 이름은 {agentName} 입니다. 사용 모델은 {modelName}입니다.",
+            idleSessionTTLInSeconds=600
+        )
+        print('response of update_agent(): ', response)
+    except Exception:
+        err_msg = traceback.format_exc()
+        print(f'error message: {err_msg}')   
+
     time.sleep(5)            
     
     # preparing
+    if debug_mode=="Enable":
+        st.info(f'{agentName}를 사용할 수 있도록 "Prepare"로 설정합니다.')    
     try:
-        if debug_mode=="Enable":
-            st.info(f'{agentName}를 사용할 수 있도록 "Prepare"로 설정합니다.')
-
         response = client.prepare_agent(
             agentId=agentId
         )
@@ -1588,7 +1593,47 @@ def update_agent(modelId, modelName, agentId, agentName, st):
 
     except Exception:
         err_msg = traceback.format_exc()
-        print(f'error message: {err_msg}')         
+        print(f'error message: {err_msg}')        
+
+    if debug_mode=="Enable":
+        st.info(f'{agentName}을 {agentAliasName}로 배포합니다.')
+    try:
+        # retrieve agent alias
+        response_agent_alias = client.list_agent_aliases(
+            agentId = agentId,
+            maxResults=10
+        )
+        print('response of list_agent_aliases(): ', response_agent_alias)   
+
+        for summary in response_agent_alias["agentAliasSummaries"]:
+            if summary["agentAliasName"] == agentAliasName:
+                agentAliasId = summary["agentAliasId"]
+                print('agentAliasId: ', agentAliasId) 
+                break
+
+        if agentAliasId:
+            response = client.delete_agent_alias(
+                agentAliasId=agentAliasId,
+                agentId=agentId
+            )            
+            print('response of agentAliasId(): ', response)     
+        
+        # create agent alias 
+        response = client.create_agent_alias(
+            agentAliasName=agentAliasName,
+            agentId=agentId,
+            description='the lastest deployment'
+        )
+        print('response of create_agent_alias(): ', response)
+
+        agentAliasId = response['agentAlias']['agentAliasId']
+        print('agentAliasId: ', agentAliasId)
+
+    except Exception:
+        err_msg = traceback.format_exc()
+        print(f'error message: {err_msg}')   
+
+    return agentAliasId
 
 def create_action_group(agentId, actionGroupName, st):
     if debug_mode=="Enable":
