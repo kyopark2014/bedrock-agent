@@ -10,7 +10,7 @@
 
 ## 전체 Architecture
 
-<img width="800" alt="image" src="https://github.com/user-attachments/assets/67c8e90d-5053-457e-917b-25ef457263e2" />
+<img width="800" alt="image" src="https://github.com/user-attachments/assets/aef453d3-c7d0-44d3-af93-24c9031bb7ec" />
 
 ## 상세 구현
 
