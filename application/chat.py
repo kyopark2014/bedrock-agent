@@ -1369,7 +1369,7 @@ def show_output(event_stream, st):
                     if "finalResponse" in trace_event["observation"]:
                         trace_resp = trace_event["observation"]["finalResponse"]["text"]
                         print('final response: ', trace_resp)                            
-                        st.info(f"finalResponse: {trace_resp}")
+                        # st.info(f"finalResponse: {trace_resp}")
                         final_result = trace_resp
 
                     if ("codeInterpreterInvocationOutput" in trace_event["observation"]):

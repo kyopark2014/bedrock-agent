@@ -349,25 +349,32 @@ def grade_documents(question, documents):
     # Score each doc    
     filtered_docs = []
     chat = get_chat()
-    retrieval_grader = get_retrieval_grader(chat)
-    for i, doc in enumerate(documents):
-        # print('doc: ', doc)
-        
-        score = retrieval_grader.invoke({"question": question, "document": doc.page_content})
-        print("score: ", score)
-        
-        grade = score.binary_score
-        print("grade: ", grade)
-        # Document relevant
-        if grade.lower() == "yes":
-            print("---GRADE: DOCUMENT RELEVANT---")
-            filtered_docs.append(doc)
-        # Document not relevant
-        else:
-            print("---GRADE: DOCUMENT NOT RELEVANT---")
-            # We do not include the document in filtered_docs
-            # We set a flag to indicate that we want to run web search
-            continue
+
+    for attempt in range(5):
+        try:
+            retrieval_grader = get_retrieval_grader(chat)
+            for i, doc in enumerate(documents):
+                # print('doc: ', doc)
+                
+                score = retrieval_grader.invoke({"question": question, "document": doc.page_content})
+                # print("score: ", score)
+                
+                grade = score.binary_score
+                print(f"{attempt}--> grade: {grade}")
+                # Document relevant
+                if grade.lower() == "yes":
+                    print("---GRADE: DOCUMENT RELEVANT---")
+                    filtered_docs.append(doc)
+                # Document not relevant
+                else:
+                    print("---GRADE: DOCUMENT NOT RELEVANT---")
+                    # We do not include the document in filtered_docs
+                    # We set a flag to indicate that we want to run web search
+                    continue            
+            break
+        except Exception:
+            err_msg = traceback.format_exc()
+            print('error message: ', err_msg)    
 
     return filtered_docs
 
