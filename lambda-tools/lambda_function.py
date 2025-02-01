@@ -277,7 +277,7 @@ def search_by_tavily(keyword: str) -> str:
         keyword = keyword.replace('\'','')
         
         search = TavilySearchResults(
-            max_results=3,
+            max_results=2,
             include_answer=True,
             include_raw_content=True,
             api_wrapper=tavily_api_wrapper,
@@ -294,7 +294,7 @@ def search_by_tavily(keyword: str) -> str:
                 if result:
                     content = result.get("content")
                     url = result.get("url")                    
-                    answer = answer + f"{content}, URL: {url}\n"
+                    answer = answer + f"{content}, URL: {url}\n\n"
         
         except Exception:
             err_msg = traceback.format_exc()
