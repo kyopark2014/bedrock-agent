@@ -16,6 +16,46 @@
 
 ## 상세 구현
 
+### 일반적인 대화
+
+일반적인 대화에서는 프롬프트의 chatbot의 이름을 지정하고 원하는 동작을 수행하도록 요청할 수 있습니다. 또한 아래와 같이 history를 이용해 이전 대화내용을 참조하여 답변하도록 합니다. 결과는 stream으로 전달되어 streamlit으로 표시됩니다.
+
+```python
+def general_conversation(query):
+    chat = get_chat()
+
+    system = (
+        "당신의 이름은 서연이고, 질문에 대해 친절하게 답변하는 사려깊은 인공지능 도우미입니다."
+        "상황에 맞는 구체적인 세부 정보를 충분히 제공합니다." 
+        "모르는 질문을 받으면 솔직히 모른다고 말합니다."
+    )    
+    human = "Question: {input}"
+    
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", system), 
+        MessagesPlaceholder(variable_name="history"), 
+        ("human", human)
+    ])                
+    history = memory_chain.load_memory_variables({})["chat_history"]
+
+    chain = prompt | chat | StrOutputParser()
+    try: 
+        stream = chain.stream(
+            {
+                "history": history,
+                "input": query,
+            }
+        )  
+        print('stream: ', stream)
+            
+    except Exception:
+        err_msg = traceback.format_exc()
+        print('error message: ', err_msg)        
+        raise Exception ("Not able to request to LLM: "+err_msg)
+        
+    return stream
+```
+
 ### RAG
 
 Knowledge Base를 이용해 관련된 문서를 가져옵니다. 문서 원본을 확인할 수 있도록 파일의 url은 cloudfront의 도메인을 기준으로 제공합니다. 문서의 조회는 LangChain의 [AmazonKnowledgeBasesRetriever](https://api.python.langchain.com/en/latest/community/retrievers/langchain_community.retrievers.bedrock.AmazonKnowledgeBasesRetriever.html)을 이용하여 numberOfResults만큼 가져옵니다. 이때 overrideSearchType로 'HYBRID'와 'SEMANTIC"을 선택할 수 있습니다. LangChain을 사용하지 않을 경우에 boto3의 [retrieve_and_generate](https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/bedrock-agent-runtime/client/retrieve_and_generate.html#)을 이용해 유사하게 구현이 가능합니다. 
@@ -143,6 +183,179 @@ agent_role.attachInlinePolicy(
   }),
 );
 ```
+
+Bedrock agent는 console에서 생성할 수도 있지만 아래와 같이 boto3의 [create_agent](https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/bedrock-agent/client/create_agent.html)을 이용해 생성할 수 있습니다. 이때 agent의 instruction을 지정하고 agent role을 활용합니다. 생성된 agentId는 이후 agent에 추가 설정을 하거나 실행할때 활용됩니다.
+
+```python
+client = boto3.client(
+    service_name='bedrock-agent',
+    region_name=bedrock_region
+)  
+agent_instruction = (
+    "당신의 이름은 서연이고, 질문에 친근한 방식으로 대답하도록 설계된 대화형 AI입니다. "
+    "상황에 맞는 구체적인 세부 정보를 충분히 제공합니다. "
+    "모르는 질문을 받으면 솔직히 모른다고 말합니다. "
+)
+response = client.create_agent(
+    agentResourceRoleArn=agent_role_arn,
+    instruction=agent_instruction,
+    foundationModel=modelId,
+    description=f"Bedrock Agent (Knowledge Base) 입니다. 사용 모델은 {modelName}입니다.",
+    agentName=agentName,
+    idleSessionTTLInSeconds=600
+)
+agentId = response['agent']['agentId']
+```
+
+Bedrock agent에서 실행할 tool들은 action group에서 정의합니다. Action group이 이미 있는지를 [list_agent_action_groups](https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/bedrock-agent/client/list_agent_action_groups.html)로 확인하고, [create_agent_action_group](https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/bedrock-agent/client/create_agent_action_group.html)을 이용해 action group을 생성할 수 있습니다.
+
+```python
+response = client.list_agent_action_groups(
+    agentId=agentId,
+    agentVersion='DRAFT',
+    maxResults=10
+)
+actionGroupSummaries = response['actionGroupSummaries']
+
+isExist = False
+for actionGroup in actionGroupSummaries:
+    if actionGroup['actionGroupId'] == actionGroupName:
+        isExist = True
+        break
+if not isExist:
+    response = client.create_agent_action_group(
+        actionGroupName=actionGroupName,
+        actionGroupState='ENABLED',
+        agentId=agentId,
+        agentVersion='DRAFT',
+        description=f"Action Group의 이름은 {actionGroupName} 입니다.",
+        actionGroupExecutor={'lambda': lambda_tools_arn},
+        functionSchema={
+            'functions': [
+                {
+                    'name': 'get_book_list',
+                    'description': 'Search book list by keyword and then return book list',                        
+                    'parameters': {
+                        'keyword': {
+                            'description': 'Search keyword',
+                            'required': True,
+                            'type': 'string'
+                        }
+                    },
+                    'requireConfirmation': 'DISABLED'
+                },
+                {
+                    'name': 'get_current_time',
+                    'description': "Returns the current date and time in the specified format such as %Y-%m-%d %H:%M:%S",
+                    'parameters': {
+                        'format': {
+                            'description': 'time format of the current time',
+                            'required': True,
+                            'type': 'string'
+                        }
+                    },
+                    'requireConfirmation': 'DISABLED'
+                },
+                {
+                    'name': 'get_weather_info',
+                    'description': "Retrieve weather information by city name and then return weather statement.",
+                    'parameters': {
+                        'city': {
+                            'description': 'the name of city to retrieve',
+                            'required': True,
+                            'type': 'string'
+                        }
+                    },
+                    'requireConfirmation': 'DISABLED'
+                },
+                {
+                    'name': 'search_by_tavily',
+                    'description': "Search general information by keyword and then return the result as a string.",
+                    'parameters': {
+                        'keyword': {
+                            'description': 'search keyword',
+                            'required': True,
+                            'type': 'string'
+                        }
+                    },
+                    'requireConfirmation': 'DISABLED'
+                },
+                {
+                    'name': 'search_by_knowledge_base',
+                    'description': "Search technical information by keyword and then return the result as a string.",
+                    'parameters': {
+                        'keyword': {
+                            'description': 'search keyword',
+                            'required': True,
+                            'type': 'string'
+                        }
+                    },
+                    'requireConfirmation': 'DISABLED'
+                }
+            ]
+        },            
+    )
+```
+
+생성된 Bedrock agent에 RAG를 직접 연결할 때에는 아래와 같이 [associate_agent_knowledge_base](https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/bedrock-agent/client/associate_agent_knowledge_base.html)을 이용하여 연결합니다.
+
+```python
+rag_prompt = (
+    "당신의 이름은 서연이고, 질문에 대해 친절하게 답변하는 사려깊은 인공지능 도우미입니다."
+    "다음의 Reference texts을 이용하여 user의 질문에 답변합니다."
+    "모르는 질문을 받으면 솔직히 모른다고 말합니다."
+    "답변의 이유를 풀어서 명확하게 설명합니다."
+)
+response = client.associate_agent_knowledge_base(
+    agentId=agentId,
+    agentVersion='DRAFT',
+    description=rag_prompt,
+    knowledgeBaseId=knowledge_base_id,
+    knowledgeBaseState='ENABLED'
+)
+print(f'response of associate_agent_knowledge_base(): {response}')
+```
+
+Bedrock agent를 이용하려면 실행전에 prepared 상태이어야 합니다. 따라서 설정후에는 아래처럼 상태를 변경합니다. 
+
+```python
+response = client.prepare_agent(
+    agentId=agentId
+)
+print('response of prepare_agent(): ', response)      
+```
+
+Bedrock agent를 사용하기 위해서는 배포를 하여야 하는데, 여기서는 원할한 데모를 위해 기존 배포가 있다지 확인해서 있다면 지우고 새로 생성합니다. 기존 배포의 확인은 [list_agent_aliases](https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/bedrock-agent/client/list_agent_aliases.html), 삭제는 [delete_agent_alias](https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/bedrock-agent/client/delete_agent_alias.html), 생성은 [create_agent_alias](https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/bedrock-agent/client/create_agent_alias.html)을 이용합니다.
+
+```python
+# retrieve agent alias
+response_agent_alias = client.list_agent_aliases(
+    agentId = agentId,
+    maxResults=10
+)
+for summary in response_agent_alias["agentAliasSummaries"]:
+    if summary["agentAliasName"] == agentAliasName:
+        agentAliasId = summary["agentAliasId"]
+        print('agentAliasId: ', agentAliasId) 
+        break
+if agentAliasId:
+    response = client.delete_agent_alias(
+        agentAliasId=agentAliasId,
+        agentId=agentId
+    )            
+
+# create agent alias 
+response = client.create_agent_alias(
+    agentAliasName=agentAliasName,
+    agentId=agentId,
+    description='the lastest deployment'
+)
+print('response of create_agent_alias(): ', response)
+
+agentAliasId = response['agentAlias']['agentAliasId']
+print('agentAliasId: ', agentAliasId)
+```
+
 
 
 ### 활용 방법
