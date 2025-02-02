@@ -446,7 +446,7 @@ if langsmith_api_key:
     os.environ["LANGCHAIN_PROJECT"] = langchain_project
 
 # api key to use Tavily Search
-tavily_key = ""
+tavily_key = tavily_api_wrapper = ""
 try:
     get_tavily_api_secret = secretsmanager.get_secret_value(
         SecretId=f"tavilyapikey-{projectName}"
@@ -454,24 +454,29 @@ try:
     #print('get_tavily_api_secret: ', get_tavily_api_secret)
     secret = json.loads(get_tavily_api_secret['SecretString'])
     #print('secret: ', secret)
-    tavily_key = secret['tavily_api_key']
-    #print('tavily_api_key: ', tavily_api_key)
 
-    tavily_api_wrapper = TavilySearchAPIWrapper(tavily_api_key=tavily_key)
-    #     os.environ["TAVILY_API_KEY"] = tavily_key
+    if "tavily_api_key" in secret:
+        tavily_key = secret['tavily_api_key']
+        #print('tavily_api_key: ', tavily_api_key)
 
-    # # Tavily Tool Test
-    # query = 'what is Amazon Nova Pro?'
-    # search = TavilySearchResults(
-    #     max_results=1,
-    #     include_answer=True,
-    #     include_raw_content=True,
-    #     api_wrapper=tavily_api_wrapper,
-    #     search_depth="advanced", # "basic"
-    #     # include_domains=["google.com", "naver.com"]
-    # )
-    # output = search.invoke(query)
-    # print('tavily output: ', output)    
+        if tavily_key:
+            tavily_api_wrapper = TavilySearchAPIWrapper(tavily_api_key=tavily_key)
+            #     os.environ["TAVILY_API_KEY"] = tavily_key
+
+            # # Tavily Tool Test
+            # query = 'what is Amazon Nova Pro?'
+            # search = TavilySearchResults(
+            #     max_results=1,
+            #     include_answer=True,
+            #     include_raw_content=True,
+            #     api_wrapper=tavily_api_wrapper,
+            #     search_depth="advanced", # "basic"
+            #     # include_domains=["google.com", "naver.com"]
+            # )
+            # output = search.invoke(query)
+            # print('tavily output: ', output)    
+        else:
+            print('tavily_key is required.')
 except Exception as e: 
     print('Tavily credential is required: ', e)
     raise e
