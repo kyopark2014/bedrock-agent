@@ -24,7 +24,7 @@ mode_descriptions = {
     ],
     "문법 검토하기": [
         "영어와 한국어 문법의 문제점을 설명하고, 수정된 결과를 함께 제공합니다."
-    ]
+    ]    
 }
 
 with st.sidebar:
@@ -66,6 +66,11 @@ with st.sidebar:
     # print('fileId: ', chat.fileId)
     uploaded_file = st.file_uploader("RAG를 위한 파일을 선택합니다.", type=["pdf", "txt", "py", "md", "csv"], key=chat.fileId)
 
+    # code interpreter checkbox
+    select_code_interpreter = st.checkbox('Code Interpreter', value=False)
+    code_interpreter = 'Enable' if select_code_interpreter else 'Disable'
+    #print('code_interpreter: ', code_interpreter)
+
     st.success(f"Connected to {modelName}", icon="💚")
     clear_button = st.button("대화 초기화", key="clear")
     print('clear_button: ', clear_button)
@@ -82,8 +87,14 @@ if clear_button==True:
 
 # Preview the uploaded image in the sidebar
 file_name = ""
+state_of_code_interpreter = False
 if uploaded_file is not None and clear_button==False:
+    print("uploaded_file.name: ", uploaded_file.name)
+    print("code_interpreter: ", code_interpreter)
     if uploaded_file.name:
+        print("csv type? ",uploaded_file.name.lower().endswith((".csv")))
+
+    if uploaded_file.name and code_interpreter=="Disable":
         chat.initiate()
 
         if debugMode=='Enable':
@@ -111,6 +122,13 @@ if uploaded_file is not None and clear_button==False:
         st.session_state.messages.append({"role": "assistant", "content": f"선택한 문서({file_name})를 요약하면 아래와 같습니다.\n\n{msg}"})    
         print('msg: ', msg)
         st.rerun()
+    elif uploaded_file.name and code_interpreter == "Enable" and uploaded_file.name.lower().endswith((".csv")): # csv only   
+        guide = "Code Interpreter가 준비되었습니다. 원하는 동작을 입력하세요."
+        st.write(guide)
+        st.session_state.messages.append({"role": "assistant", "content": guide})
+        state_of_code_interpreter = True
+
+# print("state_of_code_interpreter: ", state_of_code_interpreter)
 
 # Initialize chat history
 if "messages" not in st.session_state:
@@ -197,23 +215,48 @@ if prompt := st.chat_input("메시지를 입력하세요."):
                 chat.save_chat_history(prompt, response)
         
         elif mode == 'Agent':
-            with st.status("thinking...", expanded=True, state="running") as status:
+            if not state_of_code_interpreter: 
+                sessionState = ""
+                with st.status("thinking...", expanded=True, state="running") as status:                
+                    response, reference_docs = chat.run_bedrock_agent(prompt, chat.agent_name, sessionState, st)
+                    st.write(response)
+                    print('response: ', response)
+                    
+                    st.session_state.messages.append({"role": "assistant", "content": response})
+                    if debugMode != "Enable":
+                        st.rerun()
 
-                response, reference_docs = chat.run_bedrock_agent(prompt, chat.agent_name, st)
-                st.write(response)
-                print('response: ', response)
+                    chat.save_chat_history(prompt, response)
                 
-                st.session_state.messages.append({"role": "assistant", "content": response})
-                if debugMode != "Enable":
-                    st.rerun()
+                show_references(reference_docs) 
 
-                chat.save_chat_history(prompt, response)
-            
-            show_references(reference_docs) 
+            else: # csv only        
+                sessionState = {
+                    'files': [
+                        {
+                            'name': file_name,
+                            'source': {
+                                'byteContent': {
+                                    'data': uploaded_file.getvalue(),
+                                    'mediaType': 'text/csv'
+                                },
+                                'sourceType': 'BYTE_CONTENT'
+                            },
+                            'useCase': 'CODE_INTERPRETER'
+                        },
+                    ]
+                }
+                with st.status("thinking...", expanded=True, state="running") as status:
+                    # prompt = "첨부 파일의 내용을 분석해주세요."
+                    response, reference_docs = chat.run_bedrock_agent(prompt, chat.agent_name, sessionState, st)
+                    st.write(response)
+                    print('response: ', response)                    
+                    st.session_state.messages.append({"role": "assistant", "content": response})
         
         elif mode == 'Agent with Knowlege Base':
+            sessionState = ""
             with st.status("thinking...", expanded=True, state="running") as status:
-                response, reference_docs = chat.run_bedrock_agent(prompt, chat.agent_kb_name, st)
+                response, reference_docs = chat.run_bedrock_agent(prompt, chat.agent_kb_name, "", st)
                 st.write(response)
                 print('response: ', response)
                 

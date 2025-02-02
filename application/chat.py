@@ -1302,56 +1302,66 @@ def show_output(event_stream, st):
                 trace_event = event["trace"]["trace"]["orchestrationTrace"]
                 if "rationale" in trace_event:
                     trace_text = trace_event["rationale"]["text"]
-                    st.info(f"rationale: {trace_text}")
+                    if debug_mode=="Enable":
+                        st.info(f"rationale: {trace_text}")
 
                 if "modelInvocationInput" in trace_event:
                     if "text" in trace_event["modelInvocationInput"]:
                         trace_text = trace_event["modelInvocationInput"]["text"]
                         print("trace_text: ", trace_text)
-                        # st.info(f"modelInvocationInput: {trace_text}")
+                        #if debug_mode=="Enable":
+                            # st.info(f"modelInvocationInput: {trace_text}")
                     if "rawResponse" in trace_event["modelInvocationInput"]:
                         rawResponse = trace_event["modelInvocationInput"]["rawResponse"]                        
                         print("rawResponse: ", rawResponse)
-                        # st.info(f"modelInvocationInput: {rawResponse}")
+                        # if debug_mode=="Enable":
+                        #     st.info(f"modelInvocationInput: {rawResponse}")
 
                 if "modelInvocationOutput" in trace_event:
                     if "rawResponse" in trace_event["modelInvocationOutput"]:
                         trace_text = trace_event["modelInvocationOutput"]["rawResponse"]["content"]
                         print("trace_text: ", trace_text)
-                        # st.info(f"modelInvocationOutput: {trace_text}")
+                        # if debug_mode=="Enable":
+                        #     st.info(f"modelInvocationOutput: {trace_text}")
 
                 if "invocationInput" in trace_event:
                     if "codeInterpreterInvocationInput" in trace_event["invocationInput"]:
                         trace_code = trace_event["invocationInput"]["codeInterpreterInvocationInput"]["code"]
                         print("trace_code: ", trace_code)
-                        st.info(f"codeInterpreter: {trace_code}")
+                        if debug_mode=="Enable":
+                            st.info(f"codeInterpreter: {trace_code}")
 
                     if "knowledgeBaseLookupInput" in trace_event["invocationInput"]:
                         trace_text = trace_event["invocationInput"]["knowledgeBaseLookupInput"]["text"]
                         print("trace_text: ", trace_text)
                         # st.info(f"knowledgeBaseLookup: {trace_text}")
-                        st.info(f"RAG를 검색합니다. 검색어: {trace_text}")
+                        if debug_mode=="Enable":
+                            st.info(f"RAG를 검색합니다. 검색어: {trace_text}")
 
                     if "actionGroupInvocationInput" in trace_event["invocationInput"]:
                         trace_function = trace_event["invocationInput"]["actionGroupInvocationInput"]["function"]
                         print("trace_function: ", trace_function)
-                        st.info(f"actionGroupInvocation: {trace_function}")
+                        if debug_mode=="Enable":
+                            st.info(f"actionGroupInvocation: {trace_function}")
 
                 if "observation" in trace_event:
                     if "finalResponse" in trace_event["observation"]:
                         trace_resp = trace_event["observation"]["finalResponse"]["text"]
-                        print('final response: ', trace_resp)                            
-                        # st.info(f"finalResponse: {trace_resp}")
+                        print('final response: ', trace_resp)         
+                        # if debug_mode=="Enable":                   
+                        #     st.info(f"finalResponse: {trace_resp}")
                         final_result = trace_resp
 
                     if ("codeInterpreterInvocationOutput" in trace_event["observation"]):
                         if "executionOutput" in trace_event["observation"]["codeInterpreterInvocationOutput"]:
                             trace_resp = trace_event["observation"]["codeInterpreterInvocationOutput"]["executionOutput"]
-                            st.info(f"observation: {trace_resp}")
+                            if debug_mode=="Enable":
+                                st.info(f"observation: {trace_resp}")
 
                         if "executionError" in trace_event["observation"]["codeInterpreterInvocationOutput"]:
                             trace_resp = trace_event["observation"]["codeInterpreterInvocationOutput"]["executionError"]
-                            st.error(f"observation: {trace_resp}")
+                            if debug_mode=="Enable":
+                                st.error(f"observation: {trace_resp}")
 
                             if "image_url" in trace_resp:
                                 print("got image")
@@ -1359,10 +1369,12 @@ def show_output(event_stream, st):
                                 st.image(image_url)
                                 
                     if "knowledgeBaseLookupOutput" in trace_event["observation"]:
-                        # st.info(f"knowledgeBaseLookupOutput: {trace_event["observation"]["knowledgeBaseLookupOutput"]["retrievedReferences"]}")
+                        # if debug_mode=="Enable":
+                        #     st.info(f"knowledgeBaseLookupOutput: {trace_event["observation"]["knowledgeBaseLookupOutput"]["retrievedReferences"]}")
                         if "retrievedReferences" in trace_event["observation"]["knowledgeBaseLookupOutput"]:
                             references = trace_event["observation"]["knowledgeBaseLookupOutput"]["retrievedReferences"]
-                            st.info(f"{len(references)}개의 문서가 검색되었습니다.")
+                            if debug_mode=="Enable":
+                                st.info(f"{len(references)}개의 문서가 검색되었습니다.")
 
                             print('references: ', references)
                             for i, reference in enumerate(references):
@@ -1391,7 +1403,8 @@ def show_output(event_stream, st):
 
                     if "actionGroupInvocationOutput" in trace_event["observation"]:
                         trace_resp = trace_event["observation"]["actionGroupInvocationOutput"]["text"]
-                        st.info(f"actionGroupInvocationOutput: {trace_resp}")
+                        if debug_mode=="Enable":
+                            st.info(f"actionGroupInvocationOutput: {trace_resp}")
 
                         print("checking trace resp")
                         print(trace_resp)
@@ -1422,12 +1435,14 @@ def show_output(event_stream, st):
                             filters = assessment["contentPolicy"]["filters"]
                             for filter in filters:
                                 if filter["action"] == "BLOCKED":
-                                    st.error(f"Guardrail blocked {filter['type']} confidence: {filter['confidence']}")
+                                    if debug_mode=="Enable":
+                                        st.error(f"Guardrail blocked {filter['type']} confidence: {filter['confidence']}")
                         if "topicPolicy" in assessment:
                             topics = assessment["topicPolicy"]["topics"]
                             for topic in topics:
                                 if topic["action"] == "BLOCKED":
-                                    st.error(f"Guardrail blocked topic {topic['name']}")            
+                                    if debug_mode=="Enable":
+                                        st.error(f"Guardrail blocked topic {topic['name']}")            
                 
     if final_result:
         return final_result
@@ -1679,6 +1694,43 @@ def create_action_group(agentId, actionGroupName, st):
         )
         print('response of create_action_group(): ', response)
 
+def create_action_group_for_code_interpreter(agentId, st):
+    actionGroupName = "Code_Interpreter"
+    if debug_mode=="Enable":
+        st.info(f"Action Group에 {actionGroupName}이 존재하는지 확인합니다.")
+
+    response = client.list_agent_action_groups(
+        agentId=agentId,
+        agentVersion='DRAFT',
+        maxResults=10
+    )
+    print('response of list_agent_action_groups(): ', response)
+
+    actionGroupSummaries = response['actionGroupSummaries']
+
+    isExist = False
+    for actionGroup in actionGroupSummaries:
+        print('actionGroupName: ', actionGroup['actionGroupId'])
+
+        if actionGroup['actionGroupId'] == actionGroupName:
+            print('action group already exists')
+            isExist = True
+            break
+    
+    print('isExist: ', isExist)
+    if not isExist:
+        if debug_mode=="Enable":
+            st.info(f"{actionGroupName} Action Group을 생성합니다.")
+
+        response = client.create_agent_action_group(
+            actionGroupName=actionGroupName,
+            actionGroupState='ENABLED',
+            agentId=agentId,
+            agentVersion='DRAFT',
+            parentActionGroupSignature='AMAZON.CodeInterpreter'
+        )
+        print('response of create_action_group_for_code_interpreter(): ', response)
+
 def prepare_agent(agentId):
     try:
         response = client.prepare_agent(
@@ -1718,7 +1770,10 @@ def create_agent(modelId, modelName, enable_knowledge_base, agentName, agentAlia
     time.sleep(5)   
 
     # create action group
-    create_action_group(agentId, action_group_name, st)            
+    create_action_group(agentId, action_group_name, st)     
+
+    # create action group for code_interpreter
+    create_action_group_for_code_interpreter(agentId, st)
     
     # associate knowledge base            
     if knowledge_base_id and enable_knowledge_base == "Enable":
@@ -1827,7 +1882,7 @@ def check_agent_status(agentName, agentAliasId, agentAliasName, enable_knowledge
 
     return agentId, agentAliasId
 
-def run_bedrock_agent(text, agentName, st):   
+def run_bedrock_agent(text, agentName, sessionState, st):   
     global  agent_id, agent_alias_id, agent_kb_id, agent_kb_alias_id    
     if agentName == agent_name:
         agentId = agent_id
@@ -1897,7 +1952,8 @@ def run_bedrock_agent(text, agentName, st):
         except Exception as e:
             agent_id = agent_alias_id = agent_kb_id = agent_kb_alias_id = ""
             # raise Exception("unexpected event.",e)
-            st.error('실패하여 agent 정보를 초기화하였습니다. 재시도해주세요.')
+            if debug_mode=="Enable":
+                st.error('실패하여 agent 정보를 초기화하였습니다. 재시도해주세요.')
             err_msg = traceback.format_exc()
             print(f'error message: {err_msg}')
                 
