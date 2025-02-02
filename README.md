@@ -421,7 +421,107 @@ response = client.create_agent_alias(
 agentAliasId = response['agentAlias']['agentAliasId']
 ```
 
+Bedrock agent는 "bedrock-agent-runtime"을 이용하여 [invoke_agent](https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/bedrock-agent-runtime/client/invoke_agent.html)로 실행합니다.
 
+```python
+client_runtime = boto3.client(
+    service_name='bedrock-agent-runtime',
+    region_name=bedrock_region
+)
+response = client_runtime.invoke_agent( 
+    agentAliasId=agentAliasId,
+    agentId=agentId,
+    inputText=text, 
+    enableTrace=True,
+    sessionId=sessionId[userId], 
+    memoryId='memory-'+userId,
+    sessionState=sessionState
+)
+event_stream = response['completion']
+```
+
+결과는 stream으로 얻을수 있습니다. "enableTrace"를 이용해 중간 결과를 화면에 표시할 수 있습니다. 최종 결과는 chunk난 trace의 "observation"의 "finalResponse"로 알 수 있습니다.
+
+```python
+for index, event in enumerate(event_stream):
+    # Handle text chunks
+    if "chunk" in event:
+        chunk = event["chunk"]
+        if "bytes" in chunk:
+            text = chunk["bytes"].decode("utf-8")
+            stream_result += text
+
+    # Handle file outputs
+    if "files" in event:
+        files = event["files"]["files"]
+        for file in files:
+            st.image(file["bytes"], caption=file["name"])
+
+    # Check trace
+    if "trace" in event:
+        if ("trace" in event["trace"] and "orchestrationTrace" in event["trace"]["trace"]):
+            trace_event = event["trace"]["trace"]["orchestrationTrace"]
+            if "rationale" in trace_event:
+                trace_text = trace_event["rationale"]["text"]
+                st.info(f"rationale: {trace_text}")
+            if "modelInvocationInput" in trace_event:
+                if "text" in trace_event["modelInvocationInput"]:
+                    trace_text = trace_event["modelInvocationInput"]["text"]
+                    print("trace_text: ", trace_text)
+                if "rawResponse" in trace_event["modelInvocationInput"]:
+                    rawResponse = trace_event["modelInvocationInput"]["rawResponse"]                        
+                    print("rawResponse: ", rawResponse)
+            if "modelInvocationOutput" in trace_event:
+                if "rawResponse" in trace_event["modelInvocationOutput"]:
+                    trace_text = trace_event["modelInvocationOutput"]["rawResponse"]["content"]
+                    print("trace_text: ", trace_text)
+            if "invocationInput" in trace_event:
+                if "codeInterpreterInvocationInput" in trace_event["invocationInput"]:
+                    trace_code = trace_event["invocationInput"]["codeInterpreterInvocationInput"]["code"]
+                    print("trace_code: ", trace_code)
+                if "knowledgeBaseLookupInput" in trace_event["invocationInput"]:
+                    trace_text = trace_event["invocationInput"]["knowledgeBaseLookupInput"]["text"]
+                    st.info(f"RAG를 검색합니다. 검색어: {trace_text}")
+                if "actionGroupInvocationInput" in trace_event["invocationInput"]:
+                    trace_function = trace_event["invocationInput"]["actionGroupInvocationInput"]["function"]
+                    st.info(f"actionGroupInvocation: {trace_function}")
+            if "observation" in trace_event:
+                if "finalResponse" in trace_event["observation"]:
+                    trace_resp = trace_event["observation"]["finalResponse"]["text"]
+                    final_result = trace_resp
+                if ("codeInterpreterInvocationOutput" in trace_event["observation"]):
+                    if "executionOutput" in trace_event["observation"]["codeInterpreterInvocationOutput"]:
+                        trace_resp = trace_event["observation"]["codeInterpreterInvocationOutput"]["executionOutput"]
+                        st.info(f"observation: {trace_resp}")
+                    if "executionError" in trace_event["observation"]["codeInterpreterInvocationOutput"]:
+                        trace_resp = trace_event["observation"]["codeInterpreterInvocationOutput"]["executionError"]
+                        if "image_url" in trace_resp:
+                            print("got image")
+                            image_url = trace_resp["image_url"]
+                            st.image(image_url)
+                if "knowledgeBaseLookupOutput" in trace_event["observation"]:
+                    if "retrievedReferences" in trace_event["observation"]["knowledgeBaseLookupOutput"]:
+                        references = trace_event["observation"]["knowledgeBaseLookupOutput"]["retrievedReferences"]
+                        st.info(f"{len(references)}개의 문서가 검색되었습니다.")
+                if "actionGroupInvocationOutput" in trace_event["observation"]:
+                    trace_resp = trace_event["observation"]["actionGroupInvocationOutput"]["text"]
+                    st.info(f"actionGroupInvocationOutput: {trace_resp}")
+        elif "guardrailTrace" in event["trace"]["trace"]:
+            guardrail_trace = event["trace"]["trace"]["guardrailTrace"]
+            if "inputAssessments" in guardrail_trace:
+                assessments = guardrail_trace["inputAssessments"]
+                for assessment in assessments:
+                    if "contentPolicy" in assessment:
+                        filters = assessment["contentPolicy"]["filters"]
+                        for filter in filters:
+                            if filter["action"] == "BLOCKED":
+                                st.error(f"Guardrail blocked {filter['type']} confidence: {filter['confidence']}")
+                    if "topicPolicy" in assessment:
+                        topics = assessment["topicPolicy"]["topics"]
+                        for topic in topics:
+                            if topic["action"] == "BLOCKED":
+                                st.error(f"Guardrail blocked topic {topic['name']}")            
+```
 
 ### 활용 방법
 
