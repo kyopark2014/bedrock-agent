@@ -58,7 +58,7 @@ def general_conversation(query):
 
 ### RAG
 
-Knowledge Base를 이용해 관련된 문서를 가져옵니다. 문서 원본을 확인할 수 있도록 파일의 url은 cloudfront의 도메인을 기준으로 제공합니다. 문서의 조회는 LangChain의 [AmazonKnowledgeBasesRetriever](https://api.python.langchain.com/en/latest/community/retrievers/langchain_community.retrievers.bedrock.AmazonKnowledgeBasesRetriever.html)을 이용하여 numberOfResults만큼 가져옵니다. 이때 overrideSearchType로 'HYBRID'와 'SEMANTIC"을 선택할 수 있습니다. LangChain을 사용하지 않을 경우에 boto3의 [retrieve_and_generate](https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/bedrock-agent-runtime/client/retrieve_and_generate.html#)을 이용해 유사하게 구현이 가능합니다. 
+RAG은 retrive, grade, generation의 단계로 수행됩니다. Knowledge Base를 이용해 관련된 문서를 가져오는 retrieve 동작을 수행합니다. 문서 원본을 확인할 수 있도록 파일의 url은 cloudfront의 도메인을 기준으로 제공합니다. 문서의 조회는 LangChain의 [AmazonKnowledgeBasesRetriever](https://api.python.langchain.com/en/latest/community/retrievers/langchain_community.retrievers.bedrock.AmazonKnowledgeBasesRetriever.html)을 이용하여 numberOfResults만큼 가져옵니다. 이때 overrideSearchType로 'HYBRID'와 'SEMANTIC"을 선택할 수 있습니다. LangChain을 사용하지 않을 경우에 boto3의 [retrieve_and_generate](https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/bedrock-agent-runtime/client/retrieve_and_generate.html#)을 이용해 유사하게 구현이 가능합니다. 
 
 ```python
 def retrieve_documents_from_knowledge_base(query, top_k):
@@ -121,6 +121,75 @@ def retrieve_documents_from_knowledge_base(query, top_k):
                 )
             )    
     return relevant_docs
+```
+
+적절한 문서를 선택하기 위하여 grade 동작을 수행합니다. 아래와 같이 retieve에서 얻어진 관련된 문서들이 실제 관련이 있는데 확인합니다. 이때 확인된 문서들만  filtered_docs로 정리합니다.
+
+```python
+def grade_documents(question, documents):
+    filtered_docs = []
+    chat = get_chat()
+    retrieval_grader = get_retrieval_grader(chat)
+    for i, doc in enumerate(documents):
+        score = retrieval_grader.invoke({"question": question, "document": doc.page_content})
+        grade = score.binary_score
+        if grade.lower() == "yes":
+            print("---GRADE: DOCUMENT RELEVANT---")
+            filtered_docs.append(doc)
+        else:
+            print("---GRADE: DOCUMENT NOT RELEVANT---")
+            continue
+    return filtered_docs
+```
+
+문서가 실제 관련이 있는지는 아래와 같이 prompt를 이용합니다. 이때 "yes", "no"와 같은 결과를 추출하기 위하여 structured_output을 활용하였습니다.
+
+```python
+class GradeDocuments(BaseModel):
+    """Binary score for relevance check on retrieved documents."""
+
+    binary_score: str = Field(description="Documents are relevant to the question, 'yes' or 'no'")
+
+def get_retrieval_grader(chat):
+    system = """You are a grader assessing relevance of a retrieved document to a user question. \n 
+    If the document contains keyword(s) or semantic meaning related to the question, grade it as relevant. \n
+    Give a binary score 'yes' or 'no' score to indicate whether the document is relevant to the question."""
+    grade_prompt = ChatPromptTemplate.from_messages(
+        [
+            ("system", system),
+            ("human", "Retrieved document: \n\n {document} \n\n User question: {question}"),
+        ]
+    )    
+    structured_llm_grader = chat.with_structured_output(GradeDocuments)
+    retrieval_grader = grade_prompt | structured_llm_grader
+    return retrieval_grader
+```
+
+관련된 문서를 가지고 답변을 생성합니다.
+
+```python
+chat = get_chat()
+system = (
+    "당신의 이름은 서연이고, 질문에 대해 친절하게 답변하는 사려깊은 인공지능 도우미입니다."
+    "다음의 Reference texts을 이용하여 user의 질문에 답변합니다."
+    "모르는 질문을 받으면 솔직히 모른다고 말합니다."
+    "답변의 이유를 풀어서 명확하게 설명합니다."
+)
+human = (
+    "Question: {question}"
+
+    "Reference texts: "
+    "{context}"
+) 
+ prompt = ChatPromptTemplate.from_messages([("system", system), ("human", human)])
+rag_chain = prompt | chat
+result = rag_chain.invoke(
+    {
+        "question": text,
+        "context": relevant_context                
+    }
+)
+msg = result.content        
 ```
 
 ### Bedrock Agent
