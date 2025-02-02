@@ -336,7 +336,6 @@ response_agent_alias = client.list_agent_aliases(
 for summary in response_agent_alias["agentAliasSummaries"]:
     if summary["agentAliasName"] == agentAliasName:
         agentAliasId = summary["agentAliasId"]
-        print('agentAliasId: ', agentAliasId) 
         break
 if agentAliasId:
     response = client.delete_agent_alias(
@@ -350,10 +349,7 @@ response = client.create_agent_alias(
     agentId=agentId,
     description='the lastest deployment'
 )
-print('response of create_agent_alias(): ', response)
-
 agentAliasId = response['agentAlias']['agentAliasId']
-print('agentAliasId: ', agentAliasId)
 ```
 
 
