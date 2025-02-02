@@ -63,63 +63,44 @@ RAG은 retrive, grade, generation의 단계로 수행됩니다. Knowledge Base�
 ```python
 def retrieve_documents_from_knowledge_base(query, top_k):
     relevant_docs = []
-    if knowledge_base_id:    
-        retriever = AmazonKnowledgeBasesRetriever(
-            knowledge_base_id=knowledge_base_id, 
-            retrieval_config={"vectorSearchConfiguration": {
-                "numberOfResults": top_k,
-                "overrideSearchType": "HYBRID"   # SEMANTIC
-            }},
-            region_name=bedrock_region
-        )
-        
-        try: 
-            documents = retriever.invoke(query)
-            # print('documents: ', documents)
-            print('--> docs from knowledge base')
-            for i, doc in enumerate(documents):
-                print_doc(i, doc)
-        except Exception:
-            err_msg = traceback.format_exc()
-            print('error message: ', err_msg)    
-            raise Exception ("Not able to request to LLM: "+err_msg)
-        
-        relevant_docs = []
-        for doc in documents:
-            content = ""
-            if doc.page_content:
-                content = doc.page_content
-            
-            score = doc.metadata["score"]
-            
-            link = ""
-            if "s3Location" in doc.metadata["location"]:
-                link = doc.metadata["location"]["s3Location"]["uri"] if doc.metadata["location"]["s3Location"]["uri"] is not None else ""
-                
-                # print('link:', link)    
-                pos = link.find(f"/{doc_prefix}")
-                name = link[pos+len(doc_prefix)+1:]
-                encoded_name = parse.quote(name)
-                # print('name:', name)
-                link = f"{path}/{doc_prefix}{encoded_name}"
-                
-            elif "webLocation" in doc.metadata["location"]:
-                link = doc.metadata["location"]["webLocation"]["url"] if doc.metadata["location"]["webLocation"]["url"] is not None else ""
-                name = "WEB"
-
-            url = link
-            
-            relevant_docs.append(
-                Document(
-                    page_content=content,
-                    metadata={
-                        'name': name,
-                        'score': score,
-                        'url': url,
-                        'from': 'RAG'
-                    },
-                )
-            )    
+    retriever = AmazonKnowledgeBasesRetriever(
+        knowledge_base_id=knowledge_base_id, 
+        retrieval_config={"vectorSearchConfiguration": {
+            "numberOfResults": top_k,
+            "overrideSearchType": "HYBRID"   # SEMANTIC
+        }},
+        region_name=bedrock_region
+    )
+    
+    documents = retriever.invoke(query)    
+    relevant_docs = []
+    for doc in documents:
+        content = ""
+        if doc.page_content:
+            content = doc.page_content        
+        score = doc.metadata["score"]        
+        link = ""
+        if "s3Location" in doc.metadata["location"]:
+            link = doc.metadata["location"]["s3Location"]["uri"] if doc.metadata["location"]["s3Location"]["uri"] is not None else ""
+            pos = link.find(f"/{doc_prefix}")
+            name = link[pos+len(doc_prefix)+1:]
+            encoded_name = parse.quote(name)
+            link = f"{path}/{doc_prefix}{encoded_name}"
+        elif "webLocation" in doc.metadata["location"]:
+            link = doc.metadata["location"]["webLocation"]["url"] if doc.metadata["location"]["webLocation"]["url"] is not None else ""
+            name = "WEB"
+        url = link
+        relevant_docs.append(
+            Document(
+                page_content=content,
+                metadata={
+                    'name': name,
+                    'score': score,
+                    'url': url,
+                    'from': 'RAG'
+                },
+            )
+        )    
     return relevant_docs
 ```
 
