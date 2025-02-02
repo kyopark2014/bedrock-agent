@@ -23,7 +23,6 @@
 ```python
 def general_conversation(query):
     chat = get_chat()
-
     system = (
         "당신의 이름은 서연이고, 질문에 대해 친절하게 답변하는 사려깊은 인공지능 도우미입니다."
         "상황에 맞는 구체적인 세부 정보를 충분히 제공합니다." 
@@ -37,22 +36,13 @@ def general_conversation(query):
         ("human", human)
     ])                
     history = memory_chain.load_memory_variables({})["chat_history"]
-
     chain = prompt | chat | StrOutputParser()
-    try: 
-        stream = chain.stream(
-            {
-                "history": history,
-                "input": query,
-            }
-        )  
-        print('stream: ', stream)
-            
-    except Exception:
-        err_msg = traceback.format_exc()
-        print('error message: ', err_msg)        
-        raise Exception ("Not able to request to LLM: "+err_msg)
-        
+    stream = chain.stream(
+        {
+            "history": history,
+            "input": query,
+        }
+    )          
     return stream
 ```
 
