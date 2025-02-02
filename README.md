@@ -6,11 +6,12 @@
 </p>
 
 
-여기에서는 Knowledge Base로 RAG를 구성하고 bedrock agent를 활용하는 방법을 설명합니다. Bedrock agent의 LLM 모델로는 Anthropic의 Claude와 Amazon의 Nova를 활용합니다. 
+여기에서는 Knowledge Base로 RAG를 구성하고 bedrock agent를 활용하는 방법을 설명합니다. Bedrock agent는 완전관리형 서비스로 한번 구현하면 추가적인 노력없이 편리하게 agent를 이용한 서비스를 구현할 수 있습니다. 이를 위해 action group으로 tools를 등록하고, knowledge base로 편리하게 RAG를 구성할 수 있어야 합니다. Bedrock agent의 LLM 모델로는 Anthropic의 Claude와 Amazon의 Nova를 선택하여 활용할 수 있도록 하였고, agent로 구현하는 code interpreter를 테스트 해볼 수 있습니다.
+
 
 ## 전체 Architecture
 
-여기에서는 Knowledge Base를 이용해 지식저장소를 활용합니다.
+아래 그림에서는 bedrock agent로 구현된 architecture를 보여주고 있습니다.  Knowledge base로 RAG를 구성하였고, AWS lambda로 구현된 tools에서는 인터넷 검색, 날씨정보 API를 호출할 수 있습니다. 테스트용 애플리케이션은 streamlit으로 구성하였고, 안전하게 접속할 수 있도록 CloudFront와 API Gateway를 이용해 HTTPS 연결을 제공합니다. 애플리케이션에서 문서를 선택하면 Amazon S3에 업로드 되고, Knowledge base를 이용해 OpenSearch Serverless에 자동 동기화 됩니다. 이후 RAG로 검색을 수행하면 CloudFront - S3의 연결로 파일을 공유 할 수 있습니다.
 
 <img width="800" alt="image" src="https://github.com/user-attachments/assets/aef453d3-c7d0-44d3-af93-24c9031bb7ec" />
 
