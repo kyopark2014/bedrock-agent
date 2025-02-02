@@ -133,6 +133,11 @@ agent_kb_alias_name = "latest_version"
 
 action_group_name = f"action_group_tools-for-{projectName}"
 
+client = boto3.client(
+    service_name='bedrock-agent',
+    region_name=bedrock_region
+)  
+
 def update(modelName, debugMode, st):    
     global model_name, model_id, model_type, debug_mode
     global models, agent_id, agent_kb_id
@@ -147,11 +152,6 @@ def update(modelName, debugMode, st):
         model_type = models[0]["model_type"]
 
         # retrieve agent_id
-        client = boto3.client(
-            service_name='bedrock-agent',
-            region_name=bedrock_region
-        )  
-
         agent_id = retrieve_agent_id(agent_name)
         print('agent_id: ', agent_id)
         
@@ -159,7 +159,7 @@ def update(modelName, debugMode, st):
         if agent_id: 
             agent_alias_id = update_agent(model_id, model_name, agent_id, agent_name, agent_alias_id, agent_alias_name, st)
         else:
-            agent_id = create_agent(model_id, model_name, "Disable", agent_name, st)
+            agent_id, agent_alias_id = create_agent(model_id, model_name, "Disable", agent_name, agent_alias_name, st)
         
         # retrieve agent_kb_id
         agent_kb_id = retrieve_agent_id(agent_kb_name)
@@ -169,7 +169,7 @@ def update(modelName, debugMode, st):
         if agent_kb_id: 
             agent_kb_alias_id = update_agent(model_id, model_name, agent_kb_id, agent_kb_name, agent_kb_alias_id, agent_kb_alias_name, st)                        
         else:
-            agent_kb_id = create_agent(model_id, model_name, "Enable", agent_kb_name, st)
+            agent_kb_id, agent_kb_alias_id = create_agent(model_id, model_name, "Enable", agent_kb_name, agent_kb_alias_name, st)
                                 
     if debug_mode != debugMode:
         debug_mode = debugMode
@@ -329,22 +329,6 @@ def check_grammer(text):
         raise Exception ("Not able to request to LLM")
     
     return msg
-
-def grade_document_based_on_relevance(conn, question, doc):     
-    chat = get_chat()
-    retrieval_grader = get_retrieval_grader(chat)
-    score = retrieval_grader.invoke({"question": question, "document": doc.page_content})
-    # print(f"score: {score}")
-    
-    grade = score.binary_score    
-    if grade == 'yes':
-        print("---GRADE: DOCUMENT RELEVANT---")
-        conn.send(doc)
-    else:  # no
-        print("---GRADE: DOCUMENT NOT RELEVANT---")
-        conn.send(None)
-    
-    conn.close()
 
 class GradeDocuments(BaseModel):
     """Binary score for relevance check on retrieved documents."""
@@ -761,10 +745,6 @@ def initiate_knowledge_base():
     print('embeddingModelArn: ', embeddingModelArn)
     print('knowledge_base_role: ', knowledge_base_role)
     try: 
-        client = boto3.client(
-            service_name='bedrock-agent',
-            region_name=bedrock_region
-        )   
         response = client.list_knowledge_bases(
             maxResults=10
         )
@@ -971,10 +951,6 @@ def retrieve_documents_from_knowledge_base(query, top_k):
 def sync_data_source():
     if knowledge_base_id and data_source_id:
         try:
-            client = boto3.client(
-                service_name='bedrock-agent',
-                region_name=bedrock_region                
-            )
             response = client.start_ingestion_job(
                 knowledgeBaseId=knowledge_base_id,
                 dataSourceId=data_source_id
@@ -1133,11 +1109,6 @@ flow_alias_identifier = None
 def run_flow(text, connectionId, requestId):    
     print('prompt_flow_name: ', prompt_flow_name)
     
-    client = boto3.client(
-        service_name='bedrock-agent',
-        region_name=bedrock_region
-    )   
-    
     global flow_arn, flow_alias_identifier
     
     if not flow_arn:
@@ -1221,10 +1192,6 @@ def run_RAG_prompt_flow(text, connectionId, requestId):
     print('rag_flow_arn: ', rag_flow_arn)
     print('rag_flow_alias_identifier: ', rag_flow_alias_identifier)
     
-    client = boto3.client(
-        service_name='bedrock-agent',
-        region_name=bedrock_region
-    )
     if not rag_flow_arn:
         response = client.list_flows(
             maxResults=10
@@ -1525,56 +1492,8 @@ def show_output2(response_stream, st):
                             )    
     print('reference_docs: ', reference_docs)
 
-def update_agent(modelId, modelName, agentId, agentName, agentAliasId, agentAliasName, st):
-    client = boto3.client(
-        service_name='bedrock-agent',
-        region_name=bedrock_region
-    )  
-
-    if debug_mode=="Enable":
-        st.info(f"{agentName}의 모델을 {modelName}로 업데이트합니다.")
-
-    # create agent
-    try:
-        agent_instruction = (
-            "당신의 이름은 서연이고, 질문에 친근한 방식으로 대답하도록 설계된 대화형 AI입니다. "
-            "상황에 맞는 구체적인 세부 정보를 충분히 제공합니다. "
-            "모르는 질문을 받으면 솔직히 모른다고 말합니다. "
-        )
-        print('modelId: ', modelId)
-
-        response = client.update_agent(
-            agentId=agentId,
-            agentName=agentName,
-            agentResourceRoleArn=agent_role_arn,
-            instruction=agent_instruction,
-            foundationModel=modelId,
-            description=f"Agent의 이름은 {agentName} 입니다. 사용 모델은 {modelName}입니다.",
-            idleSessionTTLInSeconds=600
-        )
-        print('response of update_agent(): ', response)
-    except Exception:
-        err_msg = traceback.format_exc()
-        print(f'error message: {err_msg}')   
-
-    time.sleep(5)            
-    
-    # preparing
-    if debug_mode=="Enable":
-        st.info(f'{agentName}를 사용할 수 있도록 "Prepare"로 설정합니다.')    
-    try:
-        response = client.prepare_agent(
-            agentId=agentId
-        )
-        print('response of prepare_agent(): ', response)      
-        time.sleep(5) # delay 5 seconds
-
-    except Exception:
-        err_msg = traceback.format_exc()
-        print(f'error message: {err_msg}')        
-
-    if debug_mode=="Enable":
-        st.info(f'{agentName}을 {agentAliasName}로 배포합니다.')
+def deploy_agent(agentId, agentAliasName):
+    agentAliasId = ""
     try:
         # retrieve agent alias
         response_agent_alias = client.list_agent_aliases(
@@ -1610,17 +1529,53 @@ def update_agent(modelId, modelName, agentId, agentName, agentAliasId, agentAlia
     except Exception:
         err_msg = traceback.format_exc()
         print(f'error message: {err_msg}')   
+    
+    return agentAliasId
+
+def update_agent(modelId, modelName, agentId, agentName, agentAliasId, agentAliasName, st):
+    if debug_mode=="Enable":
+        st.info(f"{agentName}의 모델을 {modelName}로 업데이트합니다.")
+
+    # update agent
+    try:
+        agent_instruction = (
+            "당신의 이름은 서연이고, 질문에 친근한 방식으로 대답하도록 설계된 대화형 AI입니다. "
+            "상황에 맞는 구체적인 세부 정보를 충분히 제공합니다. "
+            "모르는 질문을 받으면 솔직히 모른다고 말합니다. "
+        )
+        print('modelId: ', modelId)
+
+        response = client.update_agent(
+            agentId=agentId,
+            agentName=agentName,
+            agentResourceRoleArn=agent_role_arn,
+            instruction=agent_instruction,
+            foundationModel=modelId,
+            description=f"Agent의 이름은 {agentName} 입니다. 사용 모델은 {modelName}입니다.",
+            idleSessionTTLInSeconds=600
+        )
+        print('response of update_agent(): ', response)
+    except Exception:
+        err_msg = traceback.format_exc()
+        print(f'error message: {err_msg}')   
+
+    time.sleep(5)            
+    
+    # preparing
+    if debug_mode=="Enable":
+        st.info(f'{agentName}를 사용할 수 있도록 "Prepare"로 설정합니다.')    
+    prepare_agent(agentId)    
+
+    # deploy
+    if debug_mode=="Enable":
+        st.info(f'{agentName}을 {agentAliasName}로 배포합니다.')    
+    agentAliasId = deploy_agent(agentId, agentAliasName)
 
     return agentAliasId
 
 def create_action_group(agentId, actionGroupName, st):
     if debug_mode=="Enable":
         st.info(f"Action Group에 {actionGroupName}이 존재하는지 확인합니다.")
-
-    client = boto3.client(
-        service_name='bedrock-agent',
-        region_name=bedrock_region
-    )  
 
     response = client.list_agent_action_groups(
         agentId=agentId,
@@ -1719,12 +1674,19 @@ def create_action_group(agentId, actionGroupName, st):
         )
         print('response of create_action_group(): ', response)
 
-def create_agent(modelId, modelName, enable_knowledge_base, agentName, st):
-    client = boto3.client(
-        service_name='bedrock-agent',
-        region_name=bedrock_region
-    )  
+def prepare_agent(agentId):
+    try:
+        response = client.prepare_agent(
+            agentId=agentId
+        )
+        print('response of prepare_agent(): ', response)      
+        time.sleep(5) # delay 5 seconds
 
+    except Exception:
+        err_msg = traceback.format_exc()
+        print(f'error message: {err_msg}')      
+
+def create_agent(modelId, modelName, enable_knowledge_base, agentName, agentAliasName, st):
     if debug_mode=="Enable":
         st.info(f"Agent를 생성합니다. 사용 모델은 {modelName}입니다.")
 
@@ -1779,28 +1741,18 @@ def create_agent(modelId, modelName, enable_knowledge_base, agentName, st):
             print(f'error message: {err_msg}')  
 
     # preparing
-    try:
-        if debug_mode=="Enable":
-            st.info('Agent를 사용할 수 있도록 "Prepare"로 설정합니다.')
+    if debug_mode=="Enable":
+        st.info('Agent를 사용할 수 있도록 "Prepare"로 설정합니다.')    
+    prepare_agent(agentId)
+    
+    # deploy
+    if debug_mode=="Enable":
+        st.info(f'{agentName}을 {agentAliasName}로 배포합니다.')    
+    agentAliasId = deploy_agent(agentId, agentAliasName)
 
-        response = client.prepare_agent(
-            agentId=agentId
-        )
-        print('response of prepare_agent(): ', response)      
-        time.sleep(5) # delay 5 seconds
-
-    except Exception:
-        err_msg = traceback.format_exc()
-        print(f'error message: {err_msg}')      
-
-    return agentId           
+    return agentId, agentAliasId           
 
 def retrieve_agent_id(agentName):
-    client = boto3.client(
-        service_name='bedrock-agent',
-        region_name=bedrock_region
-    )
-
     response_agent = client.list_agents(
         maxResults=10
     )
@@ -1816,10 +1768,6 @@ def retrieve_agent_id(agentName):
     return agentId  
 
 def check_agent_status(agentName, agentAliasId, agentAliasName, enable_knowledge_base, st):
-    client = boto3.client(
-        service_name='bedrock-agent',
-        region_name=bedrock_region
-    )
     agentId = retrieve_agent_id(agentName)  
     
     # create agent if no agent
@@ -1851,16 +1799,7 @@ def check_agent_status(agentName, agentAliasId, agentAliasName, enable_knowledge
                 if not summary["agentAliasStatus"] == "PREPARED":
                     if debug_mode=="Enable":
                         st.info('Agent를 사용할 수 있도록 "Prepare"로 다시 설정합니다.')
-
-                    try: # preparing                        
-                        response = client.prepare_agent(
-                            agentId=agentId
-                        )
-                        print('response of prepare_agent(): ', response)
-                        time.sleep(5) # delay 5 seconds
-                    except Exception:
-                        err_msg = traceback.format_exc()
-                        print(f'error message: {err_msg}')
+                    prepare_agent(agentId)
                 break
         
         # creat agent alias if no alias
@@ -1878,6 +1817,8 @@ def check_agent_status(agentName, agentAliasId, agentAliasName, enable_knowledge
             agentAliasId = response['agentAlias']['agentAliasId']
             print('agentAliasId: ', agentAliasId)
             time.sleep(5) # delay 5 seconds
+
+            deploy_agent(agentId, agentAliasName)
 
     return agentId, agentAliasId
 
