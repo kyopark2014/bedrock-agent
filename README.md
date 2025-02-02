@@ -6,7 +6,7 @@
 </p>
 
 
-여기에서는 Knowledge Base로 RAG를 구성하고 이를 바탕으로 bedrock agent의 사용해 봅니다.
+여기에서는 Knowledge Base로 RAG를 구성하고 bedrock agent를 활용하는 방법을 설명합니다. Bedrock agent의 LLM 모델로는 Anthropic의 Claude와 Amazon의 Nova를 활용합니다. 
 
 ## 전체 Architecture
 
