@@ -604,7 +604,6 @@ sessionState = {
     ]
 }
 with st.status("thinking...", expanded=True, state="running") as status:
-    # prompt = "첨부 파일의 내용을 분석해주세요."
     response, reference_docs = chat.run_bedrock_agent(prompt, chat.agent_name, sessionState, st)
     st.write(response)
 ```
