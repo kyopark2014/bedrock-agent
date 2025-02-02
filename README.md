@@ -491,6 +491,66 @@ for index, event in enumerate(event_stream):
                                 st.error(f"Guardrail blocked topic {topic['name']}")            
 ```
 
+### Agent에서 사용할 Tool의 구현
+
+Action group에 정의된 Tool들은 Lambda를 이용해 실행됩니다. [cdk-bedrock-agent-stack.ts](./cdk-bedrock-agent/lib/cdk-bedrock-agent-stack.ts)에서는 아래와 같이 tools을 위한 lambda를 정의합니다. 이때, lambda는 "lambda:InvokeFunction"에 대한 권한을 가지고 있어야 합니다.
+
+```java
+const lambdaTools = new lambda.DockerImageFunction(this, `lambda-tools-for-${projectName}`, {
+  description: 'action group - tools',
+  functionName: `lambda-tools-for-${projectName}`,
+  code: lambda.DockerImageCode.fromImageAsset(path.join(__dirname, '../../lambda-tools')),
+  timeout: cdk.Duration.seconds(60),
+  environment: {
+    bedrock_region: String(region),
+    projectName: projectName,
+    "sharing_url": 'https://'+distribution_sharing.domainName,
+  }
+});         
+lambdaTools.grantInvoke(new cdk.aws_iam.ServicePrincipal("bedrock.amazonaws.com"));
+```
+
+Bedrock agent가 Tool을 선택하면 event로 전달됩니다. 이때 event에서 "function"으로 tool의 이름을 확인하고, "parameters"의 "value"로 tool을 실행시키고 결과를 리턴합니다. 아래의 코드는 [lambda_function.py](./lambda-tools/lambda_function.py)을 참조합니다.
+
+```python
+def lambda_handler(event, context):
+    agent = event['agent']
+    actionGroup = event['actionGroup']
+    function = event['function']
+    parameters = event.get('parameters',[])
+    name = parameters[0]['name']
+    value = parameters[0]['value']
+    
+    if function == 'get_current_time':
+        output = get_current_time(value)        
+    elif function == 'get_book_list':
+        output = get_book_list(value)            
+    elif function == 'get_weather_info':        
+        output = get_weather_info(value)
+    elif function == 'search_by_tavily':
+        output = search_by_tavily(value)
+    elif function == 'search_by_knowledge_base':
+        output = search_by_knowledge_base(value)
+
+    responseBody =  {
+        "TEXT": {
+            "body": output
+        }
+    }
+    action_response = {
+        'actionGroup': actionGroup,
+        'function': function,
+        'functionResponse': {
+            'responseBody': responseBody
+        }
+    }
+    response = {
+        'response': action_response, 
+        'messageVersion': event['messageVersion']
+    }
+    return response
+```
+
 ### 활용 방법
 
 EC2는 Private Subnet에 있으므로 SSL로 접속할 수 없습니다. 따라서, [Console-EC2](https://us-west-2.console.aws.amazon.com/ec2/home?region=us-west-2#Instances:)에 접속하여 "app-for-bedrock-agent"를 선택한 후에 Connect에서 sesseion manager를 선택하여 접속합니다. 
