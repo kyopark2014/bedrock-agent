@@ -421,7 +421,7 @@ response = client.create_agent_alias(
 agentAliasId = response['agentAlias']['agentAliasId']
 ```
 
-Bedrock agent는 "bedrock-agent-runtime"을 이용하여 [invoke_agent](https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/bedrock-agent-runtime/client/invoke_agent.html)로 실행합니다.
+Bedrock agent는 "bedrock-agent-runtime"을 이용하여 [invoke_agent](https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/bedrock-agent-runtime/client/invoke_agent.html)로 실행합니다.
 
 ```python
 client_runtime = boto3.client(
