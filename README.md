@@ -69,7 +69,6 @@ def retrieve_documents_from_knowledge_base(query, top_k):
         if doc.page_content:
             content = doc.page_content        
         score = doc.metadata["score"]        
-        link = ""
         if "s3Location" in doc.metadata["location"]:
             link = doc.metadata["location"]["s3Location"]["uri"] if doc.metadata["location"]["s3Location"]["uri"] is not None else ""
             pos = link.find(f"/{doc_prefix}")
@@ -421,13 +420,11 @@ for index, event in enumerate(event_stream):
         if "bytes" in chunk:
             text = chunk["bytes"].decode("utf-8")
             stream_result += text
-
     # Handle file outputs
     if "files" in event:
         files = event["files"]["files"]
         for file in files:
             st.image(file["bytes"], caption=file["name"])
-
     # Check trace
     if "trace" in event:
         if ("trace" in event["trace"] and "orchestrationTrace" in event["trace"]["trace"]):
