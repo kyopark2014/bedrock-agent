@@ -385,7 +385,7 @@ response = client.associate_agent_knowledge_base(
 print(f'response of associate_agent_knowledge_base(): {response}')
 ```
 
-Bedrock agent를 이용하려면 실행전에 prepared 상태이어야 합니다. 따라서 설정후에는 아래처럼 상태를 변경합니다. 
+Bedrock agent를 이용하려면 실행전에 prepared 상태이어야 합니다. 따라서 설정 후에는 아래처럼 prepare 상태를 변경합니다. 
 
 ```python
 response = client.prepare_agent(
