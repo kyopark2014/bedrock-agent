@@ -621,6 +621,10 @@ cd .. && zip my_deployment_package.zip lambda_function.py info.py # add lambda_f
 
 <img src="https://github.com/user-attachments/assets/b4966b10-1799-4552-8b1e-48bd108dd904" width="600">
 
+Bedrock agetn의 code interpreter의 기능을 테스트하기 위하여 "code interpreter"를 enable하고 [주식 CSV 파일](./contents/stock_prices.csv)파일을 업로드합니다. 이후 "가장 변화량이 큰 주식의 지난 1년간의 변화량을 일자별로 표시하는 그래프를 그려주세요."라고 입력합니다. 이때의 결과는 아래와 같습니다.
+
+![image](https://github.com/user-attachments/assets/2fb75f3f-c0fa-4bb4-98b6-fe933ca67152)
+
 
 ## 리소스 정리하기 
 
