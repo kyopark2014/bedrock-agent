@@ -589,7 +589,7 @@ sudo systemctl stop streamlit
 sudo runuser -l ec2-user -c "/home/ec2-user/.local/bin/streamlit run /home/ec2-user/bedrock-agent/application/app.py"
 ```
 
-lambda-tools를 압축해서 올리는 명령어는 아래와 같습니다. 압축후에 my_deployment_package.zip을 console에서 업로드합니다.
+참고로 lambda-tools로 docker image가 아닌 코드를 압축해서 올리는 경우에 참조할 명령어는 아래와 같습니다. 압축후에 my_deployment_package.zip을 console에서 업로드합니다.
 
 ```text
 cd lambda-tools/
