@@ -432,6 +432,7 @@ for index, event in enumerate(event_stream):
             if "rationale" in trace_event:
                 trace_text = trace_event["rationale"]["text"]
                 st.info(f"rationale: {trace_text}")
+
             if "modelInvocationInput" in trace_event:
                 if "text" in trace_event["modelInvocationInput"]:
                     trace_text = trace_event["modelInvocationInput"]["text"]
@@ -443,6 +444,7 @@ for index, event in enumerate(event_stream):
                 if "rawResponse" in trace_event["modelInvocationOutput"]:
                     trace_text = trace_event["modelInvocationOutput"]["rawResponse"]["content"]
                     print("trace_text: ", trace_text)
+
             if "invocationInput" in trace_event:
                 if "codeInterpreterInvocationInput" in trace_event["invocationInput"]:
                     trace_code = trace_event["invocationInput"]["codeInterpreterInvocationInput"]["code"]
@@ -453,6 +455,7 @@ for index, event in enumerate(event_stream):
                 if "actionGroupInvocationInput" in trace_event["invocationInput"]:
                     trace_function = trace_event["invocationInput"]["actionGroupInvocationInput"]["function"]
                     st.info(f"actionGroupInvocation: {trace_function}")
+
             if "observation" in trace_event:
                 if "finalResponse" in trace_event["observation"]:
                     trace_resp = trace_event["observation"]["finalResponse"]["text"]
@@ -474,6 +477,7 @@ for index, event in enumerate(event_stream):
                 if "actionGroupInvocationOutput" in trace_event["observation"]:
                     trace_resp = trace_event["observation"]["actionGroupInvocationOutput"]["text"]
                     st.info(f"actionGroupInvocationOutput: {trace_resp}")
+
         elif "guardrailTrace" in event["trace"]["trace"]:
             guardrail_trace = event["trace"]["trace"]["guardrailTrace"]
             if "inputAssessments" in guardrail_trace:
@@ -550,6 +554,63 @@ def lambda_handler(event, context):
     }
     return response
 ```
+
+### Code Interpreter
+
+Code Interpreter를 위한 action group을 생성합니다. 이때, [Amazon Bedrock에서 코드 해석 활성화](https://docs.aws.amazon.com/ko_kr/bedrock/latest/userguide/agents-enable-code-interpretation.html)와 같이 parentActionGroupSignature을 'AMAZON.CodeInterpreter'로 설정합니다. 이때 [description, actionGroupExecutor](https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/bedrock-agent/client/create_agent_action_group.html)은 사용할 수 없습니다.
+
+```python
+def create_action_group_for_code_interpreter(agentId, st):
+    actionGroupName = "Code_Interpreter"
+    response = client.list_agent_action_groups(
+        agentId=agentId,
+        agentVersion='DRAFT',
+        maxResults=10
+    )
+    actionGroupSummaries = response['actionGroupSummaries']
+
+    isExist = False
+    for actionGroup in actionGroupSummaries:
+        if actionGroup['actionGroupId'] == actionGroupName:
+            print('action group already exists')
+            isExist = True
+            break
+    if not isExist:
+        response = client.create_agent_action_group(
+            actionGroupName=actionGroupName,
+            actionGroupState='ENABLED',
+            agentId=agentId,
+            agentVersion='DRAFT',
+            parentActionGroupSignature='AMAZON.CodeInterpreter'
+        )
+```
+
+[Test code interpretation in Amazon Bedrock](https://docs.aws.amazon.com/bedrock/latest/userguide/agents-test-code-interpretation.html)와 같이 sessionState을 이용해 code interpreter를 실행시킬 수 있습니다. [app.py](./application/app.py)와 같이 sessionState에 "files"를 정의 후에 실행합니다.
+
+```python
+sessionState = {
+    'files': [
+        {
+            'name': file_name,
+            'source': {
+                'byteContent': {
+                    'data': uploaded_file.getvalue(),
+                    'mediaType': 'text/csv'
+                },
+                'sourceType': 'BYTE_CONTENT'
+            },
+            'useCase': 'CODE_INTERPRETER'
+        },
+    ]
+}
+with st.status("thinking...", expanded=True, state="running") as status:
+    # prompt = "첨부 파일의 내용을 분석해주세요."
+    response, reference_docs = chat.run_bedrock_agent(prompt, chat.agent_name, sessionState, st)
+    st.write(response)
+```
+
+
+
 
 ### 활용 방법
 
