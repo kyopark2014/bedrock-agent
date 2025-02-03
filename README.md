@@ -676,6 +676,14 @@ cd .. && zip my_deployment_package.zip lambda_function.py info.py # add lambda_f
 
 ## 실행결과
 
+CloudFront의 도메인 주소로 접속시 아래와 같은 화면을 볼 수 있습니다. 메뉴에는 "일상적인대화", "RAG", "Agent", "Agent with Knowledge Base", "번역하기", "문법 검토하기"가 있습니다. 여기서 "Agent"는 Bedrock agent이고, "Agent with Knowledge Base"는 "Agent"에 Knodwledge Base를 추가한 형태입니다. "Agent"는 Knowledge base를 Tool의 형태로 action group에 지정하여 활용하고 "Agent with Knowledge Base"는 Bedrock agent에 Knodwledge base를 등록합니다. "Agent with Knowledge Base"은 먼저 action group의 tool들을 조회하고 없는 경우에 "Knowledge Base"를 조회하고, "Agent"는 tool의 하나로 Knowledge base를 사용하는 차이가 있습니다. 
+
+![image](https://github.com/user-attachments/assets/72a98ac8-160c-43da-b8e6-475177b3a21a)
+
+또한, 아래와 같이 메뉴에서 사용 모델을 선택하면, 6개의 모델을 선택하여 사용할 수 있습니다. 모델을 선택하면 Bedrock agent의 설정을 바꾸기위한 provisioning이 수행됩니다.
+
+![image](https://github.com/user-attachments/assets/0428d85d-3c5e-41fa-aec4-050dbde1d9b3)
+
 
 메뉴에서 "Agent"를 선택하고 "여행과 관련된 책 추천해줘."라고 입력한 후에 결과를 확인합니다. 아래와 같이 action group에서 "get_book_list"를 호출하여 얻은 값을 가지고 답변을 생성하였습니다.
 
