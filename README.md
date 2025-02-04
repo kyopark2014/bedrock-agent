@@ -612,7 +612,7 @@ with st.status("thinking...", expanded=True, state="running") as status:
 
 
 
-### 활용 방법
+### 활용 방법 (Debugging)
 
 EC2는 Private Subnet에 있으므로 SSL로 접속할 수 없습니다. 따라서, [Console-EC2](https://us-west-2.console.aws.amazon.com/ec2/home?region=us-west-2#Instances:)에 접속하여 "app-for-bedrock-agent"를 선택한 후에 Connect에서 sesseion manager를 선택하여 접속합니다. 
 
