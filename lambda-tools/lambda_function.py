@@ -309,8 +309,8 @@ def stock_data_lookup(ticker, country):
 
     print("country:", country)
 
-    if len(alphabet)==0:
-        if country == "South Korea":
+    if len(alphabet)==0:        
+        if country == "South Korea" or country == "Korea":
             ticker += ".KS"
         elif country == "Japan":
             ticker += ".T"

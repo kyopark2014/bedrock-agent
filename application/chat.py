@@ -1848,8 +1848,8 @@ def check_agent_status(agentName, agentAliasId, agentAliasName, enable_knowledge
     agentId = retrieve_agent_id(agentName)  
     
     # create agent if no agent
-    if not agentId:
-        agentId = create_agent(model_id, model_name, enable_knowledge_base, agentName, st)                
+    if not agentId:        
+        agentId, agentAliasId = create_agent(model_id, model_name, "Disable", agent_name, agent_alias_name, st)           
     # else:
     #     response = client.get_agent(
     #         agentId=agentId
