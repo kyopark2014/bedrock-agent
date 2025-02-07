@@ -60,6 +60,7 @@ region = config["region"] if "region" in config else "us-west-2"
 print('region: ', region)
 
 s3_prefix = 'docs'
+s3_image_prefix = 'images'
 
 knowledge_base_role = config["knowledge_base_role"] if "knowledge_base_role" in config else None
 if knowledge_base_role is None:
@@ -1990,12 +1991,7 @@ def upload_to_s3(file_bytes, file_name):
             service_name='s3',
             region_name=bedrock_region
         )
-        # Generate a unique file name to avoid collisions
-        #timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        #unique_id = str(uuid.uuid4())[:8]
-        #s3_key = f"uploaded_images/{timestamp}_{unique_id}_{file_name}"
-        s3_key = f"{s3_prefix}/{file_name}"
-
+        
         if file_name.lower().endswith((".jpg", ".jpeg")):
             content_type = "image/jpeg"
         elif file_name.lower().endswith((".pdf")):
@@ -2018,6 +2014,17 @@ def upload_to_s3(file_bytes, file_name):
             content_type = "text/markdown"
         elif file_name.lower().endswith((".png")):
             content_type = "image/png"
+
+        
+        # Generate a unique file name to avoid collisions
+        #timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        #unique_id = str(uuid.uuid4())[:8]
+        #s3_key = f"uploaded_images/{timestamp}_{unique_id}_{file_name}"
+
+        if content_type == "image/jpeg" or "image/png":
+            s3_key = f"{s3_image_prefix}/{file_name}"
+        else:
+            s3_key = f"{s3_prefix}/{file_name}"
         
         user_meta = {  # user-defined metadata
             "content_type": content_type,
@@ -2422,3 +2429,82 @@ def get_summary_of_uploaded_file(file_name, st):
     # print('fileId: ', fileId)
 
     return msg
+
+####################### LangChain #######################
+# Image Summarization
+#########################################################
+
+def get_image_summarization(object_name, prompt, st):
+    # load image
+    s3_client = boto3.client(
+        service_name='s3',
+        region_name=bedrock_region
+    )
+
+    if debug_mode=="Enable":
+        status = "이미지를 가져옵니다."
+        print('status: ', status)
+        st.info(status)
+                
+    image_obj = s3_client.get_object(Bucket=s3_bucket, Key=s3_image_prefix+'/'+object_name)
+    # print('image_obj: ', image_obj)
+    
+    image_content = image_obj['Body'].read()
+    img = Image.open(BytesIO(image_content))
+    
+    width, height = img.size 
+    print(f"width: {width}, height: {height}, size: {width*height}")
+    
+    isResized = False
+    while(width*height > 5242880):                    
+        width = int(width/2)
+        height = int(height/2)
+        isResized = True
+        print(f"width: {width}, height: {height}, size: {width*height}")
+    
+    if isResized:
+        img = img.resize((width, height))
+    
+    buffer = BytesIO()
+    img.save(buffer, format="PNG")
+    img_base64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
+
+    # extract text from the image
+    if debug_mode=="Enable":
+        status = "이미지에서 텍스트를 추출합니다."
+        print('status: ', status)
+        st.info(status)
+
+    text = extract_text(img_base64)
+    print('extracted text: ', text)
+
+    if text.find('<result>') != -1:
+        extracted_text = text[text.find('<result>')+8:text.find('</result>')] # remove <result> tag
+        # print('extracted_text: ', extracted_text)
+    else:
+        extracted_text = text
+    
+    if debug_mode=="Enable":
+        status = f"### 추출된 텍스트\n\n{extracted_text}"
+        print('status: ', status)
+        st.info(status)
+    
+    if debug_mode=="Enable":
+        status = "이미지의 내용을 분석합니다."
+        print('status: ', status)
+        st.info(status)
+
+    image_summary = summary_image(img_base64, prompt)
+    
+    if text.find('<result>') != -1:
+        image_summary = image_summary[image_summary.find('<result>')+8:image_summary.find('</result>')]
+    print('image summary: ', image_summary)
+            
+    if len(extracted_text) > 10:
+        contents = f"## 이미지 분석\n\n{image_summary}\n\n## 추출된 텍스트\n\n{extracted_text}"
+    else:
+        contents = f"## 이미지 분석\n\n{image_summary}"
+    print('image contents: ', contents)
+
+    return contents
+

@@ -24,6 +24,9 @@ mode_descriptions = {
     ],
     "문법 검토하기": [
         "영어와 한국어 문법의 문제점을 설명하고, 수정된 결과를 함께 제공합니다."
+    ],
+    "이미지 분석": [
+        "이미지를 업로드하면 이미지의 내용을 요약할 수 있습니다."
     ]    
 }
 
@@ -43,7 +46,7 @@ with st.sidebar:
     # radio selection
     mode = st.radio(
         # label="원하는 대화 형태를 선택하세요. ",options=["일상적인 대화", "RAG", "Flow", "Agent", "번역하기", "문법 검토하기"], index=0
-        label="원하는 대화 형태를 선택하세요. ",options=["일상적인 대화", "RAG", "Agent", "Agent with Knowlege Base", "번역하기", "문법 검토하기"], index=0
+        label="원하는 대화 형태를 선택하세요. ",options=["일상적인 대화", "RAG", "Agent", "Agent with Knowlege Base", "번역하기", "문법 검토하기", "이미지 분석"], index=0
     )   
     st.info(mode_descriptions[mode][0])
 
@@ -52,8 +55,22 @@ with st.sidebar:
     # model selection box
     modelName = st.selectbox(
         '🖊️ 사용 모델을 선택하세요',
-        ('Nova Pro', 'Nova Lite', 'Nova Micro', 'Claude 3.5 Sonnet', 'Claude 3.0 Sonnet', 'Claude 3.5 Haiku')
+        ('Nova Pro', 'Nova Lite', 'Nova Micro', 'Claude 3.5 Sonnet', 'Claude 3.0 Sonnet', 'Claude 3.5 Haiku'), index=3
     )
+
+    uploaded_file = None
+    if mode=='이미지 분석':        
+        st.subheader("🌇 이미지 업로드")
+        uploaded_file = st.file_uploader("이미지 요약을 위한 파일을 선택합니다.", type=["png", "jpg", "jpeg"])
+    elif mode=='RAG' or mode=="Agent (Tool Use)":
+        st.subheader("📋 문서 업로드")
+        # print('fileId: ', chat.fileId)
+        uploaded_file = st.file_uploader("RAG를 위한 파일을 선택합니다.", type=["pdf", "txt", "py", "md", "csv", "json"], key=chat.fileId)
+
+    # code interpreter checkbox
+    select_code_interpreter = st.checkbox('Code Interpreter', value=False)
+    code_interpreter = 'Enable' if select_code_interpreter else 'Disable'
+    #print('code_interpreter: ', code_interpreter)
 
     # debug checkbox
     select_debugMode = st.checkbox('Debug Mode', value=True)
@@ -62,73 +79,14 @@ with st.sidebar:
 
     chat.update(modelName, debugMode, st)
 
-    st.subheader("📋 문서 업로드")
-    # print('fileId: ', chat.fileId)
-    uploaded_file = st.file_uploader("RAG를 위한 파일을 선택합니다.", type=["pdf", "txt", "py", "md", "csv"], key=chat.fileId)
-
-    # code interpreter checkbox
-    select_code_interpreter = st.checkbox('Code Interpreter', value=False)
-    code_interpreter = 'Enable' if select_code_interpreter else 'Disable'
-    #print('code_interpreter: ', code_interpreter)
-
     st.success(f"Connected to {modelName}", icon="💚")
     clear_button = st.button("대화 초기화", key="clear")
     print('clear_button: ', clear_button)
 
 st.title('🔮 '+ mode)
 
-# Initialize chat history
-if "messages" not in st.session_state:
-    st.session_state.messages = []
-    st.session_state.greetings = False
-
 if clear_button==True:
     chat.initiate()
-
-# Preview the uploaded image in the sidebar
-file_name = ""
-state_of_code_interpreter = False
-if uploaded_file is not None and clear_button==False:
-    print("uploaded_file.name: ", uploaded_file.name)
-    print("code_interpreter: ", code_interpreter)
-    if uploaded_file.name:
-        print("csv type? ",uploaded_file.name.lower().endswith((".csv")))
-
-    if uploaded_file.name and code_interpreter=="Disable":
-        chat.initiate()
-
-        if debugMode=='Enable':
-            status = '선택한 파일을 업로드합니다.'
-            print('status: ', status)
-            st.info(status)
-
-        file_name = uploaded_file.name
-        file_url = chat.upload_to_s3(uploaded_file.getvalue(), file_name)
-        print('file_url: ', file_url) 
-
-        chat.sync_data_source()  # sync uploaded files
-            
-        status = f'선택한 "{file_name}"의 내용을 요약합니다.'
-        # my_bar = st.sidebar.progress(0, text=status)
-        
-        # for percent_complete in range(100):
-        #     time.sleep(0.2)
-        #     my_bar.progress(percent_complete + 1, text=status)
-        if debugMode=='Enable':
-            print('status: ', status)
-            st.info(status)
-    
-        msg = chat.get_summary_of_uploaded_file(file_name, st)
-        st.session_state.messages.append({"role": "assistant", "content": f"선택한 문서({file_name})를 요약하면 아래와 같습니다.\n\n{msg}"})    
-        print('msg: ', msg)
-        st.rerun()
-    elif uploaded_file.name and code_interpreter == "Enable" and uploaded_file.name.lower().endswith((".csv")): # csv only   
-        guide = "Code Interpreter가 준비되었습니다. 원하는 동작을 입력하세요."
-        st.write(guide)
-        st.session_state.messages.append({"role": "assistant", "content": guide})
-        state_of_code_interpreter = True
-
-# print("state_of_code_interpreter: ", state_of_code_interpreter)
 
 # Initialize chat history
 if "messages" not in st.session_state:
@@ -170,6 +128,59 @@ if clear_button or "messages" not in st.session_state:
     st.rerun()
 
     chat.clear_chat_history()
+
+# Preview the uploaded image in the sidebar
+file_name = ""
+state_of_code_interpreter = False
+if uploaded_file is not None and clear_button==False:
+    print("uploaded_file.name: ", uploaded_file.name)
+    print("code_interpreter: ", code_interpreter)
+    if uploaded_file.name:
+        print("csv type? ",uploaded_file.name.lower().endswith((".csv")))
+
+    if uploaded_file.name and code_interpreter=="Disable" and not mode == '이미지 분석':
+        chat.initiate()
+
+        if debugMode=='Enable':
+            status = '선택한 파일을 업로드합니다.'
+            print('status: ', status)
+            st.info(status)
+
+        file_name = uploaded_file.name
+        file_url = chat.upload_to_s3(uploaded_file.getvalue(), file_name)
+        print('file_url: ', file_url) 
+
+        chat.sync_data_source()  # sync uploaded files
+            
+        status = f'선택한 "{file_name}"의 내용을 요약합니다.'
+        # my_bar = st.sidebar.progress(0, text=status)
+        
+        # for percent_complete in range(100):
+        #     time.sleep(0.2)
+        #     my_bar.progress(percent_complete + 1, text=status)
+        if debugMode=='Enable':
+            print('status: ', status)
+            st.info(status)
+    
+        msg = chat.get_summary_of_uploaded_file(file_name, st)
+        st.session_state.messages.append({"role": "assistant", "content": f"선택한 문서({file_name})를 요약하면 아래와 같습니다.\n\n{msg}"})    
+        print('msg: ', msg)
+        st.rerun()
+
+    if uploaded_file and clear_button==False and mode == '이미지 분석':
+        st.image(uploaded_file, caption="이미지 미리보기", use_container_width=True)
+
+        file_name = uploaded_file.name
+        image_url = chat.upload_to_s3(uploaded_file.getvalue(), file_name)
+        print('image_url: ', image_url)    
+
+    elif uploaded_file.name and code_interpreter == "Enable" and uploaded_file.name.lower().endswith((".csv")): # csv only   
+        guide = "Code Interpreter가 준비되었습니다. 원하는 동작을 입력하세요."
+        st.write(guide)
+        st.session_state.messages.append({"role": "assistant", "content": guide})
+        state_of_code_interpreter = True
+
+# print("state_of_code_interpreter: ", state_of_code_interpreter)
 
 # Always show the chat input
 if prompt := st.chat_input("메시지를 입력하세요."):
@@ -281,6 +292,19 @@ if prompt := st.chat_input("메시지를 입력하세요."):
 
             st.session_state.messages.append({"role": "assistant", "content": response})
             chat.save_chat_history(prompt, response)
+        
+        elif mode == '이미지 분석':
+            if uploaded_file is None or uploaded_file == "":
+                st.error("파일을 먼저 업로드하세요.")
+                st.stop()
+
+            else:
+                with st.status("thinking...", expanded=True, state="running") as status:
+                    summary = chat.get_image_summarization(file_name, prompt, st)
+                    st.write(summary)
+
+                    st.session_state.messages.append({"role": "assistant", "content": summary})
+                    # st.rerun()
 
         else:
             stream = chat.general_conversation(prompt)
