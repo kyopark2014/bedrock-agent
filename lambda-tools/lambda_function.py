@@ -6,6 +6,7 @@ import boto3
 import os
 import re
 import info
+import yfinance as yf
 
 from pytz import timezone
 from bs4 import BeautifulSoup
@@ -295,6 +296,45 @@ def search_by_tavily(keyword: str) -> str:
 
     return answer
 
+def stock_data_lookup(ticker, country):
+    """
+    Retrieve accurate stock trends for a given ticker.
+    ticker: the ticker to retrieve price history for
+    country: the english country name of the stock
+    return: the information of ticker
+    """ 
+    com = re.compile('[a-zA-Z]') 
+    alphabet = com.findall(ticker)
+    print('alphabet: ', alphabet)
+
+    print("country:", country)
+
+    if len(alphabet)==0:
+        if country == "South Korea":
+            ticker += ".KS"
+        elif country == "Japan":
+            ticker += ".T"
+    print("ticker:", ticker)
+    
+    stock = yf.Ticker(ticker)
+    
+    # get the price history for past 1 month
+    history = stock.history(period="1mo")
+    print('history: ', history)
+    
+    result = f"## Trading History\n{history}"
+    #history.reset_index().to_json(orient="split", index=False, date_format="iso")    
+    
+    result += f"\n\n## Financials\n{stock.financials}"    
+    print('financials: ', stock.financials)
+
+    result += f"\n\n## Major Holders\n{stock.major_holders}"
+    print('major_holders: ', stock.major_holders)
+
+    print('result: ', result)
+
+    return result
+
 numberOfDocs = 2
 knowledge_base_name = projectName
 s3_prefix = 'docs'
@@ -505,22 +545,54 @@ def lambda_handler(event, context):
     print('function: ', function)
     parameters = event.get('parameters', [])
     print('parameters: ', parameters)
-    name = parameters[0]['name']
-    print('name: ', name)
-    value = parameters[0]['value']
-    print('value: ', value)
     
     if function == 'get_current_time':
-        output = get_current_time(value)        
-    elif function == 'get_book_list':
-        output = get_book_list(value)            
-    elif function == 'get_weather_info':        
-        output = get_weather_info(value)
-    elif function == 'search_by_tavily':
-        output = search_by_tavily(value)
-    elif function == 'search_by_knowledge_base':
-        output = search_by_knowledge_base(value)
+        name = parameters[0]['name']
+        print('name: ', name)
+        format = parameters[0]['value']
+        print('format: ', format)
+        output = get_current_time(format)        
 
+    elif function == 'get_book_list':
+        name = parameters[0]['name']
+        print('name: ', name)
+        keyword = parameters[0]['value']
+        print('keyword: ', keyword)
+        output = get_book_list(keyword)     
+
+    elif function == 'get_weather_info':  
+        name = parameters[0]['name']
+        print('name: ', name)
+        city = parameters[0]['value']
+        print('city: ', city)      
+        output = get_weather_info(city)
+
+    elif function == 'search_by_tavily':
+        name = parameters[0]['name']
+        print('name: ', name)
+        keyword = parameters[0]['value']
+        print('keyword: ', keyword)
+        output = search_by_tavily(keyword)
+        
+    elif function == 'search_by_knowledge_base':
+        name = parameters[0]['name']
+        print('name: ', name)
+        keyword = parameters[0]['value']
+        print('keyword: ', keyword)
+        output = search_by_knowledge_base(keyword)
+
+    elif function == 'stock_data_lookup':
+        country = ticker = ""
+        for p in parameters:
+            if p['name'] == 'country':
+                country = p['value']
+                print('country: ', country)
+            if p['name'] == 'ticker':
+                ticker = p['value']
+                print('ticker: ', ticker)
+
+        output = stock_data_lookup(ticker, country)
+        
     responseBody =  {
         "TEXT": {
             "body": output

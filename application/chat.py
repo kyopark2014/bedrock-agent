@@ -1688,6 +1688,23 @@ def create_action_group(agentId, actionGroupName, st):
                             }
                         },
                         'requireConfirmation': 'DISABLED'
+                    },
+                    {
+                        'name': 'stock_data_lookup',
+                        'description': "Retrieve accurate stock trends for a given ticker.",
+                        'parameters': {
+                            'ticker': {
+                                'description': 'the ticker to retrieve price history for',
+                                'required': True,
+                                'type': 'string'
+                            },
+                            'country': {
+                                'description': 'the english country name of the stock',
+                                'required': True,
+                                'type': 'string'
+                            }
+                        },
+                        'requireConfirmation': 'DISABLED'
                     }
                 ]
             },            

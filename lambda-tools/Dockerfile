@@ -12,5 +12,6 @@ RUN /var/lang/bin/python3 -m pip install tavily-python
 RUN /var/lang/bin/python3 -m pip install langchain
 RUN /var/lang/bin/python3 -m pip install langchain-community
 RUN /var/lang/bin/python3 -m pip install langchain-aws
+RUN /var/lang/bin/python3 -m pip install yfinance
 
 CMD ["lambda_function.lambda_handler"]
