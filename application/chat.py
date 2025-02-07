@@ -840,7 +840,7 @@ def initiate_knowledge_base():
         print('creating data source...')  
         try:
             response = client.create_data_source(
-                dataDeletionPolicy='DELETE',
+                dataDeletionPolicy='RETAIN',
                 dataSourceConfiguration={
                     's3Configuration': {
                         'bucketArn': s3_arn,
