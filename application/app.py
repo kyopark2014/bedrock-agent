@@ -164,7 +164,7 @@ if uploaded_file is not None and clear_button==False:
     logger.info(f"uploaded_file.name: {uploaded_file.name}")
     logger.info(f"code_interpreter: {code_interpreter}")
     if uploaded_file.name:
-        logger.info(f"sv type? {uploaded_file.name.lower().endswith((".csv"))}")
+        logger.info(f"csv type? {uploaded_file.name.lower().endswith(('.csv'))}")
 
     if uploaded_file.name and code_interpreter=="Disable" and not mode == '이미지 분석':
         chat.initiate()
