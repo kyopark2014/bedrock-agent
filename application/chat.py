@@ -9,6 +9,8 @@ import base64
 import info 
 import PyPDF2
 import csv
+import logging
+import sys
 
 from io import BytesIO
 from PIL import Image
@@ -38,15 +40,73 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_community.utilities.tavily_search import TavilySearchAPIWrapper
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 
+#logging
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+#formatter = logging.Formatter('%(asctime)s | %(filename)s:%(lineno)d | %(levelname)s | %(message)s')
+#formatter = logging.Formatter('%(asctime)s | %(filename)s:%(lineno)d | %(message)s')
+formatter = logging.Formatter('%(message)s')
+
+stdout_handler = logging.StreamHandler(sys.stdout)
+stdout_handler.setLevel(logging.INFO)
+stdout_handler.setFormatter(formatter)
+
+enableLoggerChat = False
+logger.info(f"enableLoggerChat: {enableLoggerChat}")
+
+enableLoggerApp = False
+def get_logger_state():
+    global enableLoggerApp
+    if not enableLoggerApp:
+        enableLoggerApp = True
+    return enableLoggerApp
+
+userId = "demo"
+map_chain = dict() 
+
+def initiate():
+    global userId
+    global memory_chain
+
+    userId = uuid.uuid4().hex
+    logger.info(f"userId: {userId}")
+
+    if userId in map_chain:  
+            # print('memory exist. reuse it!')
+            memory_chain = map_chain[userId]
+    else: 
+        # print('memory does not exist. create new one!')        
+        memory_chain = ConversationBufferWindowMemory(memory_key="chat_history", output_key='answer', return_messages=True, k=5)
+        map_chain[userId] = memory_chain
+
+    if not enableLoggerChat:
+        logger.addHandler(stdout_handler)        
+
+initiate()
+
 try:
     with open("/home/config.json", "r", encoding="utf-8") as f:
         config = json.load(f)
-        print('config: ', config)
+        logger.info(f"config: {config}")
+
+        if not enableLoggerChat:
+            logger.addHandler(stdout_handler)        
+            
+            file_handler = logging.FileHandler('/var/log/application/logs.log')
+            file_handler.setLevel(logging.INFO)
+            file_handler.setFormatter(formatter)
+            logger.addHandler(file_handler)
+
+            logger.info("Ready to write log (chat)!")
+
+            enableLoggerChat = True
+            logger.info(f"enableLoggerChat: {enableLoggerChat}")
+
 except Exception:
-    print("use local configuration")
+    logger.info(f"use local configuration")
     with open("application/config.json", "r", encoding="utf-8") as f:
         config = json.load(f)
-        print('config: ', config)
+        logger.info(f"config: {config}")
 
 bedrock_region = config["region"] if "region" in config else "us-west-2"
 
@@ -57,7 +117,7 @@ if accountId is None:
     raise Exception ("No accountId")
 
 region = config["region"] if "region" in config else "us-west-2"
-print('region: ', region)
+logger.info(f"region: {region}")
 
 s3_prefix = 'docs'
 s3_image_prefix = 'images'
@@ -115,11 +175,8 @@ grade_state = "LLM" # LLM, OTHERS
 
 doc_prefix = s3_prefix+'/'
 
-userId = "demo"
-map_chain = dict() 
-
-model_name = "Nova Pro"
-model_type = "nova"
+model_name = "Claude 3.5 Sonnet"
+model_type = "claude"
 models = info.get_model_info(model_name)
 model_id = models[0]["model_id"]
 debug_mode = "Enable"
@@ -146,7 +203,7 @@ def update(modelName, debugMode, st):
     
     if model_name != modelName:
         model_name = modelName
-        print('model_name: ', model_name)
+        logger.info(f"model_name: {model_name}")
         
         models = info.get_model_info(model_name)
         model_id = models[0]["model_id"]
@@ -154,7 +211,7 @@ def update(modelName, debugMode, st):
 
         # retrieve agent_id
         agent_id = retrieve_agent_id(agent_name)
-        print('agent_id: ', agent_id)
+        logger.info(f"agent_id: {agent_id}")
         
         # update agent
         if agent_id: 
@@ -164,7 +221,7 @@ def update(modelName, debugMode, st):
         
         # retrieve agent_kb_id
         agent_kb_id = retrieve_agent_id(agent_kb_name)
-        print('agent_kb_id: ', agent_kb_id)
+        logger.info(f"agent_kb_id: {agent_kb_id}")
 
         # update agent (kb)
         if agent_kb_id: 
@@ -174,24 +231,7 @@ def update(modelName, debugMode, st):
                                 
     if debug_mode != debugMode:
         debug_mode = debugMode
-        print('debug_mode: ', debug_mode)
-
-def initiate():
-    global userId
-    global memory_chain
-
-    userId = uuid.uuid4().hex
-    print('userId: ', userId)
-
-    if userId in map_chain:  
-            # print('memory exist. reuse it!')
-            memory_chain = map_chain[userId]
-    else: 
-        # print('memory does not exist. create new one!')        
-        memory_chain = ConversationBufferWindowMemory(memory_key="chat_history", output_key='answer', return_messages=True, k=5)
-        map_chain[userId] = memory_chain
-
-initiate()
+        logger.info(f"debug_mode: {debug_mode}")
 
 def clear_chat_history():
     memory_chain = []
@@ -218,7 +258,7 @@ def get_chat():
     else: # nova
         maxOutputTokens = 5120 # 5k
     
-    print(f'LLM: bedrock_region: {bedrock_region}, modelId: {modelId}, model_type: {model_type}')
+    logger.info(f"LLM: bedrock_region: {bedrock_region}, modelId: {modelId}, model_type: {model_type}")
 
     if model_type == 'nova':
         STOP_SEQUENCE = '"\n\n<thinking>", "\n<thinking>", " <thinking>"'
@@ -259,7 +299,7 @@ def print_doc(i, doc):
     else:
         text = doc.page_content
             
-    print(f"{i}: {text}, metadata:{doc.metadata}")
+    logger.info(f"{i}: {text}, metadata:{doc.metadata}")
 
 def translate_text(text):
     chat = get_chat()
@@ -289,10 +329,10 @@ def translate_text(text):
             }
         )
         msg = result.content
-        print('translated text: ', msg)
+        logger.info(f"translated text: {msg}")
     except Exception:
         err_msg = traceback.format_exc()
-        print('error message: ', err_msg)       
+        logger.info(f"error message: {err_msg}")      
         raise Exception ("Not able to request to LLM")
 
     return msg[msg.find('<result>')+8:len(msg)-9] # remove <result> tag
@@ -323,10 +363,10 @@ def check_grammer(text):
         )
         
         msg = result.content
-        print('result of grammer correction: ', msg)
+        logger.info(f"esult of grammer correction: {premsgpare}")
     except Exception:
         err_msg = traceback.format_exc()
-        print('error message: ', err_msg)        
+        logger.info(f"error message: {err_msg}")       
         raise Exception ("Not able to request to LLM")
     
     return msg
@@ -353,10 +393,10 @@ def get_retrieval_grader(chat):
     return retrieval_grader
 
 def grade_documents(question, documents):
-    print("###### grade_documents ######")
+    logger.info(f"###### grade_documents ######")
     
-    print("start grading...")
-    print("grade_state: ", grade_state)
+    logger.info(f"start grading...")
+    logger.info(f"grade_state: {grade_state}")
     
     if grade_state == "LLM":
         filtered_docs = []
@@ -374,11 +414,11 @@ def grade_documents(question, documents):
             # print("grade: ", grade)
             # Document relevant
             if grade.lower() == "yes":
-                print("---GRADE: DOCUMENT RELEVANT---")
+                logger.info(f"---GRADE: DOCUMENT RELEVANT---")
                 filtered_docs.append(doc)
             # Document not relevant
             else:
-                print("---GRADE: DOCUMENT NOT RELEVANT---")
+                logger.info(f"---GRADE: DOCUMENT NOT RELEVANT---")
                 # We do not include the document in filtered_docs
                 # We set a flag to indicate that we want to run web search
                 continue
@@ -394,18 +434,18 @@ def check_duplication(docs):
     length_original = len(docs)
     
     updated_docs = []
-    print('length of relevant_docs:', len(docs))
+    logger.info(f"length of relevant_docs: {len(docs)}")
     for doc in docs:            
         # print('excerpt: ', doc['metadata']['excerpt'])
             if doc.page_content in contentList:
-                print('duplicated!')
+                logger.info(f"duplicated")
                 continue
             contentList.append(doc.page_content)
             updated_docs.append(doc)            
     length_updateed_docs = len(updated_docs)     
     
     if length_original == length_updateed_docs:
-        print('no duplication')
+        logger.info(f"no duplication")
     
     return updated_docs
 
@@ -477,9 +517,9 @@ try:
             # output = search.invoke(query)
             # print('tavily output: ', output)    
         else:
-            print('tavily_key is required.')
+            logger.info(f"tavily_key is required.")
 except Exception as e: 
-    print('Tavily credential is required: ', e)
+    logger.info(f"Tavily credential is required: {e}")
     raise e
 
 def get_references(docs):    
@@ -492,7 +532,7 @@ def get_references(docs):
         url = ""
         if "url" in doc.metadata:
             url = doc.metadata['url']
-            print('url: ', url)
+            logger.info(f"url: {url}")
         name = ""
         if "name" in doc.metadata:
             name = doc.metadata['name']
@@ -522,7 +562,7 @@ def get_references(docs):
         #excerpt = ''.join(c for c in excerpt if c not in '"')
         excerpt = re.sub('"', '', excerpt)
         excerpt = re.sub('#', '', excerpt)        
-        print('excerpt(quotation removed): ', excerpt)
+        logger.info(f"excerpt(quotation removed): {excerpt}")
         
         if page:                
             reference += f"{i+1}. {page}page in [{name}]({url})), {excerpt[:30]}...\n"
@@ -557,7 +597,7 @@ def tavily_search(query, k):
                 )
             )                   
     except Exception as e:
-        print('Exception: ', e)
+        logger.info(f"Exception: {e}")
 
     return docs
 
@@ -568,10 +608,10 @@ def isKorean(text):
     # print('word_kor: ', word_kor)
 
     if word_kor and word_kor != 'None':
-        print('Korean: ', word_kor)
+        # logger.info(f"Korean: {word_kor}")
         return True
     else:
-        print('Not Korean: ', word_kor)
+        # logger.info(f"Not Korean:: {word_kor}")
         return False
     
 def traslation(chat, text, input_language, output_language):
@@ -598,7 +638,7 @@ def traslation(chat, text, input_language, output_language):
         # print('translated text: ', msg)
     except Exception:
         err_msg = traceback.format_exc()
-        print('error message: ', err_msg)          
+        logger.info(f"error message: {err_msg}")     
         raise Exception ("Not able to request to LLM")
 
     return msg[msg.find('<result>')+8:len(msg)-9] # remove <result> tag
@@ -635,11 +675,11 @@ def general_conversation(query):
                 "input": query,
             }
         )  
-        print('stream: ', stream)
+        logger.info(f"stream: {stream}")
             
     except Exception:
         err_msg = traceback.format_exc()
-        print('error message: ', err_msg)        
+        logger.info(f"error message: {err_msg}")      
         raise Exception ("Not able to request to LLM: "+err_msg)
         
     return stream
@@ -657,13 +697,13 @@ os_client = OpenSearch(
 )
 
 def is_not_exist(index_name):    
-    print('index_name: ', index_name)
+    logger.info(f"index_name: {index_name}")
         
     if os_client.indices.exists(index_name):
-        print('use exist index: ', index_name)    
+        logger.info(f"use exist index: {index_name}")  
         return False
     else:
-        print('no index: ', index_name)
+        logger.info(f"no index: {index_name}")
         return True
     
 knowledge_base_id = ""
@@ -674,7 +714,7 @@ def initiate_knowledge_base():
     # opensearch index
     #########################
     if(is_not_exist(vectorIndexName)):
-        print(f"creating opensearch index... {vectorIndexName}")        
+        logger.info(f"creating opensearch index... {vectorIndexName}")     
         body={ 
             'settings':{
                 "index.knn": True,
@@ -733,41 +773,41 @@ def initiate_knowledge_base():
                 vectorIndexName,
                 body=body
             )
-            print('opensearch index was created:', response)
+            logger.info(f"opensearch index was created: {response}")
 
             # delay 3seconds
             time.sleep(5)
         except Exception:
             err_msg = traceback.format_exc()
-            print('error message: ', err_msg)                
+            logger.info(f"error message: {err_msg}")            
             #raise Exception ("Not able to create the index")
             
     #########################
     # knowledge base
     #########################
-    print('knowledge_base_name: ', knowledge_base_name)
-    print('collectionArn: ', collectionArn)
-    print('vectorIndexName: ', vectorIndexName)
-    print('embeddingModelArn: ', embeddingModelArn)
-    print('knowledge_base_role: ', knowledge_base_role)
+    logger.info(f"knowledge_base_name: {knowledge_base_name}")
+    logger.info(f"collectionArn: {collectionArn}")
+    logger.info(f"vectorIndexName: {vectorIndexName}")
+    logger.info(f"embeddingModelArn: {embeddingModelArn}")
+    logger.info(f"prepknowledge_base_roleare: {knowledge_base_role}")
     try: 
         response = client.list_knowledge_bases(
             maxResults=10
         )
-        print('(list_knowledge_bases) response: ', response)
+        logger.info(f"(list_knowledge_bases) response: {response}")
         
         if "knowledgeBaseSummaries" in response:
             summaries = response["knowledgeBaseSummaries"]
             for summary in summaries:
                 if summary["name"] == knowledge_base_name:
                     knowledge_base_id = summary["knowledgeBaseId"]
-                    print('knowledge_base_id: ', knowledge_base_id)
+                    logger.info(f"knowledge_base_id: {knowledge_base_id}")
     except Exception:
         err_msg = traceback.format_exc()
-        print('error message: ', err_msg)
+        logger.info(f"error message: {err_msg}")
                     
     if not knowledge_base_id:
-        print('creating knowledge base...')        
+        logger.info(f"creating knowledge base...")    
         for atempt in range(20):
             try:
                 response = client.create_knowledge_base(
@@ -798,7 +838,7 @@ def initiate_knowledge_base():
                         }
                     }                
                 )   
-                print('(create_knowledge_base) response: ', response)
+                logger.info(f"(create_knowledge_base) response: {response}")
             
                 if 'knowledgeBaseId' in response['knowledgeBase']:
                     knowledge_base_id = response['knowledgeBase']['knowledgeBaseId']
@@ -807,12 +847,12 @@ def initiate_knowledge_base():
                     knowledge_base_id = ""    
             except Exception:
                     err_msg = traceback.format_exc()
-                    print('error message: ', err_msg)
+                    logger.info(f"error message: {err_msg}")
                     time.sleep(5)
-                    print(f"retrying... ({atempt})")
+                    logger.info(f"retrying... ({atempt})")
                     #raise Exception ("Not able to create the knowledge base")      
                 
-    print(f"knowledge_base_name: {knowledge_base_name}, knowledge_base_id: {knowledge_base_id}")    
+    logger.info(f"knowledge_base_name: {knowledge_base_name}, knowledge_base_id: {knowledge_base_id}")    
     
     #########################
     # data source      
@@ -823,21 +863,21 @@ def initiate_knowledge_base():
             knowledgeBaseId=knowledge_base_id,
             maxResults=10
         )        
-        print('(list_data_sources) response: ', response)
+        logger.info(f"(list_data_sources) response: : {response}")
         
         if 'dataSourceSummaries' in response:
             for data_source in response['dataSourceSummaries']:
-                print('data_source: ', data_source)
+                logger.info(f"data_source: {data_source}")
                 if data_source['name'] == data_source_name:
                     data_source_id = data_source['dataSourceId']
-                    print('data_source_id: ', data_source_id)
+                    logger.info(f"data_source_id: {data_source_id}")
                     break    
     except Exception:
         err_msg = traceback.format_exc()
-        print('error message: ', err_msg)
+        logger.info(f"error message: {err_msg}")
         
     if not data_source_id:
-        print('creating data source...')  
+        logger.info(f"creating data source...")
         try:
             response = client.create_data_source(
                 dataDeletionPolicy='RETAIN',
@@ -876,19 +916,19 @@ def initiate_knowledge_base():
                     }
                 }
             )
-            print('(create_data_source) response: ', response)
+            logger.info(f"(create_data_source) response: {response}")
             
             if 'dataSource' in response:
                 if 'dataSourceId' in response['dataSource']:
                     data_source_id = response['dataSource']['dataSourceId']
-                    print('data_source_id: ', data_source_id)
+                    logger.info(f"data_source_id: {data_source_id}")
                     
         except Exception:
             err_msg = traceback.format_exc()
-            print('error message: ', err_msg)
+            logger.info(f"error message: {err_msg}")
             #raise Exception ("Not able to create the data source")
     
-    print(f"data_source_name: {data_source_name}, data_source_id: {data_source_id}")
+    logger.info(f"data_source_name: {data_source_name}, data_source_id: {data_source_id}")
             
 initiate_knowledge_base()
 
@@ -908,11 +948,12 @@ def retrieve_documents_from_knowledge_base(query, top_k):
             documents = retriever.invoke(query)
             # print('documents: ', documents)
             print('--> docs from knowledge base')
+            logger.info(f"-> docs from knowledge base")
             for i, doc in enumerate(documents):
                 print_doc(i, doc)
         except Exception:
             err_msg = traceback.format_exc()
-            print('error message: ', err_msg)    
+            logger.info(f"error message: {err_msg}")    
             raise Exception ("Not able to request to LLM: "+err_msg)
         
         relevant_docs = []
@@ -939,7 +980,7 @@ def retrieve_documents_from_knowledge_base(query, top_k):
                 name = "WEB"
 
             url = link
-            print('url:', url)
+            logger.info(f"url: {url}")
             
             relevant_docs.append(
                 Document(
@@ -961,11 +1002,11 @@ def sync_data_source():
                 knowledgeBaseId=knowledge_base_id,
                 dataSourceId=data_source_id
             )
-            print('(start_ingestion_job) response: ', response)
+            logger.info(f"start_ingestion_job) response: {response}")
         except Exception:
             err_msg = traceback.format_exc()
-            print('error message: ', err_msg)
-
+            logger.info(f"error message: {err_msg}")
+            
 def get_rag_prompt(text):
     # print("###### get_rag_prompt ######")
     chat = get_chat()
@@ -1088,7 +1129,7 @@ def run_rag_with_knowledge_base(text, st):
                 "context": relevant_context                
             }
         )
-        print('result: ', result)
+        logger.info(f"result: {result}")
 
         msg = result.content        
         if msg.find('<result>')!=-1:
@@ -1096,7 +1137,7 @@ def run_rag_with_knowledge_base(text, st):
         
     except Exception:
         err_msg = traceback.format_exc()
-        print('error message: ', err_msg)                    
+        logger.info(f"error message: {err_msg}")                    
         raise Exception ("Not able to request to LLM")
     
     reference = ""
@@ -1113,7 +1154,7 @@ def run_rag_with_knowledge_base(text, st):
 flow_arn = None
 flow_alias_identifier = None
 def run_flow(text, connectionId, requestId):    
-    print('prompt_flow_name: ', prompt_flow_name)
+    logger.info(f"prompt_flow_name: {prompt_flow_name}")
     
     global flow_arn, flow_alias_identifier
     
@@ -1121,13 +1162,13 @@ def run_flow(text, connectionId, requestId):
         response = client.list_flows(
             maxResults=10
         )
-        print('response: ', response)
+        logger.info(f"response: {response}")
         
         for flow in response["flowSummaries"]:
-            print('flow: ', flow)
+            logger.info(f"flow: {flow}")
             if flow["name"] == prompt_flow_name:
                 flow_arn = flow["arn"]
-                print('flow_arn: ', flow_arn)
+                logger.info(f"flow_arn: {flow_arn}")
                 break
 
     msg = ""
@@ -1137,14 +1178,14 @@ def run_flow(text, connectionId, requestId):
             response_flow_aliases = client.list_flow_aliases(
                 flowIdentifier=flow_arn
             )
-            print('response_flow_aliases: ', response_flow_aliases)
+            logger.info(f"response_flow_aliases: {response_flow_aliases}")
             
             flowAlias = response_flow_aliases["flowAliasSummaries"]
             for alias in flowAlias:
-                print('alias: ', alias)
+                logger.info(f"alias: {alias}")
                 if alias['name'] == "latest_version":  # the name of prompt flow alias
                     flow_alias_identifier = alias['arn']
-                    print('flowAliasIdentifier: ', flow_alias_identifier)
+                    logger.info(f"flowAliasIdentifier: {flow_alias_identifier}")
                     break
         
         # invoke_flow        
@@ -1166,24 +1207,24 @@ def run_flow(text, connectionId, requestId):
                 }
             ]
         )
-        print('response of invoke_flow(): ', response)
+        logger.info(f"response of invoke_flow(): {response}")
         
         response_stream = response['responseStream']
         try:
             result = {}
             for event in response_stream:
-                print('event: ', event)
+                logger.info(f"event: {event}")
                 result.update(event)
-            print('result: ', result)
+            logger.info(f"result: {result}")
 
             if result['flowCompletionEvent']['completionReason'] == 'SUCCESS':
-                print("Prompt flow invocation was successful! The output of the prompt flow is as follows:\n")
+                logger.info(f"Prompt flow invocation was successful! The output of the prompt flow is as follows:\n")
                 # msg = result['flowOutputEvent']['content']['document']
                 
                 msg = result['flowOutputEvent']['content']['document']
-                print('msg: ', msg)
+                logger.info(f"msg: {msg}")
             else:
-                print("The prompt flow invocation completed because of the following reason:", result['flowCompletionEvent']['completionReason'])
+                logger.info(f"The prompt flow invocation completed because of the following reason:", result['flowCompletionEvent']['completionReason'])
         except Exception as e:
             raise Exception("unexpected event.",e)
 
@@ -1194,20 +1235,20 @@ rag_flow_alias_identifier = None
 def run_RAG_prompt_flow(text, connectionId, requestId):
     global rag_flow_arn, rag_flow_alias_identifier
     
-    print('rag_prompt_flow_name: ', rag_prompt_flow_name) 
-    print('rag_flow_arn: ', rag_flow_arn)
-    print('rag_flow_alias_identifier: ', rag_flow_alias_identifier)
+    logger.info(f"rag_prompt_flow_name: {rag_prompt_flow_name}")
+    logger.info(f"rag_flow_arn: {rag_flow_arn}")
+    logger.info(f"rag_flow_alias_identifier: {rag_flow_alias_identifier}")
     
     if not rag_flow_arn:
         response = client.list_flows(
             maxResults=10
         )
-        print('response: ', response)
+        logger.info(f"response: {response}")
          
         for flow in response["flowSummaries"]:
             if flow["name"] == rag_prompt_flow_name:
                 rag_flow_arn = flow["arn"]
-                print('rag_flow_arn: ', rag_flow_arn)
+                logger.info(f"rag_flow_arn: {rag_flow_arn}")
                 break
     
     if not rag_flow_alias_identifier and rag_flow_arn:
@@ -1215,14 +1256,14 @@ def run_RAG_prompt_flow(text, connectionId, requestId):
         response_flow_aliases = client.list_flow_aliases(
             flowIdentifier=rag_flow_arn
         )
-        print('response_flow_aliases: ', response_flow_aliases)
+        logger.info(f"response_flow_aliases: {response_flow_aliases}")
         rag_flow_alias_identifier = ""
         flowAlias = response_flow_aliases["flowAliasSummaries"]
         for alias in flowAlias:
-            print('alias: ', alias)
+            logger.info(f"alias: {alias}")
             if alias['name'] == "latest_version":  # the name of prompt flow alias
                 rag_flow_alias_identifier = alias['arn']
-                print('flowAliasIdentifier: ', rag_flow_alias_identifier)
+                logger.info(f"flowAliasIdentifier: {rag_flow_alias_identifier}")
                 break
     
     # invoke_flow
@@ -1243,24 +1284,24 @@ def run_RAG_prompt_flow(text, connectionId, requestId):
             }
         ]
     )
-    print('response of invoke_flow(): ', response)
+    logger.info(f"response of invoke_flow(): {response}")
     
     response_stream = response['responseStream']
     try:
         result = {}
         for event in response_stream:
-            print('event: ', event)
+            logger.info(f"event: {event}")
             result.update(event)
-        print('result: ', result)
+        logger.info(f"result: {result}")
 
         if result['flowCompletionEvent']['completionReason'] == 'SUCCESS':
-            print("Prompt flow invocation was successful! The output of the prompt flow is as follows:\n")
+            logger.info(f"Prompt flow invocation was successful! The output of the prompt flow is as follows:\n")
             # msg = result['flowOutputEvent']['content']['document']
             
             msg = result['flowOutputEvent']['content']['document']
-            print('msg: ', msg)
+            logger.info(f"msg: {msg}")
         else:
-            print("The prompt flow invocation completed because of the following reason:", result['flowCompletionEvent']['completionReason'])
+            logger.info(f"The prompt flow invocation completed because of the following reason:", result['flowCompletionEvent']['completionReason'])
     except Exception as e:
         raise Exception("unexpected event.",e)
 
@@ -1277,21 +1318,22 @@ def show_output(event_stream, st):
 
     stream_result = final_result = ""    
     for index, event in enumerate(event_stream):
-        print(f"Event {index}:")
-        print(str(event))
+        logger.info(f"Event: {index}")
+        logger.info(str(event))
         print("\n")
+        logger.info(f"\n")
             
         # Handle text chunks
         if "chunk" in event:
             chunk = event["chunk"]
             if "bytes" in chunk:
                 text = chunk["bytes"].decode("utf-8")
-                print(f"Chunk: {text}")
+                logger.info(f"Chunk: {text}")
                 stream_result += text
 
         # Handle file outputs
         if "files" in event:
-            print("Files received")
+            logger.info(f"Files received")
             files = event["files"]["files"]
 
             for file in files:
@@ -1309,46 +1351,46 @@ def show_output(event_stream, st):
                 if "modelInvocationInput" in trace_event:
                     if "text" in trace_event["modelInvocationInput"]:
                         trace_text = trace_event["modelInvocationInput"]["text"]
-                        print("trace_text: ", trace_text)
+                        logger.info(f"trace_text: {trace_text}")
                         #if debug_mode=="Enable":
                             # st.info(f"modelInvocationInput: {trace_text}")
                     if "rawResponse" in trace_event["modelInvocationInput"]:
                         rawResponse = trace_event["modelInvocationInput"]["rawResponse"]                        
-                        print("rawResponse: ", rawResponse)
+                        logger.info(f"rawResponse: {rawResponse}")
                         # if debug_mode=="Enable":
                         #     st.info(f"modelInvocationInput: {rawResponse}")
 
                 if "modelInvocationOutput" in trace_event:
                     if "rawResponse" in trace_event["modelInvocationOutput"]:
                         trace_text = trace_event["modelInvocationOutput"]["rawResponse"]["content"]
-                        print("trace_text: ", trace_text)
+                        logger.info(f"trace_text: {trace_text}")
                         # if debug_mode=="Enable":
                         #     st.info(f"modelInvocationOutput: {trace_text}")
 
                 if "invocationInput" in trace_event:
                     if "codeInterpreterInvocationInput" in trace_event["invocationInput"]:
                         trace_code = trace_event["invocationInput"]["codeInterpreterInvocationInput"]["code"]
-                        print("trace_code: ", trace_code)
+                        logger.info(f"trace_code: {trace_code}")
                         if debug_mode=="Enable":
                             st.info(f"codeInterpreter: {trace_code}")
 
                     if "knowledgeBaseLookupInput" in trace_event["invocationInput"]:
                         trace_text = trace_event["invocationInput"]["knowledgeBaseLookupInput"]["text"]
-                        print("trace_text: ", trace_text)
+                        logger.info(f"trace_text: {trace_text}")
                         # st.info(f"knowledgeBaseLookup: {trace_text}")
                         if debug_mode=="Enable":
                             st.info(f"RAG를 검색합니다. 검색어: {trace_text}")
 
                     if "actionGroupInvocationInput" in trace_event["invocationInput"]:
                         trace_function = trace_event["invocationInput"]["actionGroupInvocationInput"]["function"]
-                        print("trace_function: ", trace_function)
+                        logger.info(f"preptrace_functionare: {trace_function}")
                         if debug_mode=="Enable":
                             st.info(f"actionGroupInvocation: {trace_function}")
 
                 if "observation" in trace_event:
                     if "finalResponse" in trace_event["observation"]:
                         trace_resp = trace_event["observation"]["finalResponse"]["text"]
-                        print('final response: ', trace_resp)         
+                        logger.info(f"final response: {trace_resp}")   
                         # if debug_mode=="Enable":                   
                         #     st.info(f"finalResponse: {trace_resp}")
                         final_result = trace_resp
@@ -1365,7 +1407,7 @@ def show_output(event_stream, st):
                                 st.error(f"observation: {trace_resp}")
 
                             if "image_url" in trace_resp:
-                                print("got image")
+                                logger.info(f"got image")
                                 image_url = trace_resp["image_url"]
                                 st.image(image_url)
                                 
@@ -1377,7 +1419,7 @@ def show_output(event_stream, st):
                             if debug_mode=="Enable":
                                 st.info(f"{len(references)}개의 문서가 검색되었습니다.")
 
-                            print('references: ', references)
+                            logger.info(f"references: {references}")
                             for i, reference in enumerate(references):
                                 content = reference['content']['text']
                                 # print('content: ', content)
@@ -1389,7 +1431,7 @@ def show_output(event_stream, st):
                                 url = f"{path}/{doc_prefix}{encoded_name}"
                                 # print('url: ', url)
 
-                                print(f"--> {i}: {content[:50]}, {name}, {url}")
+                                logger.info(f"--> {i}: {content[:50]}, {name}, {url}")
 
                                 reference_docs.append(
                                     Document(
@@ -1407,24 +1449,25 @@ def show_output(event_stream, st):
                         if debug_mode=="Enable":
                             st.info(f"actionGroupInvocationOutput: {trace_resp}")
 
-                        print("checking trace resp")
+                        logger.info(f"hecking trace resp")
                         print(trace_resp)
+                        logger.info(trace_resp)
 
                         # try to covnert to json
                         try:
                             trace_resp = trace_resp.replace("'", '"')
                             trace_resp = json.loads(trace_resp)
-                            print("converted to json")
-                            print(trace_resp)
+                            logger.info(f"converted to json")
+                            logger.info(f"{trace_resp}")
 
                             # check if image_url is in trace_response, if it is download the image and add it to the images object of mdoel response
                             if "image_url" in trace_resp:
-                                print("got image")
+                                logger.info(f"got image")
                                 image_url = trace_resp["image_url"]
                                 st.image(image_url)
                                 
                         except:
-                            print("not json")
+                            logger.info(f"not json")
                             pass
 
             elif "guardrailTrace" in event["trace"]["trace"]:
@@ -1511,7 +1554,7 @@ def show_output2(response_stream, st):
                                     },
                                 )
                             )    
-    print('reference_docs: ', reference_docs)
+    logger.info(f"reference_docs: {reference_docs}")
 
 def deploy_agent(agentId, agentAliasName):
     agentAliasId = ""
@@ -1521,12 +1564,12 @@ def deploy_agent(agentId, agentAliasName):
             agentId = agentId,
             maxResults=10
         )
-        print('response of list_agent_aliases(): ', response_agent_alias)   
+        logger.info(f"response of list_agent_aliases(): {response_agent_alias}") 
 
         for summary in response_agent_alias["agentAliasSummaries"]:
             if summary["agentAliasName"] == agentAliasName:
                 agentAliasId = summary["agentAliasId"]
-                print('agentAliasId: ', agentAliasId) 
+                logger.info(f"agentAliasId: {agentAliasId}")
                 break
 
         if agentAliasId:
@@ -1534,7 +1577,7 @@ def deploy_agent(agentId, agentAliasName):
                 agentAliasId=agentAliasId,
                 agentId=agentId
             )            
-            print('response of agentAliasId(): ', response)     
+            logger.info(f"response of agentAliasId(): {response}")  
         
         # create agent alias 
         response = client.create_agent_alias(
@@ -1542,14 +1585,14 @@ def deploy_agent(agentId, agentAliasName):
             agentId=agentId,
             description='the lastest deployment'
         )
-        print('response of create_agent_alias(): ', response)
+        logger.info(f"response of create_agent_alias(): {response}")
 
         agentAliasId = response['agentAlias']['agentAliasId']
-        print('agentAliasId: ', agentAliasId)
+        logger.info(f"agentAliasId: {agentAliasId}")
 
     except Exception:
         err_msg = traceback.format_exc()
-        print(f'error message: {err_msg}')   
+        logger.info(f"error message: {err_msg}")   
     
     return agentAliasId
 
@@ -1564,7 +1607,7 @@ def update_agent(modelId, modelName, agentId, agentName, agentAliasId, agentAlia
             "상황에 맞는 구체적인 세부 정보를 충분히 제공합니다. "
             "모르는 질문을 받으면 솔직히 모른다고 말합니다. "
         )
-        print('modelId: ', modelId)
+        logger.info(f"modelId: {modelId}")
 
         response = client.update_agent(
             agentId=agentId,
@@ -1575,10 +1618,10 @@ def update_agent(modelId, modelName, agentId, agentName, agentAliasId, agentAlia
             description=f"Agent의 이름은 {agentName} 입니다. 사용 모델은 {modelName}입니다.",
             idleSessionTTLInSeconds=600
         )
-        print('response of update_agent(): ', response)
+        logger.info(f"response of update_agent(): {response}")
     except Exception:
         err_msg = traceback.format_exc()
-        print(f'error message: {err_msg}')   
+        logger.info(f"error message: {err_msg}")
 
     time.sleep(5)            
     
@@ -1603,20 +1646,20 @@ def create_action_group(agentId, actionGroupName, st):
         agentVersion='DRAFT',
         maxResults=10
     )
-    print('response of list_agent_action_groups(): ', response)
+    logger.info(f"response of list_agent_action_groups(): {response}")
 
     actionGroupSummaries = response['actionGroupSummaries']
 
     isExist = False
     for actionGroup in actionGroupSummaries:
-        print('actionGroupName: ', actionGroup['actionGroupId'])
+        logger.info(f"actionGroupName: {actionGroup['actionGroupId']}")
 
         if actionGroup['actionGroupId'] == actionGroupName:
-            print('action group already exists')
+            logger.info(f"action group already exists")
             isExist = True
             break
     
-    print('isExist: ', isExist)
+    logger.info(f"isExist: {isExist}")
     if not isExist:
         if debug_mode=="Enable":
             st.info(f"{actionGroupName} Action Group을 생성합니다.")
@@ -1710,7 +1753,7 @@ def create_action_group(agentId, actionGroupName, st):
                 ]
             },            
         )
-        print('response of create_action_group(): ', response)
+        logger.info(f"response of create_action_group(): {response}")
 
 def create_action_group_for_code_interpreter(agentId, st):
     actionGroupName = "Code_Interpreter"
@@ -1722,20 +1765,20 @@ def create_action_group_for_code_interpreter(agentId, st):
         agentVersion='DRAFT',
         maxResults=10
     )
-    print('response of list_agent_action_groups(): ', response)
+    logger.info(f"response of list_agent_action_groups(): {response}")
 
     actionGroupSummaries = response['actionGroupSummaries']
 
     isExist = False
     for actionGroup in actionGroupSummaries:
-        print('actionGroupName: ', actionGroup['actionGroupId'])
+        logger.info(f"actionGroupName: {actionGroup['actionGroupId']}")
 
         if actionGroup['actionGroupId'] == actionGroupName:
-            print('action group already exists')
+            logger.info(f"action group already exists")
             isExist = True
             break
     
-    print('isExist: ', isExist)
+    logger.info(f"isExist: {isExist}")
     if not isExist:
         if debug_mode=="Enable":
             st.info(f"{actionGroupName} Action Group을 생성합니다.")
@@ -1747,19 +1790,19 @@ def create_action_group_for_code_interpreter(agentId, st):
             agentVersion='DRAFT',
             parentActionGroupSignature='AMAZON.CodeInterpreter'
         )
-        print('response of create_action_group_for_code_interpreter(): ', response)
+        logger.info(f"esponse of create_action_group_for_code_interpreter(): {response}")
 
 def prepare_agent(agentId):
     try:
         response = client.prepare_agent(
             agentId=agentId
         )
-        print('response of prepare_agent(): ', response)      
+        logger.info(f"response of prepare_agent(): {response}")  
         time.sleep(5) # delay 5 seconds
 
     except Exception:
         err_msg = traceback.format_exc()
-        print(f'error message: {err_msg}')      
+        logger.info(f"'error message: {err_msg}")   
 
 def create_agent(modelId, modelName, enable_knowledge_base, agentName, agentAliasName, st):
     if debug_mode=="Enable":
@@ -1771,7 +1814,7 @@ def create_agent(modelId, modelName, enable_knowledge_base, agentName, agentAlia
         "상황에 맞는 구체적인 세부 정보를 충분히 제공합니다. "
         "모르는 질문을 받으면 솔직히 모른다고 말합니다. "
     )
-    print('modelId: ', modelId)
+    logger.info(f"modelId: {modelId}")
 
     response = client.create_agent(
         agentResourceRoleArn=agent_role_arn,
@@ -1781,10 +1824,10 @@ def create_agent(modelId, modelName, enable_knowledge_base, agentName, agentAlia
         agentName=agentName,
         idleSessionTTLInSeconds=600
     )
-    print('response of create_agent(): ', response)
+    logger.info(f"response of create_agent(): {response}")
 
     agentId = response['agent']['agentId']
-    print('agentId: ', agentId)
+    logger.info(f"agentId: {agentId}")
     time.sleep(5)   
 
     # create action group
@@ -1812,11 +1855,11 @@ def create_agent(modelId, modelName, enable_knowledge_base, agentName, agentAlia
                 knowledgeBaseId=knowledge_base_id,
                 knowledgeBaseState='ENABLED'
             )
-            print(f'response of associate_agent_knowledge_base(): {response}')
+            logger.info(f"response of associate_agent_knowledge_base(): {response}")
             time.sleep(5) # delay 5 seconds
         except Exception:
             err_msg = traceback.format_exc()
-            print(f'error message: {err_msg}')  
+            logger.info(f"error message: {err_msg}")
 
     # preparing
     if debug_mode=="Enable":
@@ -1834,13 +1877,13 @@ def retrieve_agent_id(agentName):
     response_agent = client.list_agents(
         maxResults=10
     )
-    print('response of list_agents(): ', response_agent)
+    logger.info(f"esponse of list_agents(): {response_agent}")
 
     agentId = ""
     for summary in response_agent["agentSummaries"]:
         if summary["agentName"] == agentName:
             agentId = summary["agentId"]
-            print('agentId: ', agentId)
+            logger.info(f"agentId: {agentId}")
             break
 
     return agentId  
@@ -1866,14 +1909,14 @@ def check_agent_status(agentName, agentAliasId, agentAliasName, enable_knowledge
             agentId = agentId,
             maxResults=10
         )
-        print('response of list_agent_aliases(): ', response_agent_alias)   
+        logger.info(f"response of list_agent_aliases(): {response_agent_alias}")
 
         for summary in response_agent_alias["agentAliasSummaries"]:
             if summary["agentAliasName"] == agentAliasName:
                 agentAliasId = summary["agentAliasId"]
-                print('agentAliasId: ', agentAliasId) 
+                logger.info(f"agentAliasId: {agentAliasId}")
 
-                print('agentAliasStatus: ', summary["agentAliasStatus"])
+                logger.info(f"agentAliasStatus: {summary["agentAliasStatus"]}")
                 if not summary["agentAliasStatus"] == "PREPARED":
                     if debug_mode=="Enable":
                         st.info('Agent를 사용할 수 있도록 "Prepare"로 다시 설정합니다.')
@@ -1890,10 +1933,10 @@ def check_agent_status(agentName, agentAliasId, agentAliasName, enable_knowledge
                 agentId=agentId,
                 description='the lastest deployment'
             )
-            print('response of create_agent_alias(): ', response)
+            logger.info(f"response of create_agent_alias(): {response}")
 
             agentAliasId = response['agentAlias']['agentAliasId']
-            print('agentAliasId: ', agentAliasId)
+            logger.info(f"agentAliasId: {agentAliasId}")
             time.sleep(5) # delay 5 seconds
 
             deploy_agent(agentId, agentAliasName)
@@ -1913,11 +1956,11 @@ def run_bedrock_agent(text, agentName, sessionState, st):
         agentAliasName = agent_kb_alias_name
         enable_knowledge_base = "Enable"
 
-    print(f"agentId: {agentId} agentAliasId: {agentAliasId}")
+    logger.info(f"agentId: {agentId} agentAliasId: {agentAliasId}")
 
     if not agentId or not agentAliasId:        
         agentId, agentAliasId = check_agent_status(agentName, agentAliasId, agentAliasName, enable_knowledge_base, st)
-        print(f"agentId: {agentId} agentAliasId: {agentAliasId}")
+        logger.info(f"agentId: {agentId} agentAliasId: {agentAliasId}")
 
         if agentName == agent_name:
             agent_id = agentId
@@ -1962,7 +2005,7 @@ def run_bedrock_agent(text, agentName, sessionState, st):
                     sessionId=sessionId[userId], 
                     memoryId='memory-'+userId
                 )
-            print('response of invoke_agent(): ', response)
+            logger.info(f"esponse of invoke_agent(): {response}")
             
             response_stream = response['completion']
             result = show_output(response_stream, st)
@@ -1973,12 +2016,12 @@ def run_bedrock_agent(text, agentName, sessionState, st):
             if debug_mode=="Enable":
                 st.error('실패하여 agent 정보를 초기화하였습니다. 재시도해주세요.')
             err_msg = traceback.format_exc()
-            print(f'error message: {err_msg}')
+            logger.info(f"error message: {err_msg}")
                 
         reference = ""
         if reference_docs:
             reference = get_references(reference_docs)
-        print('reference: ', reference)
+        logger.info(f"reference: {reference}")
     
     return result+reference, reference_docs
 
@@ -2038,14 +2081,14 @@ def upload_to_s3(file_bytes, file_name):
             Metadata = user_meta,
             Body=file_bytes            
         )
-        print('upload response: ', response)
+        logger.info(f"upload response: {response}")
 
         url = f"https://{s3_bucket}.s3.amazonaws.com/{s3_key}"
         return url
     
     except Exception as e:
         err_msg = f"Error uploading to S3: {str(e)}"
-        print(err_msg)
+        logger.info(f"{err_msg}")
         return None
 
 def extract_and_display_s3_images(text, s3_client):
@@ -2069,7 +2112,7 @@ def extract_and_display_s3_images(text, s3_client):
 
         except Exception as e:
             err_msg = f"Error downloading image from S3: {str(e)}"
-            print(err_msg)
+            logger.info(f"{err_msg}")
             continue
 
     return images
@@ -2080,12 +2123,12 @@ def load_csv_document(s3_file_name):
     doc = s3r.Object(s3_bucket, s3_prefix+'/'+s3_file_name)
 
     lines = doc.get()['Body'].read().decode('utf-8').split('\n')   # read csv per line
-    print('lins: ', len(lines))
+    logger.info(f"prelinspare: {len(lines)}")
         
     columns = lines[0].split(',')  # get columns
     #columns = ["Category", "Information"]  
     #columns_to_metadata = ["type","Source"]
-    print('columns: ', columns)
+    logger.info(f"columns: {columns}")
     
     docs = []
     n = 0
@@ -2104,7 +2147,7 @@ def load_csv_document(s3_file_name):
         )
         docs.append(doc)
         n = n+1
-    print('docs[0]: ', docs[0])
+    logger.info(f"docs[0]: {docs[0]}")
 
     return docs
 
@@ -2138,10 +2181,10 @@ def get_summary(docs):
         )
         
         summary = result.content
-        print('result of summarization: ', summary)
+        logger.info(f"esult of summarization: {summary}")
     except Exception:
         err_msg = traceback.format_exc()
-        print('error message: ', err_msg)                    
+        logger.info(f"error message: {err_msg}") 
         raise Exception ("Not able to request to LLM")
     
     return summary
@@ -2164,9 +2207,9 @@ def load_document(file_type, s3_file_name):
     elif file_type == 'txt' or file_type == 'md':        
         contents = doc.get()['Body'].read().decode('utf-8')
         
-    print('contents: ', contents)
+    logger.info(f"contents: {contents}")
     new_contents = str(contents).replace("\n"," ") 
-    print('length: ', len(new_contents))
+    logger.info(f"length: {len(new_contents)}")
 
     text_splitter = RecursiveCharacterTextSplitter(
         chunk_size=1000,
@@ -2176,7 +2219,7 @@ def load_document(file_type, s3_file_name):
     ) 
     texts = text_splitter.split_text(new_contents) 
     if texts:
-        print('texts[0]: ', texts[0])
+        logger.info(f"exts[0]: {texts[0]}")
     
     return texts
 
@@ -2213,10 +2256,10 @@ def summary_of_code(code, mode):
         )
         
         summary = result.content
-        print('result of code summarization: ', summary)
+        logger.info(f"result of code summarization: {summary}")
     except Exception:
         err_msg = traceback.format_exc()
-        print('error message: ', err_msg)                    
+        logger.info(f"error message: {err_msg}")        
         raise Exception ("Not able to request to LLM")
     
     return summary
@@ -2225,8 +2268,9 @@ def summary_image(img_base64, instruction):
     chat = get_chat()
 
     if instruction:
-        print('instruction: ', instruction)  
+        logger.info(f"instruction: {instruction}")
         query = f"{instruction}. <result> tag를 붙여주세요."
+        
     else:
         query = "이미지가 의미하는 내용을 풀어서 자세히 알려주세요. markdown 포맷으로 답변을 작성합니다."
     
@@ -2247,7 +2291,7 @@ def summary_image(img_base64, instruction):
     ]
     
     for attempt in range(5):
-        print('attempt: ', attempt)
+        logger.info(f"attempt: {attempt}")
         try: 
             result = chat.invoke(messages)
             
@@ -2256,7 +2300,7 @@ def summary_image(img_base64, instruction):
             break
         except Exception:
             err_msg = traceback.format_exc()
-            print('error message: ', err_msg)                    
+            logger.info(f"error message: {err_msg}")                    
             raise Exception ("Not able to request to LLM")
         
     return extracted_text
@@ -2282,7 +2326,7 @@ def extract_text(img_base64):
     ]
     
     for attempt in range(5):
-        print('attempt: ', attempt)
+        logger.info(f"attempt: {attempt}")
         try: 
             result = multimodal.invoke(messages)
             
@@ -2291,10 +2335,10 @@ def extract_text(img_base64):
             break
         except Exception:
             err_msg = traceback.format_exc()
-            print('error message: ', err_msg)                    
+            logger.info(f"error message: {err_msg}")                    
             raise Exception ("Not able to request to LLM")
     
-    print('extracted_text: ', extracted_text)
+    logger.info(f"xtracted_text: {extracted_text}")
     if len(extracted_text)<10:
         extracted_text = "텍스트를 추출하지 못하였습니다."    
 
@@ -2304,14 +2348,14 @@ fileId = uuid.uuid4().hex
 # print('fileId: ', fileId)
 def get_summary_of_uploaded_file(file_name, st):
     file_type = file_name[file_name.rfind('.')+1:len(file_name)]            
-    print('file_type: ', file_type)
+    logger.info(f"file_type: {file_type}")
     
     if file_type == 'csv':
         docs = load_csv_document(file_name)
         contexts = []
         for doc in docs:
             contexts.append(doc.page_content)
-        print('contexts: ', contexts)
+        logger.info(f"contexts: {contexts}")
     
         msg = get_summary(contexts)
 
@@ -2331,13 +2375,13 @@ def get_summary_of_uploaded_file(file_name, st):
                         }
                     )
                 )
-            print('docs[0]: ', docs[0])    
-            print('docs size: ', len(docs))
+            logger.info(f"docs[0]: {docs[0]}") 
+            logger.info(f"docs size: {len(docs)}")
 
             contexts = []
             for doc in docs:
                 contexts.append(doc.page_content)
-            print('contexts: ', contexts)
+            logger.info(f"contexts: {contexts}")
 
             msg = get_summary(contexts)
         else:
@@ -2354,7 +2398,7 @@ def get_summary_of_uploaded_file(file_name, st):
         msg = summary_of_code(contents, file_type)                  
         
     elif file_type == 'png' or file_type == 'jpeg' or file_type == 'jpg':
-        print('multimodal: ', file_name)
+        logger.info(f"multimodal: {file_name}")
         
         s3_client = boto3.client(
             service_name='s3',
@@ -2362,7 +2406,7 @@ def get_summary_of_uploaded_file(file_name, st):
         )             
         if debug_mode=="Enable":
             status = "이미지를 가져옵니다."
-            print('status: ', status)
+            logger.info(f"status: {status}")
             st.info(status)
             
         image_obj = s3_client.get_object(Bucket=s3_bucket, Key=s3_prefix+'/'+file_name)
@@ -2372,14 +2416,14 @@ def get_summary_of_uploaded_file(file_name, st):
         img = Image.open(BytesIO(image_content))
         
         width, height = img.size 
-        print(f"width: {width}, height: {height}, size: {width*height}")
+        logger.info(f"width: {width}, height: {height}, size: {width*height}")
         
         isResized = False
         while(width*height > 5242880):                    
             width = int(width/2)
             height = int(height/2)
             isResized = True
-            print(f"width: {width}, height: {height}, size: {width*height}")
+            logger.info(f"width: {width}, height: {height}, size: {width*height}")
         
         if isResized:
             img = img.resize((width, height))
@@ -2391,7 +2435,7 @@ def get_summary_of_uploaded_file(file_name, st):
         # extract text from the image
         if debug_mode=="Enable":
             status = "이미지에서 텍스트를 추출합니다."
-            print('status: ', status)
+            logger.info(f"status: {status}")
             st.info(status)
         
         text = extract_text(img_base64)
@@ -2404,23 +2448,23 @@ def get_summary_of_uploaded_file(file_name, st):
             extracted_text = text
 
         if debug_mode=="Enable":
-            status = f"### 추출된 텍스트\n\n{extracted_text}"
+            logger.info(f"### 추출된 텍스트\n\n{extracted_text}")
             print('status: ', status)
             st.info(status)
     
         if debug_mode=="Enable":
             status = "이미지의 내용을 분석합니다."
-            print('status: ', status)
+            logger.info(f"status: {status}")
             st.info(status)
 
         image_summary = summary_image(img_base64, "")
-        print('image summary: ', image_summary)
+        logger.info(f"image summary: {image_summary}")
             
         if len(extracted_text) > 10:
             contents = f"## 이미지 분석\n\n{image_summary}\n\n## 추출된 텍스트\n\n{extracted_text}"
         else:
             contents = f"## 이미지 분석\n\n{image_summary}"
-        print('image contents: ', contents)
+        logger.info(f"image content: {contents}")
 
         msg = contents
 
@@ -2443,7 +2487,7 @@ def get_image_summarization(object_name, prompt, st):
 
     if debug_mode=="Enable":
         status = "이미지를 가져옵니다."
-        print('status: ', status)
+        logger.info(f"status: {status}")
         st.info(status)
                 
     image_obj = s3_client.get_object(Bucket=s3_bucket, Key=s3_image_prefix+'/'+object_name)
@@ -2453,14 +2497,14 @@ def get_image_summarization(object_name, prompt, st):
     img = Image.open(BytesIO(image_content))
     
     width, height = img.size 
-    print(f"width: {width}, height: {height}, size: {width*height}")
+    logger.info(f"width: {width}, height: {height}, size: {width*height}")
     
     isResized = False
     while(width*height > 5242880):                    
         width = int(width/2)
         height = int(height/2)
         isResized = True
-        print(f"width: {width}, height: {height}, size: {width*height}")
+        logger.info(f"width: {width}, height: {height}, size: {width*height}")
     
     if isResized:
         img = img.resize((width, height))
@@ -2472,11 +2516,11 @@ def get_image_summarization(object_name, prompt, st):
     # extract text from the image
     if debug_mode=="Enable":
         status = "이미지에서 텍스트를 추출합니다."
-        print('status: ', status)
+        logger.info(f"status: {status}")
         st.info(status)
 
     text = extract_text(img_base64)
-    print('extracted text: ', text)
+    logger.info(f"extracted text: {text}")
 
     if text.find('<result>') != -1:
         extracted_text = text[text.find('<result>')+8:text.find('</result>')] # remove <result> tag
@@ -2486,25 +2530,24 @@ def get_image_summarization(object_name, prompt, st):
     
     if debug_mode=="Enable":
         status = f"### 추출된 텍스트\n\n{extracted_text}"
-        print('status: ', status)
+        logger.info(f"status: {status}")
         st.info(status)
     
     if debug_mode=="Enable":
         status = "이미지의 내용을 분석합니다."
-        print('status: ', status)
+        logger.info(f"status: {status}")
         st.info(status)
 
     image_summary = summary_image(img_base64, prompt)
     
     if text.find('<result>') != -1:
         image_summary = image_summary[image_summary.find('<result>')+8:image_summary.find('</result>')]
-    print('image summary: ', image_summary)
+    logger.info(f"image summary: {image_summary}")
             
     if len(extracted_text) > 10:
         contents = f"## 이미지 분석\n\n{image_summary}\n\n## 추출된 텍스트\n\n{extracted_text}"
     else:
         contents = f"## 이미지 분석\n\n{image_summary}"
-    print('image contents: ', contents)
+    logger.info(f"image contents: {contents}")
 
     return contents
-
