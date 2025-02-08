@@ -14,7 +14,7 @@ stdout_handler.setLevel(logging.INFO)
 stdout_handler.setFormatter(formatter)
 
 enableLoggerApp = chat.get_logger_state()
-logger.info(f"enableLoggerApp: {enableLoggerApp}")
+# logger.info(f"enableLoggerApp: {enableLoggerApp}")
 if not enableLoggerApp:
     logger.addHandler(stdout_handler)
     try:
@@ -78,7 +78,7 @@ with st.sidebar:
     )   
     st.info(mode_descriptions[mode][0])
 
-    logger.info(f"mode: {mode}")
+    # logger.info(f"mode: {mode}")
 
     # model selection box
     modelName = st.selectbox(
@@ -109,7 +109,7 @@ with st.sidebar:
 
     st.success(f"Connected to {modelName}", icon="💚")
     clear_button = st.button("대화 초기화", key="clear")
-    logger.info(f"clear_button: {clear_button}")
+    # logger.info(f"clear_button: {clear_button}")
 
 st.title('🔮 '+ mode)
 
