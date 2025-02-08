@@ -1916,7 +1916,7 @@ def check_agent_status(agentName, agentAliasId, agentAliasName, enable_knowledge
                 agentAliasId = summary["agentAliasId"]
                 logger.info(f"agentAliasId: {agentAliasId}")
 
-                logger.info(f"agentAliasStatus: {summary["agentAliasStatus"]}")
+                logger.info(f"agentAliasStatus: {summary['agentAliasStatus']}")
                 if not summary["agentAliasStatus"] == "PREPARED":
                     if debug_mode=="Enable":
                         st.info('Agent를 사용할 수 있도록 "Prepare"로 다시 설정합니다.')
