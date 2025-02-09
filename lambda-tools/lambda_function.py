@@ -25,7 +25,7 @@ bedrock_region = os.environ.get('bedrock_region')
 projectName = os.environ.get('projectName')
 path = os.environ.get('sharing_url')
 
-model_name = "Nova Lite"
+model_name = "Nova Pro"
 models = info.get_model_info(model_name)
 
 secretsmanager = boto3.client(
@@ -109,7 +109,7 @@ def get_chat():
     global selected_chat, model_type
 
     profile = models[selected_chat]
-    # print('profile: ', profile)
+    print('profile: ', profile)
     number_of_models = len(models)
         
     bedrock_region =  profile['bedrock_region']
@@ -513,8 +513,7 @@ def search_by_knowledge_base(keyword: str) -> str:
                 )
             )    
     
-        # grading        
-        
+        # grading                
         if len(relevant_docs):
             filtered_docs = grade_documents(keyword, relevant_docs)
             filtered_docs = check_duplication(filtered_docs) # duplication checker
