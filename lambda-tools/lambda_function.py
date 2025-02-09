@@ -448,8 +448,6 @@ def search_by_knowledge_base(keyword: str) -> str:
     """    
     print("###### search_by_knowledge_base ######")    
     
-    reference_docs = []
-
     global contentList
     contentList = []
  
@@ -472,7 +470,9 @@ def search_by_knowledge_base(keyword: str) -> str:
         )
         
         docs = retriever.invoke(keyword)
+        print('length of docs: ', len(docs))        
         # print('docs: ', docs)
+
         print('--> docs from knowledge base')
         for i, doc in enumerate(docs):
             # print_doc(i, doc)
@@ -514,25 +514,22 @@ def search_by_knowledge_base(keyword: str) -> str:
             )    
     
         # grading        
-        filtered_docs = grade_documents(keyword, relevant_docs)
-
-        filtered_docs = check_duplication(filtered_docs) # duplication checker
-
-        relevant_context = ""
+        
+        if len(relevant_docs):
+            filtered_docs = grade_documents(keyword, relevant_docs)
+            filtered_docs = check_duplication(filtered_docs) # duplication checker
+        
+    relevant_context = ""
+    if len(filtered_docs):
         for i, document in enumerate(filtered_docs):
             print(f"{i}: {document}")
-            if document.page_content:
-                relevant_context += document.page_content + "\n\n"        
-        print('relevant_context: ', relevant_context)
-    
-    if len(filtered_docs):
-        reference_docs += filtered_docs
+            relevant_context += document.page_content + "\n\n"        
+        print('relevant_context: ', relevant_context)        
+
+    if relevant_context:
         return relevant_context
     else:        
-        # relevant_context = "No relevant documents found."
-        relevant_context = "관련된 정보를 찾지 못하였습니다."
-        print(f"--> {relevant_context}")
-        return relevant_context
+        return "관련된 정보를 찾지 못하였습니다."
 
 def lambda_handler(event, context):
     print('event: ', event)
