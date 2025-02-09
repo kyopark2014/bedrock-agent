@@ -9,8 +9,8 @@ import base64
 import info 
 import PyPDF2
 import csv
-import logging
-import sys
+import knowledge_base as kb
+import utils
 
 from io import BytesIO
 from PIL import Image
@@ -23,43 +23,14 @@ from langchain_core.tools import tool
 from langchain.docstore.document import Document
 from tavily import TavilyClient  
 from langchain_community.tools.tavily_search import TavilySearchResults
-from bs4 import BeautifulSoup
-from botocore.exceptions import ClientError
-from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, SystemMessage, ToolMessage
-from langgraph.graph import START, END, StateGraph
-from typing import Any, List, Tuple, Dict, Optional, cast, Literal, Sequence, Union
-from typing_extensions import Annotated, TypedDict
-from langgraph.graph.message import add_messages
-from langgraph.prebuilt import ToolNode
-from opensearchpy import OpenSearch, RequestsHttpConnection, AWSV4SignerAuth
-from langchain_aws import AmazonKnowledgeBasesRetriever
-from multiprocessing import Process, Pipe
 from urllib import parse
 from pydantic.v1 import BaseModel, Field
 from langchain_core.output_parsers import StrOutputParser
 from langchain_community.utilities.tavily_search import TavilySearchAPIWrapper
 from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_core.messages import HumanMessage
 
-#logging
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
-#formatter = logging.Formatter('%(asctime)s | %(filename)s:%(lineno)d | %(levelname)s | %(message)s')
-#formatter = logging.Formatter('%(asctime)s | %(filename)s:%(lineno)d | %(message)s')
-formatter = logging.Formatter('%(message)s')
-
-stdout_handler = logging.StreamHandler(sys.stdout)
-stdout_handler.setLevel(logging.INFO)
-stdout_handler.setFormatter(formatter)
-
-enableLoggerChat = False
-logger.info(f"enableLoggerChat: {enableLoggerChat}")
-
-enableLoggerApp = False
-def get_logger_state():
-    global enableLoggerApp
-    if not enableLoggerApp:
-        enableLoggerApp = True
-    return enableLoggerApp
+logger = utils.CreateLogger("chat")
 
 userId = "demo"
 map_chain = dict() 
@@ -79,28 +50,12 @@ def initiate():
         memory_chain = ConversationBufferWindowMemory(memory_key="chat_history", output_key='answer', return_messages=True, k=5)
         map_chain[userId] = memory_chain
 
-    if not enableLoggerChat:
-        logger.addHandler(stdout_handler)        
-
 initiate()
 
 try:
     with open("/home/config.json", "r", encoding="utf-8") as f:
         config = json.load(f)
         logger.info(f"config: {config}")
-
-        if not enableLoggerChat:
-            logger.addHandler(stdout_handler)        
-            
-            file_handler = logging.FileHandler('/var/log/application/logs.log')
-            file_handler.setLevel(logging.INFO)
-            file_handler.setFormatter(formatter)
-            logger.addHandler(file_handler)
-
-            logger.info("Ready to write log (chat)!")
-
-            enableLoggerChat = True
-            logger.info(f"enableLoggerChat: {enableLoggerChat}")
 
 except Exception:
     logger.info(f"use local configuration")
@@ -143,10 +98,6 @@ if path is None:
 agent_role_arn = config["agent_role_arn"] if "agent_role_arn" in config else None
 if agent_role_arn is None:
     raise Exception ("No agent role")
-
-credentials = boto3.Session().get_credentials()
-service = "aoss" 
-awsauth = AWSV4SignerAuth(credentials, region, service)
 
 s3_arn = config["s3_arn"] if "s3_arn" in config else None
 if s3_arn is None:
@@ -376,7 +327,7 @@ class GradeDocuments(BaseModel):
 
     binary_score: str = Field(description="Documents are relevant to the question, 'yes' or 'no'")
 
-def get_retrieval_grader(chat):
+def get_retrieval_grader(llm):
     system = """You are a grader assessing relevance of a retrieved document to a user question. \n 
     If the document contains keyword(s) or semantic meaning related to the question, grade it as relevant. \n
     Give a binary score 'yes' or 'no' score to indicate whether the document is relevant to the question."""
@@ -388,7 +339,7 @@ def get_retrieval_grader(chat):
         ]
     )
     
-    structured_llm_grader = chat.with_structured_output(GradeDocuments)
+    structured_llm_grader = llm.with_structured_output(GradeDocuments)
     retrieval_grader = grade_prompt | structured_llm_grader
     return retrieval_grader
 
@@ -401,8 +352,8 @@ def grade_documents(question, documents):
     if grade_state == "LLM":
         filtered_docs = []
         # Score each doc    
-        chat = get_chat()
-        retrieval_grader = get_retrieval_grader(chat)
+        llm = get_chat()
+        retrieval_grader = get_retrieval_grader(llm)
         for i, doc in enumerate(documents):
             # print('doc: ', doc)
             print_doc(i, doc)
@@ -649,7 +600,7 @@ def traslation(chat, text, input_language, output_language):
 #########################################################
 
 def general_conversation(query):
-    chat = get_chat()
+    llm = get_chat()
 
     system = (
         "당신의 이름은 서연이고, 질문에 대해 친절하게 답변하는 사려깊은 인공지능 도우미입니다."
@@ -667,7 +618,7 @@ def general_conversation(query):
                 
     history = memory_chain.load_memory_variables({})["chat_history"]
 
-    chain = prompt | chat | StrOutputParser()
+    chain = prompt | llm | StrOutputParser()
     try: 
         stream = chain.stream(
             {
@@ -684,332 +635,9 @@ def general_conversation(query):
         
     return stream
 
-
-os_client = OpenSearch(
-    hosts = [{
-        'host': opensearch_url.replace("https://", ""), 
-        'port': 443
-    }],
-    http_auth=awsauth,
-    use_ssl = True,
-    verify_certs = True,
-    connection_class=RequestsHttpConnection,
-)
-
-def is_not_exist(index_name):    
-    logger.info(f"index_name: {index_name}")
-        
-    if os_client.indices.exists(index_name):
-        logger.info(f"use exist index: {index_name}")  
-        return False
-    else:
-        logger.info(f"no index: {index_name}")
-        return True
-    
-knowledge_base_id = ""
-data_source_id = ""
-def initiate_knowledge_base():
-    global knowledge_base_id, data_source_id
-    #########################
-    # opensearch index
-    #########################
-    if(is_not_exist(vectorIndexName)):
-        logger.info(f"creating opensearch index... {vectorIndexName}")     
-        body={ 
-            'settings':{
-                "index.knn": True,
-                "index.knn.algo_param.ef_search": 512,
-                'analysis': {
-                    'analyzer': {
-                        'my_analyzer': {
-                            'char_filter': ['html_strip'], 
-                            'tokenizer': 'nori',
-                            'filter': ['nori_number','lowercase','trim','my_nori_part_of_speech'],
-                            'type': 'custom'
-                        }
-                    },
-                    'tokenizer': {
-                        'nori': {
-                            'decompound_mode': 'mixed',
-                            'discard_punctuation': 'true',
-                            'type': 'nori_tokenizer'
-                        }
-                    },
-                    "filter": {
-                        "my_nori_part_of_speech": {
-                            "type": "nori_part_of_speech",
-                            "stoptags": [
-                                    "E", "IC", "J", "MAG", "MAJ",
-                                    "MM", "SP", "SSC", "SSO", "SC",
-                                    "SE", "XPN", "XSA", "XSN", "XSV",
-                                    "UNA", "NA", "VSV"
-                            ]
-                        }
-                    }
-                },
-            },
-            'mappings': {
-                'properties': {
-                    'vector_field': {
-                        'type': 'knn_vector',
-                        'dimension': 1024,
-                        'method': {
-                            "name": "hnsw",
-                            "engine": "faiss",
-                            "parameters": {
-                                "ef_construction": 512,
-                                "m": 16
-                            }
-                        }                  
-                    },
-                    "AMAZON_BEDROCK_METADATA": {"type": "text", "index": False},
-                    "AMAZON_BEDROCK_TEXT": {"type": "text"},
-                }
-            }
-        }
-
-        try: # create index
-            response = os_client.indices.create(
-                vectorIndexName,
-                body=body
-            )
-            logger.info(f"opensearch index was created: {response}")
-
-            # delay 3seconds
-            time.sleep(5)
-        except Exception:
-            err_msg = traceback.format_exc()
-            logger.info(f"error message: {err_msg}")            
-            #raise Exception ("Not able to create the index")
-            
-    #########################
-    # knowledge base
-    #########################
-    logger.info(f"knowledge_base_name: {knowledge_base_name}")
-    logger.info(f"collectionArn: {collectionArn}")
-    logger.info(f"vectorIndexName: {vectorIndexName}")
-    logger.info(f"embeddingModelArn: {embeddingModelArn}")
-    logger.info(f"prepknowledge_base_roleare: {knowledge_base_role}")
-    try: 
-        response = client.list_knowledge_bases(
-            maxResults=10
-        )
-        logger.info(f"(list_knowledge_bases) response: {response}")
-        
-        if "knowledgeBaseSummaries" in response:
-            summaries = response["knowledgeBaseSummaries"]
-            for summary in summaries:
-                if summary["name"] == knowledge_base_name:
-                    knowledge_base_id = summary["knowledgeBaseId"]
-                    logger.info(f"knowledge_base_id: {knowledge_base_id}")
-    except Exception:
-        err_msg = traceback.format_exc()
-        logger.info(f"error message: {err_msg}")
-                    
-    if not knowledge_base_id:
-        logger.info(f"creating knowledge base...")    
-        for atempt in range(20):
-            try:
-                response = client.create_knowledge_base(
-                    name=knowledge_base_name,
-                    description="Knowledge base based on OpenSearch",
-                    roleArn=knowledge_base_role,
-                    knowledgeBaseConfiguration={
-                        'type': 'VECTOR',
-                        'vectorKnowledgeBaseConfiguration': {
-                            'embeddingModelArn': embeddingModelArn,
-                            'embeddingModelConfiguration': {
-                                'bedrockEmbeddingModelConfiguration': {
-                                    'dimensions': 1024
-                                }
-                            }
-                        }
-                    },
-                    storageConfiguration={
-                        'type': 'OPENSEARCH_SERVERLESS',
-                        'opensearchServerlessConfiguration': {
-                            'collectionArn': collectionArn,
-                            'fieldMapping': {
-                                'metadataField': 'AMAZON_BEDROCK_METADATA',
-                                'textField': 'AMAZON_BEDROCK_TEXT',
-                                'vectorField': 'vector_field'
-                            },
-                            'vectorIndexName': vectorIndexName
-                        }
-                    }                
-                )   
-                logger.info(f"(create_knowledge_base) response: {response}")
-            
-                if 'knowledgeBaseId' in response['knowledgeBase']:
-                    knowledge_base_id = response['knowledgeBase']['knowledgeBaseId']
-                    break
-                else:
-                    knowledge_base_id = ""    
-            except Exception:
-                    err_msg = traceback.format_exc()
-                    logger.info(f"error message: {err_msg}")
-                    time.sleep(5)
-                    logger.info(f"retrying... ({atempt})")
-                    #raise Exception ("Not able to create the knowledge base")      
-                
-    logger.info(f"knowledge_base_name: {knowledge_base_name}, knowledge_base_id: {knowledge_base_id}")    
-    
-    #########################
-    # data source      
-    #########################
-    data_source_name = s3_bucket  
-    try: 
-        response = client.list_data_sources(
-            knowledgeBaseId=knowledge_base_id,
-            maxResults=10
-        )        
-        logger.info(f"(list_data_sources) response: : {response}")
-        
-        if 'dataSourceSummaries' in response:
-            for data_source in response['dataSourceSummaries']:
-                logger.info(f"data_source: {data_source}")
-                if data_source['name'] == data_source_name:
-                    data_source_id = data_source['dataSourceId']
-                    logger.info(f"data_source_id: {data_source_id}")
-                    break    
-    except Exception:
-        err_msg = traceback.format_exc()
-        logger.info(f"error message: {err_msg}")
-        
-    if not data_source_id:
-        logger.info(f"creating data source...")
-        try:
-            response = client.create_data_source(
-                dataDeletionPolicy='RETAIN',
-                dataSourceConfiguration={
-                    's3Configuration': {
-                        'bucketArn': s3_arn,
-                        'inclusionPrefixes': [ 
-                            s3_prefix+'/',
-                        ]
-                    },
-                    'type': 'S3'
-                },
-                description = f"S3 data source: {s3_bucket}",
-                knowledgeBaseId = knowledge_base_id,
-                name = data_source_name,
-                vectorIngestionConfiguration={
-                    'chunkingConfiguration': {
-                        'chunkingStrategy': 'HIERARCHICAL',
-                        'hierarchicalChunkingConfiguration': {
-                            'levelConfigurations': [
-                                {
-                                    'maxTokens': 1500
-                                },
-                                {
-                                    'maxTokens': 300
-                                }
-                            ],
-                            'overlapTokens': 60
-                        }
-                    },
-                    'parsingConfiguration': {
-                        'bedrockFoundationModelConfiguration': {
-                            'modelArn': parsingModelArn
-                        },
-                        'parsingStrategy': 'BEDROCK_FOUNDATION_MODEL'
-                    }
-                }
-            )
-            logger.info(f"(create_data_source) response: {response}")
-            
-            if 'dataSource' in response:
-                if 'dataSourceId' in response['dataSource']:
-                    data_source_id = response['dataSource']['dataSourceId']
-                    logger.info(f"data_source_id: {data_source_id}")
-                    
-        except Exception:
-            err_msg = traceback.format_exc()
-            logger.info(f"error message: {err_msg}")
-            #raise Exception ("Not able to create the data source")
-    
-    logger.info(f"data_source_name: {data_source_name}, data_source_id: {data_source_id}")
-            
-initiate_knowledge_base()
-
-def retrieve_documents_from_knowledge_base(query, top_k):
-    relevant_docs = []
-    if knowledge_base_id:    
-        retriever = AmazonKnowledgeBasesRetriever(
-            knowledge_base_id=knowledge_base_id, 
-            retrieval_config={"vectorSearchConfiguration": {
-                "numberOfResults": top_k,
-                "overrideSearchType": "HYBRID"   # SEMANTIC
-            }},
-            region_name=bedrock_region
-        )
-        
-        try: 
-            documents = retriever.invoke(query)
-            # print('documents: ', documents)
-            print('--> docs from knowledge base')
-            logger.info(f"-> docs from knowledge base")
-            for i, doc in enumerate(documents):
-                print_doc(i, doc)
-        except Exception:
-            err_msg = traceback.format_exc()
-            logger.info(f"error message: {err_msg}")    
-            raise Exception ("Not able to request to LLM: "+err_msg)
-        
-        relevant_docs = []
-        for doc in documents:
-            content = ""
-            if doc.page_content:
-                content = doc.page_content
-            
-            score = doc.metadata["score"]
-            
-            link = ""
-            if "s3Location" in doc.metadata["location"]:
-                link = doc.metadata["location"]["s3Location"]["uri"] if doc.metadata["location"]["s3Location"]["uri"] is not None else ""
-                
-                # print('link:', link)    
-                pos = link.find(f"/{doc_prefix}")
-                name = link[pos+len(doc_prefix)+1:]
-                encoded_name = parse.quote(name)
-                # print('name:', name)
-                link = f"{path}/{doc_prefix}{encoded_name}"
-                
-            elif "webLocation" in doc.metadata["location"]:
-                link = doc.metadata["location"]["webLocation"]["url"] if doc.metadata["location"]["webLocation"]["url"] is not None else ""
-                name = "WEB"
-
-            url = link
-            logger.info(f"url: {url}")
-            
-            relevant_docs.append(
-                Document(
-                    page_content=content,
-                    metadata={
-                        'name': name,
-                        'score': score,
-                        'url': url,
-                        'from': 'RAG'
-                    },
-                )
-            )    
-    return relevant_docs
-
-def sync_data_source():
-    if knowledge_base_id and data_source_id:
-        try:
-            response = client.start_ingestion_job(
-                knowledgeBaseId=knowledge_base_id,
-                dataSourceId=data_source_id
-            )
-            logger.info(f"start_ingestion_job) response: {response}")
-        except Exception:
-            err_msg = traceback.format_exc()
-            logger.info(f"error message: {err_msg}")
-            
 def get_rag_prompt(text):
     # print("###### get_rag_prompt ######")
-    chat = get_chat()
+    llm = get_chat()
     # print('model_type: ', model_type)
     
     if model_type == "nova":
@@ -1066,7 +694,7 @@ def get_rag_prompt(text):
     prompt = ChatPromptTemplate.from_messages([("system", system), ("human", human)])
     # print('prompt: ', prompt)
     
-    rag_chain = prompt | chat
+    rag_chain = prompt | llm
 
     return rag_chain
 
@@ -1075,8 +703,6 @@ def run_rag_with_knowledge_base(text, st):
     reference_docs = []
     contentList = []
 
-    chat = get_chat()
-    
     msg = ""
     top_k = numberOfDocs
     
@@ -1084,7 +710,7 @@ def run_rag_with_knowledge_base(text, st):
     if debug_mode == "Enable":
         st.info(f"RAG 검색을 수행합니다. 검색어: {text}")  
     
-    relevant_docs = retrieve_documents_from_knowledge_base(text, top_k=top_k)
+    relevant_docs = kb.retrieve_documents_from_knowledge_base(text, top_k=top_k)
     # relevant_docs += retrieve_documents_from_tavily(text, top_k=top_k)
 
     # grade   
@@ -1837,7 +1463,7 @@ def create_agent(modelId, modelName, enable_knowledge_base, agentName, agentAlia
     create_action_group_for_code_interpreter(agentId, st)
     
     # associate knowledge base            
-    if knowledge_base_id and enable_knowledge_base == "Enable":
+    if kb.knowledge_base_id and enable_knowledge_base == "Enable":
         if debug_mode=="Enable":
             st.info("Agent에서 Knowledge Base를 사용할 수 있도록 설정합니다.")
 
@@ -1852,7 +1478,7 @@ def create_agent(modelId, modelName, enable_knowledge_base, agentName, agentAlia
                 agentId=agentId,
                 agentVersion='DRAFT',
                 description=rag_prompt,
-                knowledgeBaseId=knowledge_base_id,
+                knowledgeBaseId=kb.knowledge_base_id,
                 knowledgeBaseState='ENABLED'
             )
             logger.info(f"response of associate_agent_knowledge_base(): {response}")
@@ -2152,7 +1778,7 @@ def load_csv_document(s3_file_name):
     return docs
 
 def get_summary(docs):    
-    chat = get_chat()
+    llm = get_chat()
 
     text = ""
     for doc in docs:
@@ -2172,7 +1798,7 @@ def get_summary(docs):
     prompt = ChatPromptTemplate.from_messages([("system", system), ("human", human)])
     # print('prompt: ', prompt)
     
-    chain = prompt | chat    
+    chain = prompt | llm    
     try: 
         result = chain.invoke(
             {
@@ -2245,9 +1871,9 @@ def summary_of_code(code, mode):
     prompt = ChatPromptTemplate.from_messages([("system", system), ("human", human)])
     # print('prompt: ', prompt)
     
-    chat = get_chat()
+    llm = get_chat()
 
-    chain = prompt | chat    
+    chain = prompt | llm    
     try: 
         result = chain.invoke(
             {
@@ -2265,7 +1891,7 @@ def summary_of_code(code, mode):
     return summary
 
 def summary_image(img_base64, instruction):      
-    chat = get_chat()
+    llm = get_chat()
 
     if instruction:
         logger.info(f"instruction: {instruction}")
@@ -2293,7 +1919,7 @@ def summary_image(img_base64, instruction):
     for attempt in range(5):
         logger.info(f"attempt: {attempt}")
         try: 
-            result = chat.invoke(messages)
+            result = llm.invoke(messages)
             
             extracted_text = result.content
             # print('summary from an image: ', extracted_text)
@@ -2477,7 +2103,6 @@ def get_summary_of_uploaded_file(file_name, st):
 ####################### LangChain #######################
 # Image Summarization
 #########################################################
-
 def get_image_summarization(object_name, prompt, st):
     # load image
     s3_client = boto3.client(

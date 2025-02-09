@@ -2,31 +2,10 @@ import streamlit as st
 import chat
 import logging
 import sys
+import utils
 
 # logging
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
-# formatter = logging.Formatter('%(asctime)s | %(filename)s:%(lineno)d | %(message)s')
-formatter = logging.Formatter('%(message)s')
-
-stdout_handler = logging.StreamHandler(sys.stdout)
-stdout_handler.setLevel(logging.INFO)
-stdout_handler.setFormatter(formatter)
-
-enableLoggerApp = chat.get_logger_state()
-# logger.info(f"enableLoggerApp: {enableLoggerApp}")
-if not enableLoggerApp:
-    logger.addHandler(stdout_handler)
-    try:
-        with open("/home/config.json", "r", encoding="utf-8") as f:
-            file_handler = logging.FileHandler('/var/log/application/logs.log')
-            file_handler.setLevel(logging.INFO)
-            file_handler.setFormatter(formatter)
-            logger.addHandler(file_handler)
-
-            logger.info("Ready to write log (app)!")
-    except Exception:
-        logger.debug(f"Not available to write application log (app)")
+logger = utils.CreateLogger("streamlit")
 
 # title
 st.set_page_config(page_title='Bedrock Agent', page_icon=None, layout="centered", initial_sidebar_state="auto", menu_items=None)
