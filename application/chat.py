@@ -597,7 +597,6 @@ def traslation(chat, text, input_language, output_language):
 ####################### LangChain #######################
 # General Conversation
 #########################################################
-
 def general_conversation(query):
     llm = get_chat()
 
@@ -775,7 +774,6 @@ def run_rag_with_knowledge_base(text, st):
 ####################### Prompt Flow #######################
 # Prompt Flow
 ###########################################################  
-    
 flow_arn = None
 flow_alias_identifier = None
 def run_flow(text, connectionId, requestId):    
@@ -944,9 +942,9 @@ def show_output(event_stream, st):
     stream_result = final_result = ""    
     for index, event in enumerate(event_stream):
         logger.info(f"Event: {index}")
-        logger.info(str(event))
-        print("\n")
-        logger.info(f"\n")
+        #logger.info(str(event))
+        #print("\n")
+        #logger.info(f"\n")
             
         # Handle text chunks
         if "chunk" in event:
@@ -1612,6 +1610,7 @@ def run_bedrock_agent(text, agentName, sessionState, st):
         )
         try:
             if sessionState:
+                logger.info(f'code interpreter is used with sessionState')
                 response = client_runtime.invoke_agent( 
                     agentAliasId=agentAliasId,
                     agentId=agentId,
@@ -1630,11 +1629,11 @@ def run_bedrock_agent(text, agentName, sessionState, st):
                     sessionId=sessionId[userId], 
                     memoryId='memory-'+userId
                 )
-            logger.info(f"esponse of invoke_agent(): {response}")
+            logger.info(f"response of invoke_agent(): {response}")
             
             response_stream = response['completion']
             result = show_output(response_stream, st)
-            # print('response_stream: ', response_stream)            
+            
         except Exception as e:
             agent_id = agent_alias_id = agent_kb_id = agent_kb_alias_id = ""
             # raise Exception("unexpected event.",e)
@@ -1660,29 +1659,7 @@ def upload_to_s3(file_bytes, file_name):
             region_name=bedrock_region
         )
         
-        if file_name.lower().endswith((".jpg", ".jpeg")):
-            content_type = "image/jpeg"
-        elif file_name.lower().endswith((".pdf")):
-            content_type = "application/pdf"
-        elif file_name.lower().endswith((".txt")):
-            content_type = "text/plain"
-        elif file_name.lower().endswith((".csv")):
-            content_type = "text/csv"
-        elif file_name.lower().endswith((".ppt", ".pptx")):
-            content_type = "application/vnd.ms-powerpoint"
-        elif file_name.lower().endswith((".doc", ".docx")):
-            content_type = "application/msword"
-        elif file_name.lower().endswith((".xls")):
-            content_type = "application/vnd.ms-excel"
-        elif file_name.lower().endswith((".py")):
-            content_type = "text/x-python"
-        elif file_name.lower().endswith((".js")):
-            content_type = "application/javascript"
-        elif file_name.lower().endswith((".md")):
-            content_type = "text/markdown"
-        elif file_name.lower().endswith((".png")):
-            content_type = "image/png"
-
+        content_type = utils.get_contents_type(file_name)
         
         # Generate a unique file name to avoid collisions
         #timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")

@@ -1,7 +1,5 @@
 import streamlit as st 
 import chat
-import logging
-import sys
 import utils
 
 # logging
@@ -66,10 +64,10 @@ with st.sidebar:
     )
 
     uploaded_file = None
-    if mode=='이미지 분석':        
+    if mode=='이미지 분석':
         st.subheader("🌇 이미지 업로드")
         uploaded_file = st.file_uploader("이미지 요약을 위한 파일을 선택합니다.", type=["png", "jpg", "jpeg"])
-    elif mode=='RAG' or mode=="Agent (Tool Use)":
+    elif mode=='RAG' or mode=="Agent" or mode=="Agent with Knowlege Base":
         st.subheader("📋 문서 업로드")
         # print('fileId: ', chat.fileId)
         uploaded_file = st.file_uploader("RAG를 위한 파일을 선택합니다.", type=["pdf", "txt", "py", "md", "csv", "json"], key=chat.fileId)
@@ -78,6 +76,10 @@ with st.sidebar:
     select_code_interpreter = st.checkbox('Code Interpreter', value=False)
     code_interpreter = 'Enable' if select_code_interpreter else 'Disable'
     #print('code_interpreter: ', code_interpreter)
+
+    if code_interpreter=='Enable' and mode=="Agent":
+        st.subheader("📋 분석할 문서 업로드")  
+        uploaded_file = st.file_uploader("분석할 파일을 선택하세요.", type=["csv", "xls", "xlsx", "YAML", "json", "doc", "docx", "html", "md", "txt", "pdf"])
 
     # debug checkbox
     select_debugMode = st.checkbox('Debug Mode', value=True)
@@ -182,7 +184,7 @@ if uploaded_file is not None and clear_button==False:
         image_url = chat.upload_to_s3(uploaded_file.getvalue(), file_name)
         logger.info(f"image_url: {image_url}")   
 
-    elif uploaded_file.name and code_interpreter == "Enable" and uploaded_file.name.lower().endswith((".csv")): # csv only   
+    elif uploaded_file.name and code_interpreter == "Enable":
         guide = "Code Interpreter가 준비되었습니다. 원하는 동작을 입력하세요."
         st.write(guide)
         st.session_state.messages.append({"role": "assistant", "content": guide})
@@ -251,7 +253,12 @@ if prompt := st.chat_input("메시지를 입력하세요."):
                 
                 show_references(reference_docs) 
 
-            else: # csv only        
+            else: # code interpreter
+                file_name = uploaded_file.name
+                logger.info(f"file_name: {file_name}")
+                content_type = utils.get_contents_type(file_name)
+                logger.info(f"content_type: {content_type}")
+
                 sessionState = {
                     'files': [
                         {
@@ -259,7 +266,7 @@ if prompt := st.chat_input("메시지를 입력하세요."):
                             'source': {
                                 'byteContent': {
                                     'data': uploaded_file.getvalue(),
-                                    'mediaType': 'text/csv'
+                                    'mediaType': content_type
                                 },
                                 'sourceType': 'BYTE_CONTENT'
                             },
