@@ -14,7 +14,6 @@ import utils
 
 from io import BytesIO
 from PIL import Image
-from pytz import timezone
 from langchain_aws import ChatBedrock
 from botocore.config import Config
 from langchain_core.prompts import MessagesPlaceholder, ChatPromptTemplate
@@ -314,7 +313,7 @@ def check_grammer(text):
         )
         
         msg = result.content
-        logger.info(f"esult of grammer correction: {premsgpare}")
+        logger.info(f"result of grammer correction: {msg}")
     except Exception:
         err_msg = traceback.format_exc()
         logger.info(f"error message: {err_msg}")       
