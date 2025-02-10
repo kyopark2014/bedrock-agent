@@ -704,8 +704,7 @@ Bedrock agetn의 code interpreter의 기능을 테스트하기 위하여 "code i
 
 "네이버 주가 동향을 그래프로 그려주세요. 그림의 글자는 충분히 크게 하고 영어를 사용합니다."라고 입력하면 API를 통해 주식 정보를 확인하고, 얻어진 정보를 기반으로 그래프를 아래와 같이 그려줍니다.
 
-![image](https://github.com/user-attachments/assets/dc2669b5-b32d-4e5c-ba83-d02660002825)
-
+<img src="https://github.com/user-attachments/assets/dc2669b5-b32d-4e5c-ba83-d02660002825" width="600">
 
 ## 리소스 정리하기 
 
