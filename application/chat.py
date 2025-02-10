@@ -964,7 +964,7 @@ def show_output(event_stream, st):
             logger.info(f"Number of files: {len(files)}")
             for i, file in enumerate(files):
                 st.image(file["bytes"], caption=file["name"])
-                logger.info(f"image[{i}]: {file["name"]}")
+                logger.info(f"image[{i}]: {file['name']}")
 
                 file_url = upload_to_s3(file["bytes"], file["name"])
                 logger.info(f"file_url[{i}]: {file_url}")
