@@ -218,8 +218,6 @@ if prompt := st.chat_input("메시지를 입력하세요."):
                 logger.info(f"response: {response}")
 
                 st.session_state.messages.append({"role": "assistant", "content": response})
-                if debugMode != "Enable":
-                    st.rerun()
 
                 chat.save_chat_history(prompt, response)
             
@@ -232,8 +230,6 @@ if prompt := st.chat_input("메시지를 입력하세요."):
                 logger.info(f"response: {response}")
 
                 st.session_state.messages.append({"role": "assistant", "content": response})
-                if debugMode=='Enable':
-                    st.rerun()
 
                 chat.save_chat_history(prompt, response)
         
@@ -246,8 +242,6 @@ if prompt := st.chat_input("메시지를 입력하세요."):
                     logger.info(f"response: {response}")
                     
                     st.session_state.messages.append({"role": "assistant", "content": response})
-                    #if debugMode != "Enable":
-                    #    st.rerun()
 
                     chat.save_chat_history(prompt, response)
                 
@@ -276,22 +270,31 @@ if prompt := st.chat_input("메시지를 입력하세요."):
                 }
                 with st.status("thinking...", expanded=True, state="running") as status:
                     # prompt = "첨부 파일의 내용을 분석해주세요."
-                    response, reference_docs = chat.run_bedrock_agent(prompt, chat.agent_name, sessionState, st)
+                    response, image_url, reference_docs = chat.run_bedrock_agent(prompt, chat.agent_name, sessionState, st)
                     st.write(response)
                     logger.info(f"response: {response}")                
-                    st.session_state.messages.append({"role": "assistant", "content": response})
+                    st.session_state.messages.append(
+                    {
+                        "role": "assistant", 
+                        "content": response,
+                        "images": [image_url] if image_url else []
+                    }
+                )
         
         elif mode == 'Agent with Knowlege Base':
             sessionState = ""
             with st.status("thinking...", expanded=True, state="running") as status:
-                response, reference_docs = chat.run_bedrock_agent(prompt, chat.agent_kb_name, "", st)
+                response, image_url, reference_docs = chat.run_bedrock_agent(prompt, chat.agent_kb_name, "", st)
                 st.write(response)
                 logger.info(f"response: {response}")
                 
-                st.session_state.messages.append({"role": "assistant", "content": response})
-                #if debugMode != "Enable":
-                #    st.rerun()
-
+                st.session_state.messages.append(
+                    {
+                        "role": "assistant", 
+                        "content": response,
+                        "images": [image_url] if image_url else []
+                    }
+                )
                 chat.save_chat_history(prompt, response)
             
             show_references(reference_docs) 
@@ -321,7 +324,6 @@ if prompt := st.chat_input("메시지를 입력하세요."):
                     st.write(summary)
 
                     st.session_state.messages.append({"role": "assistant", "content": summary})
-                    # st.rerun()
 
         else:
             stream = chat.general_conversation(prompt)

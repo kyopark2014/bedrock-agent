@@ -939,7 +939,7 @@ sessionState = ""
 def show_output(event_stream, st):
     global reference_docs
 
-    stream_result = final_result = ""    
+    stream_result = final_result = image_url = ""    
     for index, event in enumerate(event_stream):
         logger.info(f"Event: {index}")
         #logger.info(str(event))
@@ -1599,7 +1599,7 @@ def run_bedrock_agent(text, agentName, sessionState, st):
     if not userId in sessionId:
         sessionId[userId] = str(uuid.uuid4())
 
-    result = ""
+    result = image_url = ""
     if agentAliasId and agentId:
         #if debug_mode=="Enable":
         #    st.info('답변을 생성하고 있습니다.')
@@ -1632,7 +1632,7 @@ def run_bedrock_agent(text, agentName, sessionState, st):
             logger.info(f"response of invoke_agent(): {response}")
             
             response_stream = response['completion']
-            result = show_output(response_stream, st)
+            result, image_url = show_output(response_stream, st)
             
         except Exception as e:
             agent_id = agent_alias_id = agent_kb_id = agent_kb_alias_id = ""
@@ -1647,7 +1647,7 @@ def run_bedrock_agent(text, agentName, sessionState, st):
             reference = get_references(reference_docs)
         logger.info(f"reference: {reference}")
     
-    return result+reference, reference_docs
+    return result+reference, image_url, reference_docs
 
 def upload_to_s3(file_bytes, file_name):
     """
