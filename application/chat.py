@@ -936,254 +936,138 @@ def run_RAG_prompt_flow(text, connectionId, requestId):
 sessionId = dict() 
 sessionState = ""
 
-def show_output(event_stream, st):
+def show_output(event, st):
     global reference_docs
-
     stream_result = final_result = ""    
-    
-    for index, event in enumerate(event_stream):
-        image_url = []
-        logger.info(f"Event: {index}")
-        #logger.info(str(event))
-        #print("\n")
-        #logger.info(f"\n")
-            
-        # Handle text chunks
-        if "chunk" in event:
-            chunk = event["chunk"]
-            if "bytes" in chunk:
-                text = chunk["bytes"].decode("utf-8")
-                logger.info(f"Chunk: {text}")
-                stream_result += text
+    image_url = []
+        
+    #logger.info(str(event))
+    #print("\n")
+    #logger.info(f"\n")
+        
+    # Handle text chunks
+    if "chunk" in event:
+        chunk = event["chunk"]
+        if "bytes" in chunk:
+            text = chunk["bytes"].decode("utf-8")
+            logger.info(f"Chunk: {text}")
+            stream_result += text
 
-        # Handle file outputs
-        if "files" in event:
-            logger.info(f"Files received")
-            files = event["files"]["files"]
+    # Handle file outputs
+    if "files" in event:
+        logger.info(f"Files received")
+        files = event["files"]["files"]
 
-            logger.info(f"Number of files: {len(files)}")
-            for i, file in enumerate(files):
-                st.image(file["bytes"], caption=file["name"])
-                logger.info(f"image[{i}]: {file['name']}")
+        logger.info(f"Number of files: {len(files)}")
+        for i, file in enumerate(files):
+            st.image(file["bytes"], caption=file["name"])
+            logger.info(f"image[{i}]: {file['name']}")
 
-                file_url = upload_to_s3(file["bytes"], file["name"])
-                logger.info(f"file_url[{i}]: {file_url}")
+            file_url = upload_to_s3(file["bytes"], file["name"])
+            logger.info(f"file_url[{i}]: {file_url}")
 
-                file_name = file_url[file_url.rfind('/')+1:]
-                url = f"{path}/{s3_image_prefix}/{file_name}"
-                logger.info(f"(files) image_url[{i}]: {url}")
-                image_url.append(url)
+            file_name = file_url[file_url.rfind('/')+1:]
+            url = f"{path}/{s3_image_prefix}/{file_name}"
+            logger.info(f"(files) image_url[{i}]: {url}")
+            image_url.append(url)
 
-        # Check trace
-        if "trace" in event:
-            if ("trace" in event["trace"] and "orchestrationTrace" in event["trace"]["trace"]):
-                trace_event = event["trace"]["trace"]["orchestrationTrace"]
-                if "rationale" in trace_event:
-                    trace_text = trace_event["rationale"]["text"]
+    # Check trace
+    if "trace" in event:
+        if ("trace" in event["trace"] and "orchestrationTrace" in event["trace"]["trace"]):
+            trace_event = event["trace"]["trace"]["orchestrationTrace"]
+            if "rationale" in trace_event:
+                trace_text = trace_event["rationale"]["text"]
+                if debug_mode=="Enable":
+                    st.info(f"rationale: {trace_text}")
+
+            if "modelInvocationInput" in trace_event:
+                if "text" in trace_event["modelInvocationInput"]:
+                    trace_text = trace_event["modelInvocationInput"]["text"]
+                    logger.info(f"trace_text: {trace_text}")
+                    #if debug_mode=="Enable":
+                        # st.info(f"modelInvocationInput: {trace_text}")
+                if "rawResponse" in trace_event["modelInvocationInput"]:
+                    rawResponse = trace_event["modelInvocationInput"]["rawResponse"]                        
+                    logger.info(f"rawResponse: {rawResponse}")
+                    # if debug_mode=="Enable":
+                    #     st.info(f"modelInvocationInput: {rawResponse}")
+
+            if "modelInvocationOutput" in trace_event:
+                if "rawResponse" in trace_event["modelInvocationOutput"]:
+                    trace_text = trace_event["modelInvocationOutput"]["rawResponse"]["content"]
+                    logger.info(f"trace_text: {trace_text}")
+                    # if debug_mode=="Enable":
+                    #     st.info(f"modelInvocationOutput: {trace_text}")
+
+            if "invocationInput" in trace_event:
+                if "codeInterpreterInvocationInput" in trace_event["invocationInput"]:
+                    trace_code = trace_event["invocationInput"]["codeInterpreterInvocationInput"]["code"]
+                    logger.info(f"trace_code: {trace_code}")
                     if debug_mode=="Enable":
-                        st.info(f"rationale: {trace_text}")
+                        st.info(f"codeInterpreter: {trace_code}")
 
-                if "modelInvocationInput" in trace_event:
-                    if "text" in trace_event["modelInvocationInput"]:
-                        trace_text = trace_event["modelInvocationInput"]["text"]
-                        logger.info(f"trace_text: {trace_text}")
-                        #if debug_mode=="Enable":
-                            # st.info(f"modelInvocationInput: {trace_text}")
-                    if "rawResponse" in trace_event["modelInvocationInput"]:
-                        rawResponse = trace_event["modelInvocationInput"]["rawResponse"]                        
-                        logger.info(f"rawResponse: {rawResponse}")
-                        # if debug_mode=="Enable":
-                        #     st.info(f"modelInvocationInput: {rawResponse}")
+                if "knowledgeBaseLookupInput" in trace_event["invocationInput"]:
+                    trace_text = trace_event["invocationInput"]["knowledgeBaseLookupInput"]["text"]
+                    logger.info(f"trace_text: {trace_text}")
+                    # st.info(f"knowledgeBaseLookup: {trace_text}")
+                    if debug_mode=="Enable":
+                        st.info(f"RAG를 검색합니다. 검색어: {trace_text}")
 
-                if "modelInvocationOutput" in trace_event:
-                    if "rawResponse" in trace_event["modelInvocationOutput"]:
-                        trace_text = trace_event["modelInvocationOutput"]["rawResponse"]["content"]
-                        logger.info(f"trace_text: {trace_text}")
-                        # if debug_mode=="Enable":
-                        #     st.info(f"modelInvocationOutput: {trace_text}")
+                if "actionGroupInvocationInput" in trace_event["invocationInput"]:
+                    trace_function = trace_event["invocationInput"]["actionGroupInvocationInput"]["function"]
+                    logger.info(f"preptrace_functionare: {trace_function}")
+                    if debug_mode=="Enable":
+                        st.info(f"actionGroupInvocation: {trace_function}")
 
-                if "invocationInput" in trace_event:
-                    if "codeInterpreterInvocationInput" in trace_event["invocationInput"]:
-                        trace_code = trace_event["invocationInput"]["codeInterpreterInvocationInput"]["code"]
-                        logger.info(f"trace_code: {trace_code}")
+            if "observation" in trace_event:
+                if "finalResponse" in trace_event["observation"]:
+                    trace_resp = trace_event["observation"]["finalResponse"]["text"]
+                    logger.info(f"final response: {trace_resp}")   
+                    final_result = trace_resp
+
+                if ("codeInterpreterInvocationOutput" in trace_event["observation"]):
+                    if "executionOutput" in trace_event["observation"]["codeInterpreterInvocationOutput"]:
+                        trace_resp = trace_event["observation"]["codeInterpreterInvocationOutput"]["executionOutput"]
                         if debug_mode=="Enable":
-                            st.info(f"codeInterpreter: {trace_code}")
+                            st.info(f"observation: {trace_resp}")
 
-                    if "knowledgeBaseLookupInput" in trace_event["invocationInput"]:
-                        trace_text = trace_event["invocationInput"]["knowledgeBaseLookupInput"]["text"]
-                        logger.info(f"trace_text: {trace_text}")
-                        # st.info(f"knowledgeBaseLookup: {trace_text}")
+                    if "executionError" in trace_event["observation"]["codeInterpreterInvocationOutput"]:
+                        trace_resp = trace_event["observation"]["codeInterpreterInvocationOutput"]["executionError"]
                         if debug_mode=="Enable":
-                            st.info(f"RAG를 검색합니다. 검색어: {trace_text}")
+                            st.error(f"observation: {trace_resp}")
 
-                    if "actionGroupInvocationInput" in trace_event["invocationInput"]:
-                        trace_function = trace_event["invocationInput"]["actionGroupInvocationInput"]["function"]
-                        logger.info(f"preptrace_functionare: {trace_function}")
+                        if "image_url" in trace_resp:
+                            file_url = trace_resp["image_url"]
+                            logger.info(f"file_url: {file_url}")
+
+                            file_name = file_url[file_url.rfind('/')+1:]
+                            url = f"{path}/{s3_image_prefix}/{file_name}"
+                            logger.info(f"(observation) image_url: {url}")
+                            image_url.append(url)
+
+                            st.image(url)
+                            
+                if "knowledgeBaseLookupOutput" in trace_event["observation"]:
+                    # if debug_mode=="Enable":
+                    #     st.info(f"knowledgeBaseLookupOutput: {trace_event["observation"]["knowledgeBaseLookupOutput"]["retrievedReferences"]}")
+                    if "retrievedReferences" in trace_event["observation"]["knowledgeBaseLookupOutput"]:
+                        references = trace_event["observation"]["knowledgeBaseLookupOutput"]["retrievedReferences"]
                         if debug_mode=="Enable":
-                            st.info(f"actionGroupInvocation: {trace_function}")
+                            st.info(f"{len(references)}개의 문서가 검색되었습니다.")
 
-                if "observation" in trace_event:
-                    if "finalResponse" in trace_event["observation"]:
-                        trace_resp = trace_event["observation"]["finalResponse"]["text"]
-                        logger.info(f"final response: {trace_resp}")   
-                        final_result = trace_resp
-
-                    if ("codeInterpreterInvocationOutput" in trace_event["observation"]):
-                        if "executionOutput" in trace_event["observation"]["codeInterpreterInvocationOutput"]:
-                            trace_resp = trace_event["observation"]["codeInterpreterInvocationOutput"]["executionOutput"]
-                            if debug_mode=="Enable":
-                                st.info(f"observation: {trace_resp}")
-
-                        if "executionError" in trace_event["observation"]["codeInterpreterInvocationOutput"]:
-                            trace_resp = trace_event["observation"]["codeInterpreterInvocationOutput"]["executionError"]
-                            if debug_mode=="Enable":
-                                st.error(f"observation: {trace_resp}")
-
-                            if "image_url" in trace_resp:
-                                file_url = trace_resp["image_url"]
-                                logger.info(f"file_url: {file_url}")
-
-                                file_name = file_url[file_url.rfind('/')+1:]
-                                url = f"{path}/{s3_image_prefix}/{file_name}"
-                                logger.info(f"(observation) image_url: {url}")
-                                image_url.append(url)
-
-                                st.image(url)
-                                
-                    if "knowledgeBaseLookupOutput" in trace_event["observation"]:
-                        # if debug_mode=="Enable":
-                        #     st.info(f"knowledgeBaseLookupOutput: {trace_event["observation"]["knowledgeBaseLookupOutput"]["retrievedReferences"]}")
-                        if "retrievedReferences" in trace_event["observation"]["knowledgeBaseLookupOutput"]:
-                            references = trace_event["observation"]["knowledgeBaseLookupOutput"]["retrievedReferences"]
-                            if debug_mode=="Enable":
-                                st.info(f"{len(references)}개의 문서가 검색되었습니다.")
-
-                            logger.info(f"references: {references}")
-                            for i, reference in enumerate(references):
-                                content = reference['content']['text']
-                                # print('content: ', content)
-                                uri = reference['location']['s3Location']['uri']
-                                # print('uri: ', uri)
-
-                                name = uri.split('/')[-1]
-                                encoded_name = parse.quote(name)
-                                url = f"{path}/{doc_prefix}{encoded_name}"
-                                # print('url: ', url)
-
-                                logger.info(f"--> {i}: {content[:50]}, {name}, {url}")
-
-                                reference_docs.append(
-                                    Document(
-                                        page_content=content,
-                                        metadata={
-                                            'name': name,
-                                            'url': url,
-                                            'from': 'RAG'
-                                        },
-                                    )
-                                )    
-
-                    if "actionGroupInvocationOutput" in trace_event["observation"]:
-                        trace_resp = trace_event["observation"]["actionGroupInvocationOutput"]["text"]
-                        if debug_mode=="Enable":
-                            st.info(f"actionGroupInvocationOutput: {trace_resp}")
-
-                        logger.info(f"hecking trace resp")
-                        print(trace_resp)
-                        logger.info(trace_resp)
-
-                        # try to covnert to json
-                        try:
-                            trace_resp = trace_resp.replace("'", '"')
-                            trace_resp = json.loads(trace_resp)
-                            logger.info(f"converted to json")
-                            logger.info(f"{trace_resp}")
-
-                            # check if image_url is in trace_response, if it is download the image and add it to the images object of mdoel response
-                            if "image_url" in trace_resp:
-                                logger.info(f"got image")
-                                image_url = trace_resp["image_url"]
-                                st.image(image_url)
-                                
-                        except:
-                            logger.info(f"not json")
-                            pass
-
-            elif "guardrailTrace" in event["trace"]["trace"]:
-                guardrail_trace = event["trace"]["trace"]["guardrailTrace"]
-                if "inputAssessments" in guardrail_trace:
-                    assessments = guardrail_trace["inputAssessments"]
-                    for assessment in assessments:
-                        if "contentPolicy" in assessment:
-                            filters = assessment["contentPolicy"]["filters"]
-                            for filter in filters:
-                                if filter["action"] == "BLOCKED":
-                                    if debug_mode=="Enable":
-                                        st.error(f"Guardrail blocked {filter['type']} confidence: {filter['confidence']}")
-                        if "topicPolicy" in assessment:
-                            topics = assessment["topicPolicy"]["topics"]
-                            for topic in topics:
-                                if topic["action"] == "BLOCKED":
-                                    if debug_mode=="Enable":
-                                        st.error(f"Guardrail blocked topic {topic['name']}")            
-
-    logger.info(f'image_url: {image_url}')
-
-    if final_result:                
-        return final_result, image_url 
-    else:
-        return stream_result, image_url
-
-def show_output2(response_stream, st):
-    global reference_docs
-
-    result = ""
-    for event in response_stream:
-        if "chunk" in event:
-            chunk = event.get('chunk')
-            answer = chunk["bytes"].decode()
-
-            result += answer
-                
-        if 'files' in event:
-            files = event['files']['files']
-            for file in files:
-                st.image(file["bytes"], caption=file["name"])
-
-                result.append(
-                    {
-                        "type": "file",
-                        "name": file["name"],
-                        "bytes": file["bytes"],
-                    }
-                ) 
-                    
-        if 'trace' in event:
-            trace = event['trace']['trace']
-            # print('trace: ', trace)
-
-            if 'orchestrationTrace' in trace:                        
-                orchestrationTrace = trace['orchestrationTrace']
-                # print('orchestrationTrace: ', orchestrationTrace)
-
-                if "observation" in orchestrationTrace:
-                    observation = orchestrationTrace['observation']
-                    # print('observation: ', observation)
-                    
-                    if 'knowledgeBaseLookupOutput' in observation:
-                        retrievedReferences = observation['knowledgeBaseLookupOutput']['retrievedReferences']
-                        # print('retrievedReferences: ', retrievedReferences)
-                        
-                        for ref in retrievedReferences:
-                            content = ref['content']['text']
+                        logger.info(f"references: {references}")
+                        for i, reference in enumerate(references):
+                            content = reference['content']['text']
                             # print('content: ', content)
-                            uri = ref['location']['s3Location']['uri']
+                            uri = reference['location']['s3Location']['uri']
                             # print('uri: ', uri)
 
                             name = uri.split('/')[-1]
                             encoded_name = parse.quote(name)
                             url = f"{path}/{doc_prefix}{encoded_name}"
                             # print('url: ', url)
+
+                            logger.info(f"--> {i}: {content[:50]}, {name}, {url}")
 
                             reference_docs.append(
                                 Document(
@@ -1195,7 +1079,57 @@ def show_output2(response_stream, st):
                                     },
                                 )
                             )    
-    logger.info(f"reference_docs: {reference_docs}")
+
+                if "actionGroupInvocationOutput" in trace_event["observation"]:
+                    trace_resp = trace_event["observation"]["actionGroupInvocationOutput"]["text"]
+                    if debug_mode=="Enable":
+                        st.info(f"actionGroupInvocationOutput: {trace_resp}")
+
+                    logger.info(f"hecking trace resp")
+                    print(trace_resp)
+                    logger.info(trace_resp)
+
+                    # try to covnert to json
+                    try:
+                        trace_resp = trace_resp.replace("'", '"')
+                        trace_resp = json.loads(trace_resp)
+                        logger.info(f"converted to json")
+                        logger.info(f"{trace_resp}")
+
+                        # check if image_url is in trace_response, if it is download the image and add it to the images object of mdoel response
+                        if "image_url" in trace_resp:
+                            logger.info(f"got image")
+                            image_url = trace_resp["image_url"]
+                            st.image(image_url)
+                            
+                    except:
+                        logger.info(f"not json")
+                        pass
+
+        elif "guardrailTrace" in event["trace"]["trace"]:
+            guardrail_trace = event["trace"]["trace"]["guardrailTrace"]
+            if "inputAssessments" in guardrail_trace:
+                assessments = guardrail_trace["inputAssessments"]
+                for assessment in assessments:
+                    if "contentPolicy" in assessment:
+                        filters = assessment["contentPolicy"]["filters"]
+                        for filter in filters:
+                            if filter["action"] == "BLOCKED":
+                                if debug_mode=="Enable":
+                                    st.error(f"Guardrail blocked {filter['type']} confidence: {filter['confidence']}")
+                    if "topicPolicy" in assessment:
+                        topics = assessment["topicPolicy"]["topics"]
+                        for topic in topics:
+                            if topic["action"] == "BLOCKED":
+                                if debug_mode=="Enable":
+                                    st.error(f"Guardrail blocked topic {topic['name']}")            
+
+    logger.info(f'image_url: {image_url}')
+
+    if final_result:                
+        return final_result, image_url 
+    else:
+        return stream_result, image_url
 
 def deploy_agent(agentId, agentAliasName):
     agentAliasId = ""
@@ -1651,8 +1585,15 @@ def run_bedrock_agent(text, agentName, sessionState, st):
             logger.info(f"response of invoke_agent(): {response}")
             
             response_stream = response['completion']
-            result, image_url = show_output(response_stream, st)
-            
+
+            final_result = ""    
+            image_url = []
+            for index, event in enumerate(response_stream):
+                result, image_url = show_output(event, st)
+                if result:
+                    logger.info(f"event: {index}, result: {result}")
+                    final_result = result
+                    
         except Exception as e:
             agent_id = agent_alias_id = agent_kb_id = agent_kb_alias_id = ""
             # raise Exception("unexpected event.",e)
@@ -1666,7 +1607,7 @@ def run_bedrock_agent(text, agentName, sessionState, st):
             reference = get_references(reference_docs)
         logger.info(f"reference: {reference}")
     
-    return result+reference, image_url, reference_docs
+    return final_result+reference, image_url, reference_docs
 
 def upload_to_s3(file_bytes, file_name):
     """
