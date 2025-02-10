@@ -939,8 +939,10 @@ sessionState = ""
 def show_output(event_stream, st):
     global reference_docs
 
-    stream_result = final_result = image_url = ""    
+    stream_result = final_result = ""    
+    
     for index, event in enumerate(event_stream):
+        image_url = []
         logger.info(f"Event: {index}")
         #logger.info(str(event))
         #print("\n")
@@ -959,8 +961,18 @@ def show_output(event_stream, st):
             logger.info(f"Files received")
             files = event["files"]["files"]
 
-            for file in files:
+            logger.info(f"Number of files: {len(files)}")
+            for i, file in enumerate(files):
                 st.image(file["bytes"], caption=file["name"])
+                logger.info(f"image[{i}]: {file["name"]}")
+
+                file_url = upload_to_s3(file["bytes"], file["name"])
+                logger.info(f"file_url[{i}]: {file_url}")
+
+                file_name = file_url[file_url.rfind('/')+1:]
+                url = f"{path}/{s3_image_prefix}/{file_name}"
+                logger.info(f"(files) image_url[{i}]: {url}")
+                image_url.append(url)
 
         # Check trace
         if "trace" in event:
@@ -1014,8 +1026,6 @@ def show_output(event_stream, st):
                     if "finalResponse" in trace_event["observation"]:
                         trace_resp = trace_event["observation"]["finalResponse"]["text"]
                         logger.info(f"final response: {trace_resp}")   
-                        # if debug_mode=="Enable":                   
-                        #     st.info(f"finalResponse: {trace_resp}")
                         final_result = trace_resp
 
                     if ("codeInterpreterInvocationOutput" in trace_event["observation"]):
@@ -1030,9 +1040,15 @@ def show_output(event_stream, st):
                                 st.error(f"observation: {trace_resp}")
 
                             if "image_url" in trace_resp:
-                                logger.info(f"got image")
-                                image_url = trace_resp["image_url"]
-                                st.image(image_url)
+                                file_url = trace_resp["image_url"]
+                                logger.info(f"file_url: {file_url}")
+
+                                file_name = file_url[file_url.rfind('/')+1:]
+                                url = f"{path}/{s3_image_prefix}/{file_name}"
+                                logger.info(f"(observation) image_url: {url}")
+                                image_url.append(url)
+
+                                st.image(url)
                                 
                     if "knowledgeBaseLookupOutput" in trace_event["observation"]:
                         # if debug_mode=="Enable":
@@ -1110,11 +1126,13 @@ def show_output(event_stream, st):
                                 if topic["action"] == "BLOCKED":
                                     if debug_mode=="Enable":
                                         st.error(f"Guardrail blocked topic {topic['name']}")            
-                
-    if final_result:
-        return final_result
+
+    logger.info(f'image_url: {image_url}')
+
+    if final_result:                
+        return final_result, image_url 
     else:
-        return stream_result
+        return stream_result, image_url
 
 def show_output2(response_stream, st):
     global reference_docs
@@ -1599,7 +1617,8 @@ def run_bedrock_agent(text, agentName, sessionState, st):
     if not userId in sessionId:
         sessionId[userId] = str(uuid.uuid4())
 
-    result = image_url = ""
+    result = ""
+    image_url = []
     if agentAliasId and agentId:
         #if debug_mode=="Enable":
         #    st.info('답변을 생성하고 있습니다.')

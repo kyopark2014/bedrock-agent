@@ -109,6 +109,12 @@ def display_chat_messages() -> None:
     """
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
+            if "images" in message:                
+                for url in message["images"]:
+                    logger.info(f"url: {url}")
+
+                    file_name = url[url.rfind('/')+1:]
+                    st.image(url, caption=file_name, use_container_width=True)
             st.markdown(message["content"])
 
 display_chat_messages()
@@ -181,8 +187,8 @@ if uploaded_file is not None and clear_button==False:
         st.image(uploaded_file, caption="이미지 미리보기", use_container_width=True)
 
         file_name = uploaded_file.name
-        image_url = chat.upload_to_s3(uploaded_file.getvalue(), file_name)
-        logger.info(f"image_url: {image_url}")   
+        file_url = chat.upload_to_s3(uploaded_file.getvalue(), file_name)
+        logger.info(f"file_url: {file_url}")   
 
     elif uploaded_file.name and code_interpreter == "Enable":
         guide = "Code Interpreter가 준비되었습니다. 원하는 동작을 입력하세요."
@@ -237,12 +243,15 @@ if prompt := st.chat_input("메시지를 입력하세요."):
             if not state_of_code_interpreter: 
                 sessionState = ""
                 with st.status("thinking...", expanded=True, state="running") as status:                
-                    response, reference_docs = chat.run_bedrock_agent(prompt, chat.agent_name, sessionState, st)
+                    response, image_url, reference_docs = chat.run_bedrock_agent(prompt, chat.agent_name, sessionState, st)
                     st.write(response)
-                    logger.info(f"response: {response}")
+                    logger.info(f"response: {response}, image_url: {image_url}")
                     
-                    st.session_state.messages.append({"role": "assistant", "content": response})
-
+                    st.session_state.messages.append({
+                        "role": "assistant", 
+                        "content":  response,
+                        "images": image_url if image_url else []
+                    })
                     chat.save_chat_history(prompt, response)
                 
                 show_references(reference_docs) 
@@ -273,13 +282,11 @@ if prompt := st.chat_input("메시지를 입력하세요."):
                     response, image_url, reference_docs = chat.run_bedrock_agent(prompt, chat.agent_name, sessionState, st)
                     st.write(response)
                     logger.info(f"response: {response}")                
-                    st.session_state.messages.append(
-                    {
+                    st.session_state.messages.append({
                         "role": "assistant", 
                         "content": response,
-                        "images": [image_url] if image_url else []
-                    }
-                )
+                        "images": image_url if image_url else []
+                    })
         
         elif mode == 'Agent with Knowlege Base':
             sessionState = ""
@@ -288,13 +295,11 @@ if prompt := st.chat_input("메시지를 입력하세요."):
                 st.write(response)
                 logger.info(f"response: {response}")
                 
-                st.session_state.messages.append(
-                    {
-                        "role": "assistant", 
-                        "content": response,
-                        "images": [image_url] if image_url else []
-                    }
-                )
+                st.session_state.messages.append({
+                    "role": "assistant", 
+                    "content": response,
+                    "images": image_url if image_url else []
+                })
                 chat.save_chat_history(prompt, response)
             
             show_references(reference_docs) 
