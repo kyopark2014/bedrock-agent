@@ -134,12 +134,15 @@ debug_mode = "Enable"
 agent_id = agent_alias_id = None
 agent_name = projectName
 agent_alias_name = "latest_version"
+agent_alias_arn = ""
 
 agent_kb_id = agent_kb_alias_id = None
 agent_kb_name = projectName+'-knowledge-base'
 agent_kb_alias_name = "latest_version"
+agent_kb_alias_arn = ""
 
-action_group_name = f"action_group_tools-for-{projectName}"
+action_group_name = f"action_group_for-{projectName}"
+action_group_name_for_multi_agent = f"action_group_multi_agent-for-{projectName}"
 
 client = boto3.client(
     service_name='bedrock-agent',
@@ -1132,7 +1135,7 @@ def show_output(event, st):
         return stream_result, image_url
 
 def deploy_agent(agentId, agentAliasName):
-    agentAliasId = ""
+    agentAliasId = agentAliasArn = ""
     try:
         # retrieve agent alias
         response_agent_alias = client.list_agent_aliases(
@@ -1143,7 +1146,7 @@ def deploy_agent(agentId, agentAliasName):
 
         for summary in response_agent_alias["agentAliasSummaries"]:
             if summary["agentAliasName"] == agentAliasName:
-                agentAliasId = summary["agentAliasId"]
+                agentAliasId = summary["agentAliasId"]                
                 logger.info(f"agentAliasId: {agentAliasId}")
                 break
 
@@ -1163,13 +1166,14 @@ def deploy_agent(agentId, agentAliasName):
         logger.info(f"response of create_agent_alias(): {response}")
 
         agentAliasId = response['agentAlias']['agentAliasId']
-        logger.info(f"agentAliasId: {agentAliasId}")
-
+        agentAliasArn = response['agentAlias']['agentAliasArn']
+        logger.info(f"agentAliasId: {agentAliasId}, agentAliasArn: {agentAliasArn}")
+        
     except Exception:
         err_msg = traceback.format_exc()
         logger.info(f"error message: {err_msg}")   
     
-    return agentAliasId
+    return agentAliasId, agentAliasArn
 
 def update_agent(modelId, modelName, agentId, agentName, agentAliasId, agentAliasName, st):
     if debug_mode=="Enable":
@@ -1208,11 +1212,11 @@ def update_agent(modelId, modelName, agentId, agentName, agentAliasId, agentAlia
     # deploy
     if debug_mode=="Enable":
         st.info(f'{agentName}을 {agentAliasName}로 배포합니다.')    
-    agentAliasId = deploy_agent(agentId, agentAliasName)
+    agentAliasId, agentAliasArn = deploy_agent(agentId, agentAliasName)
 
-    return agentAliasId
+    return agentAliasId, agentAliasArn
 
-def create_action_group(agentId, actionGroupName, functionSchema, st):    
+def create_action_group(agentId, actionGroupName, lambdaToolsArn, functionSchema, st):    
     if debug_mode=="Enable":
         st.info(f"Action Group에 {actionGroupName}이 존재하는지 확인합니다.")
 
@@ -1245,7 +1249,7 @@ def create_action_group(agentId, actionGroupName, functionSchema, st):
             agentId=agentId,
             agentVersion='DRAFT',
             description=f"Action Group의 이름은 {actionGroupName} 입니다.",
-            actionGroupExecutor={'lambda': lambda_tools_arn},
+            actionGroupExecutor={'lambda': lambdaToolsArn},  
             functionSchema=functionSchema
         )
         logger.info(f"response of create_action_group(): {response}")
@@ -1407,7 +1411,7 @@ def create_bedrock_agent(modelId, modelName, enable_knowledge_base, agentName, a
             }
         ]
     }
-    create_action_group(agentId, action_group_name, functionSchema, st)     
+    create_action_group(agentId, action_group_name, lambda_tools_arn, functionSchema, st)     
 
     # create action group for code_interpreter
     create_action_group_for_code_interpreter(agentId, st)
@@ -1445,9 +1449,9 @@ def create_bedrock_agent(modelId, modelName, enable_knowledge_base, agentName, a
     # deploy
     if debug_mode=="Enable":
         st.info(f'{agentName}을 {agentAliasName}로 배포합니다.')    
-    agentAliasId = deploy_agent(agentId, agentAliasName)
+    agentAliasId, agentAliasArn = deploy_agent(agentId, agentAliasName)
 
-    return agentId, agentAliasId           
+    return agentId, agentAliasId, agentAliasArn           
 
 def retrieve_agent_id(agentName):
     response_agent = client.list_agents(
@@ -1464,12 +1468,12 @@ def retrieve_agent_id(agentName):
 
     return agentId  
 
-def check_bedrock_agent_status(agentName, agentAliasId, agentAliasName, st):
+def check_bedrock_agent_status(agentName, agentAliasId, agentAliasName, agentAliasArn, st):
     agentId = retrieve_agent_id(agentName)  
     
     # create agent if no agent
     if not agentId:        
-        agentId, agentAliasId = create_bedrock_agent(model_id, model_name, "Disable", agent_name, agent_alias_name, st)           
+        agentId, agentAliasId, agentAliasArn = create_bedrock_agent(model_id, model_name, "Disable", agent_name, agent_alias_name, st)           
     # else:
     #     response = client.get_agent(
     #         agentId=agentId
@@ -1491,6 +1495,16 @@ def check_bedrock_agent_status(agentName, agentAliasId, agentAliasName, st):
             if summary["agentAliasName"] == agentAliasName:
                 agentAliasId = summary["agentAliasId"]
                 logger.info(f"agentAliasId: {agentAliasId}")
+
+                if not agentAliasArn:
+                    response = client.get_agent_alias(
+                        agentAliasId=agentAliasId,
+                        agentId=agentId
+                    )
+                    logger.info(f"response of get_agent_alias(): {response}")
+
+                    agentAliasArn = response["agentAlias"]["agentAliasArn"]
+                    logger.info(f"agentAliasArn: {agentAliasArn}")
 
                 logger.info(f"agentAliasStatus: {summary['agentAliasStatus']}")
                 if not summary["agentAliasStatus"] == "PREPARED":
@@ -1515,9 +1529,10 @@ def check_bedrock_agent_status(agentName, agentAliasId, agentAliasName, st):
             logger.info(f"agentAliasId: {agentAliasId}")
             time.sleep(5) # delay 5 seconds
 
-            deploy_agent(agentId, agentAliasName)
+            agentAliasId, agentAliasArn = deploy_agent(agentId, agentAliasName)
+            logger.info(f"agentAliasId: {agentAliasId}, agentAliasArn: {agentAliasArn}")
 
-    return agentId, agentAliasId
+    return agentId, agentAliasId, agentAliasArn
 
 def run_bedrock_agent(text, agentName, sessionState, st):   
     global  agent_id, agent_alias_id, agent_kb_id, agent_kb_alias_id    
@@ -1525,18 +1540,20 @@ def run_bedrock_agent(text, agentName, sessionState, st):
         agentId = agent_id
         agentAliasId = agent_alias_id
         agentAliasName = agent_alias_name
+        agentAliasArn = agent_alias_arn
         enable_knowledge_base = "Disable"
     else:
         agentId = agent_kb_id
         agentAliasId = agent_kb_alias_id
         agentAliasName = agent_kb_alias_name
+        agentAliasArn = agent_kb_alias_arn
         enable_knowledge_base = "Enable"
 
     logger.info(f"agentId: {agentId} agentAliasId: {agentAliasId}")
 
     if not agentId or not agentAliasId:        
-        agentId, agentAliasId = check_bedrock_agent_status(agentName, agentAliasId, agentAliasName, st)
-        logger.info(f"agentId: {agentId} agentAliasId: {agentAliasId}")
+        agentId, agentAliasId, agentAliasArn = check_bedrock_agent_status(agentName, agentAliasId, agentAliasName, agentAliasArn, st)
+        logger.info(f"agentId: {agentId} agentAliasId: {agentAliasId}, agentAliasArn: {agentAliasArn}")
 
         if agentName == agent_name:
             agent_id = agentId
@@ -2122,27 +2139,32 @@ def get_image_summarization(object_name, prompt, st):
 supervisor_agent_id = supervisor_alias_id = None
 supervisor_agent_name = "agent-supervisor"
 supervisor_agent_alias_name = "latest_version"
+supervisor_agent_alias_arn = ""
 
 # collaborator
 stock_agent_id = stock_agent_alias_id = None
 stock_agent_name = "stock-agent"
 stock_agent_alias_name = "latest_version"
+stock_agent_alias_arn = ""
 
 search_agent_id = search_agent_alias_id = None
 search_agent_name = "search-agent"
 search_agent_alias_name = "latest_version"
+search_agent_alias_arn = ""
 
-def run_bedrock_multi_agent(text, st):
+def run_bedrock_multi_agent_collaboration(text, st):
+    global stock_agent_id, stock_agent_alias_id, search_agent_id, search_agent_alias_id, supervisor_agent_id, supervisor_agent_alias_id
+    global stock_agent_alias_arn, search_agent_alias_arn, supervisor_agent_alias_arn
     # collaborator: stock agent
-    stock_agent_id, stock_agent_alias_id = check_bedrock_multi_agent_status("COLLABORATOR", stock_agent_name, stock_agent_id, stock_agent_alias_name, st)
+    stock_agent_id, stock_agent_alias_id, stock_agent_alias_arn = check_bedrock_multi_agent_status("COLLABORATOR", stock_agent_name, stock_agent_alias_name, stock_agent_alias_id, stock_agent_alias_arn, st)
     logger.info(f"stock_agent_id: {stock_agent_id} stock_agent_alias_id: {stock_agent_alias_id}")
 
     # collaborator: search agent
-    search_agent_id, search_agent_alias_id = check_bedrock_multi_agent_status("COLLABORATOR", search_agent_name, search_agent_id, search_agent_alias_name, st)
+    search_agent_id, search_agent_alias_id, search_agent_alias_arn = check_bedrock_multi_agent_status("COLLABORATOR", search_agent_name, search_agent_alias_name, search_agent_alias_id, search_agent_alias_arn, st)
     logger.info(f"search_agent_id: {search_agent_id} search_agent_alias_id: {search_agent_alias_id}")
 
     # supervisor
-    supervisor_agent_id, supervisor_agent_alias_id = check_bedrock_multi_agent_status("SUPERVISOR", supervisor_agent_name, supervisor_agent_id, supervisor_agent_alias_name, st)
+    supervisor_agent_id, supervisor_agent_alias_id, supervisor_agent_alias_arn = check_bedrock_multi_agent_status("SUPERVISOR", supervisor_agent_name, supervisor_agent_alias_name, supervisor_alias_id, supervisor_agent_alias_arn, st)
     logger.info(f"supervisor_agent_id: {supervisor_agent_id} supervisor_agent_alias_id: {supervisor_agent_alias_id}")
     
     global sessionId
@@ -2255,7 +2277,7 @@ def create_bedrock_agent_collaborator(modelId, modelName, agentName, agentAliasN
     time.sleep(5)   
 
     # create action group    
-    create_action_group(agentId, action_group_name, functionSchema, st)     
+    create_action_group(agentId, action_group_name_for_multi_agent, lambda_tools_arn, functionSchema, st)     
 
     if agentName == "stock-agent":
         create_action_group_for_code_interpreter(agentId, st)
@@ -2268,9 +2290,11 @@ def create_bedrock_agent_collaborator(modelId, modelName, agentName, agentAliasN
     # deploy
     if debug_mode=="Enable":
         st.info(f'{agentName}을 {agentAliasName}로 배포합니다.')    
-    agentAliasId = deploy_agent(agentId, agentAliasName)
+    agentAliasId, agentAliasArn = deploy_agent(agentId, agentAliasName)
 
-    return agentId, agentAliasId
+    logger.info(f"agentName: {agentName}, agentId: {agentId}, agentAliasId: {agentAliasId}, agentAliasArn: {agentAliasArn}")
+
+    return agentId, agentAliasId, agentAliasArn
 
 def create_bedrock_agent_supervisor(modelId, modelName, agentName, agentAliasName, st):
     # create supervisor agent
@@ -2285,7 +2309,7 @@ def create_bedrock_agent_supervisor(modelId, modelName, agentName, agentAliasNam
     logger.info(f"modelId: {modelId}")
 
     response = client.create_agent(
-        agentCollaboration = 'SUPERVISOR_ROUTER',
+        agentCollaboration = 'SUPERVISOR', # SUPERVISOR_ROUTER
         orchestrationType = 'DEFAULT',
         agentName=agentName,
         agentResourceRoleArn=agent_role_arn,
@@ -2294,32 +2318,70 @@ def create_bedrock_agent_supervisor(modelId, modelName, agentName, agentAliasNam
         description=f"Supervisor Agent인 {agentName}입니다. 사용 모델은 {modelName}입니다.",
         idleSessionTTLInSeconds=600
     )
-    logger.info(f"response of create_bedrock_agent_collaborator(): {response}")
+    logger.info(f"response of create_agent(): {response}")
 
     agentId = response['agent']['agentId']
     logger.info(f"agentId: {agentId}")
     time.sleep(5)
+
+    # add code interpreter action group
+    create_action_group_for_code_interpreter(agentId, st)
+                
+    # add stock agent
+    logger.info(f"stock_agent_alias_arn: {stock_agent_alias_arn}")
+
+    response = client.associate_agent_collaborator(
+        agentDescriptor={
+            'aliasArn': stock_agent_alias_arn
+        },
+        agentId=agentId,
+        agentVersion='DRAFT',
+        collaborationInstruction=f"{stock_agent_name} retrieves accurate stock trends for a given ticker.",
+        collaboratorName=stock_agent_name,
+        relayConversationHistory='DISABLED' # TO_COLLABORATOR
+    )
+    logger.info(f"response of associate_agent_collaborator(): {response}")
+    time.sleep(3)
     
+    # add search agent
+    logger.info(f"search_agent_alias_arn: {search_agent_alias_arn}")
+
+    response = client.associate_agent_collaborator(
+        agentDescriptor={
+            'aliasArn': search_agent_alias_arn
+        },
+        agentId=agentId,
+        agentVersion='DRAFT',
+        collaborationInstruction=f"{search_agent_name} searchs general information by keyword and then return the result as a string.",
+        collaboratorName=search_agent_name,
+        relayConversationHistory='DISABLED' # TO_COLLABORATOR
+    )
+    logger.info(f"response of associate_agent_collaborator(): {response}")
+    time.sleep(3)
+
     # preparing
     if debug_mode=="Enable":
         st.info('Agent를 사용할 수 있도록 "Prepare"로 설정합니다.')    
     prepare_agent(agentId)
+    time.sleep(3)
     
     # deploy
     if debug_mode=="Enable":
         st.info(f'{agentName}을 {agentAliasName}로 배포합니다.')    
-    agentAliasId = deploy_agent(agentId, agentAliasName)
+    agentAliasId, agentAliasArn = deploy_agent(agentId, agentAliasName)
+    time.sleep(3)
 
-    return agentId, agentAliasId
+    return agentId, agentAliasId, agentAliasArn
 
-def check_bedrock_multi_agent_status(agentType, agentName, agentAliasId, agentAliasName, st):
+def check_bedrock_multi_agent_status(agentType, agentName, agentAliasName, agentAliasId, agentAliasArn, st):
     agentId = retrieve_agent_id(agentName)  
     
     # create collaborator agent if no agent
     if not agentId and agentType=="COLLABORATOR":
-        agentId, agentAliasId = create_bedrock_agent_collaborator(model_id, model_name, agentName, agentAliasName, st)           
+        agentId, agentAliasId, agentAliasArn = create_bedrock_agent_collaborator(model_id, model_name, agentName, agentAliasName, st)           
     if not agentId and agentType=="SUPERVISOR":
-        agentId, agentAliasId = create_bedrock_agent_supervisor(model_id, model_name, agentName, agentAliasName, st)           
+        agentId, agentAliasId, agentAliasArn = create_bedrock_agent_supervisor(model_id, model_name, agentName, agentAliasName, st)     
+    logger.info(f"agentId: {agentId}, agentAliasId: {agentAliasId}, agentAliasArn: {agentAliasArn}")
 
     if not agentAliasId and agentId:
         if debug_mode=="Enable":
@@ -2336,6 +2398,16 @@ def check_bedrock_multi_agent_status(agentType, agentName, agentAliasId, agentAl
             if summary["agentAliasName"] == agentAliasName:
                 agentAliasId = summary["agentAliasId"]
                 logger.info(f"agentAliasId: {agentAliasId}")
+
+                if not agentAliasArn:
+                    response = client.get_agent_alias(
+                        agentAliasId=agentAliasId,
+                        agentId=agentId
+                    )
+                    logger.info(f"response of get_agent_alias(): {response}")
+
+                    agentAliasArn = response["agentAlias"]["agentAliasArn"]
+                    logger.info(f"agentAliasArn: {agentAliasArn}")
 
                 logger.info(f"agentAliasStatus: {summary['agentAliasStatus']}")
                 if not summary["agentAliasStatus"] == "PREPARED":
@@ -2357,10 +2429,11 @@ def check_bedrock_multi_agent_status(agentType, agentName, agentAliasId, agentAl
             logger.info(f"response of create_agent_alias(): {response}")
 
             agentAliasId = response['agentAlias']['agentAliasId']
-            logger.info(f"agentAliasId: {agentAliasId}")
+            agentAliasArn = response['agentAlias']['agentAliasArn']
+            logger.info(f"agentAliasId: {agentAliasId}, agentAliasArn: {agentAliasArn}")
             time.sleep(5) # delay 5 seconds
 
-            deploy_agent(agentId, agentAliasName)
-
-    return agentId, agentAliasId
+            agentAliasId, agentAliasArn = deploy_agent(agentId, agentAliasName)
+        
+    return agentId, agentAliasId, agentAliasArn
 

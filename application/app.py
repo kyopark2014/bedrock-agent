@@ -24,6 +24,9 @@ mode_descriptions = {
     "Agent with Knowlege Base": [
         "Bedrock Agent와 Knowledge Base를 이용하여 Workflow를 구현합니다."
     ],
+    "Multi Agent Collaboration": [
+        "Multi Bedrock Collabotion을 통해 suprervisor가 여러개의 collaborator Agent들을 효과적으로 활용할 수 있습니다."
+    ],
     "번역하기": [
         "한국어와 영어에 대한 번역을 제공합니다. 한국어로 입력하면 영어로, 영어로 입력하면 한국어로 번역합니다."        
     ],
@@ -32,7 +35,7 @@ mode_descriptions = {
     ],
     "이미지 분석": [
         "이미지를 업로드하면 이미지의 내용을 요약할 수 있습니다."
-    ]    
+    ]
 }
 
 with st.sidebar:
@@ -51,7 +54,7 @@ with st.sidebar:
     # radio selection
     mode = st.radio(
         # label="원하는 대화 형태를 선택하세요. ",options=["일상적인 대화", "RAG", "Flow", "Agent", "번역하기", "문법 검토하기"], index=0
-        label="원하는 대화 형태를 선택하세요. ",options=["일상적인 대화", "RAG", "Agent", "Agent with Knowlege Base", "번역하기", "문법 검토하기", "이미지 분석"], index=0
+        label="원하는 대화 형태를 선택하세요. ",options=["일상적인 대화", "RAG", "Agent", "Agent with Knowlege Base", "Multi Agent Collaboration", "번역하기", "문법 검토하기", "이미지 분석"], index=0
     )   
     st.info(mode_descriptions[mode][0])
 
@@ -307,7 +310,7 @@ if prompt := st.chat_input("메시지를 입력하세요."):
         elif mode == 'Multi Agent Collaboration':
             sessionState = ""
             with st.status("thinking...", expanded=True, state="running") as status:
-                response, image_url, reference_docs = chat.run_bedrock_multi_agent(prompt, st)
+                response, image_url = chat.run_bedrock_multi_agent_collaboration(prompt, st)
                 st.write(response)
                 logger.info(f"response: {response}")
                 
@@ -316,9 +319,7 @@ if prompt := st.chat_input("메시지를 입력하세요."):
                     "content": response,
                     "images": image_url if image_url else []
                 })
-                chat.save_chat_history(prompt, response)
-            
-            show_references(reference_docs) 
+                chat.save_chat_history(prompt, response)                    
 
         elif mode == '번역하기':
             response = chat.translate_text(prompt)
