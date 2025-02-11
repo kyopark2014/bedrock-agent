@@ -931,7 +931,7 @@ def run_RAG_prompt_flow(text, connectionId, requestId):
     return msg
 
 ####################### Bedrock Agent #######################
-# Agentic Workflow: Bedrock Agent
+# Bedrock Agent (Single)
 ########################################################### 
 sessionId = dict() 
 sessionState = ""
@@ -1212,7 +1212,7 @@ def update_agent(modelId, modelName, agentId, agentName, agentAliasId, agentAlia
 
     return agentAliasId
 
-def create_action_group(agentId, actionGroupName, st):
+def create_action_group(agentId, actionGroupName, functionSchema, st):    
     if debug_mode=="Enable":
         st.info(f"Action Group에 {actionGroupName}이 존재하는지 확인합니다.")
 
@@ -1246,87 +1246,7 @@ def create_action_group(agentId, actionGroupName, st):
             agentVersion='DRAFT',
             description=f"Action Group의 이름은 {actionGroupName} 입니다.",
             actionGroupExecutor={'lambda': lambda_tools_arn},
-            functionSchema={
-                'functions': [
-                    {
-                        'name': 'get_book_list',
-                        'description': 'Search book list by keyword and then return book list',                        
-                        'parameters': {
-                            'keyword': {
-                                'description': 'Search keyword',
-                                'required': True,
-                                'type': 'string'
-                            }
-                        },
-                        'requireConfirmation': 'DISABLED'
-                    },
-                    {
-                        'name': 'get_current_time',
-                        'description': "Returns the current date and time in the specified format such as %Y-%m-%d %H:%M:%S",
-                        'parameters': {
-                            'format': {
-                                'description': 'time format of the current time',
-                                'required': True,
-                                'type': 'string'
-                            }
-                        },
-                        'requireConfirmation': 'DISABLED'
-                    },
-                    {
-                        'name': 'get_weather_info',
-                        'description': "Retrieve weather information by city name and then return weather statement.",
-                        'parameters': {
-                            'city': {
-                                'description': 'the name of city to retrieve',
-                                'required': True,
-                                'type': 'string'
-                            }
-                        },
-                        'requireConfirmation': 'DISABLED'
-                    },
-                    {
-                        'name': 'search_by_tavily',
-                        'description': "Search general information by keyword and then return the result as a string.",
-                        'parameters': {
-                            'keyword': {
-                                'description': 'search keyword',
-                                'required': True,
-                                'type': 'string'
-                            }
-                        },
-                        'requireConfirmation': 'DISABLED'
-                    },
-                    {
-                        'name': 'search_by_knowledge_base',
-                        'description': "Search technical information by keyword and then return the result as a string.",
-                        'parameters': {
-                            'keyword': {
-                                'description': 'search keyword',
-                                'required': True,
-                                'type': 'string'
-                            }
-                        },
-                        'requireConfirmation': 'DISABLED'
-                    },
-                    {
-                        'name': 'stock_data_lookup',
-                        'description': "Retrieve accurate stock trends for a given ticker.",
-                        'parameters': {
-                            'ticker': {
-                                'description': 'the ticker to retrieve price history for',
-                                'required': True,
-                                'type': 'string'
-                            },
-                            'country': {
-                                'description': 'the english country name of the stock',
-                                'required': True,
-                                'type': 'string'
-                            }
-                        },
-                        'requireConfirmation': 'DISABLED'
-                    }
-                ]
-            },            
+            functionSchema=functionSchema
         )
         logger.info(f"response of create_action_group(): {response}")
 
@@ -1379,7 +1299,7 @@ def prepare_agent(agentId):
         err_msg = traceback.format_exc()
         logger.info(f"'error message: {err_msg}")   
 
-def create_agent(modelId, modelName, enable_knowledge_base, agentName, agentAliasName, st):
+def create_bedrock_agent(modelId, modelName, enable_knowledge_base, agentName, agentAliasName, st):
     if debug_mode=="Enable":
         st.info(f"Agent를 생성합니다. 사용 모델은 {modelName}입니다.")
 
@@ -1399,14 +1319,95 @@ def create_agent(modelId, modelName, enable_knowledge_base, agentName, agentAlia
         agentName=agentName,
         idleSessionTTLInSeconds=600
     )
-    logger.info(f"response of create_agent(): {response}")
+    logger.info(f"response of create_bedrock_gent(): {response}")
 
     agentId = response['agent']['agentId']
     logger.info(f"agentId: {agentId}")
     time.sleep(5)   
 
     # create action group
-    create_action_group(agentId, action_group_name, st)     
+    functionSchema = {
+        'functions': [
+            {
+                'name': 'get_book_list',
+                'description': 'Search book list by keyword and then return book list',                        
+                'parameters': {
+                    'keyword': {
+                        'description': 'Search keyword',
+                        'required': True,
+                        'type': 'string'
+                    }
+                },
+                'requireConfirmation': 'DISABLED'
+            },
+            {
+                'name': 'get_current_time',
+                'description': "Returns the current date and time in the specified format such as %Y-%m-%d %H:%M:%S",
+                'parameters': {
+                    'format': {
+                        'description': 'time format of the current time',
+                        'required': True,
+                        'type': 'string'
+                    }
+                },
+                'requireConfirmation': 'DISABLED'
+            },
+            {
+                'name': 'get_weather_info',
+                'description': "Retrieve weather information by city name and then return weather statement.",
+                'parameters': {
+                    'city': {
+                        'description': 'the name of city to retrieve',
+                        'required': True,
+                        'type': 'string'
+                    }
+                },
+                'requireConfirmation': 'DISABLED'
+            },
+            {
+                'name': 'search_by_tavily',
+                'description': "Search general information by keyword and then return the result as a string.",
+                'parameters': {
+                    'keyword': {
+                        'description': 'search keyword',
+                        'required': True,
+                        'type': 'string'
+                    }
+                },
+                'requireConfirmation': 'DISABLED'
+            },
+            {
+                'name': 'search_by_knowledge_base',
+                'description': "Search technical information by keyword and then return the result as a string.",
+                'parameters': {
+                    'keyword': {
+                        'description': 'search keyword',
+                        'required': True,
+                        'type': 'string'
+                    }
+                },
+                'requireConfirmation': 'DISABLED'
+            },
+            {
+                'name': 'stock_data_lookup',
+                'description': "Retrieve accurate stock trends for a given ticker.",
+                'parameters': {
+                    'ticker': {
+                        'description': 'the ticker to retrieve price history for',
+                        'required': True,
+                        'type': 'string'
+                    },
+                    'country': {
+                        'description': 'the english country name of the stock',
+                        'required': True,
+                        'type': 'string'
+                    }
+                },
+                'requireConfirmation': 'DISABLED'
+            }
+        ]
+    }
+    create_action_group(agentId, action_group_name, functionSchema, st)     
 
     # create action group for code_interpreter
     create_action_group_for_code_interpreter(agentId, st)
@@ -1463,12 +1464,12 @@ def retrieve_agent_id(agentName):
 
     return agentId  
 
-def check_agent_status(agentName, agentAliasId, agentAliasName, enable_knowledge_base, st):
+def check_bedrock_agent_status(agentName, agentAliasId, agentAliasName, st):
     agentId = retrieve_agent_id(agentName)  
     
     # create agent if no agent
     if not agentId:        
-        agentId, agentAliasId = create_agent(model_id, model_name, "Disable", agent_name, agent_alias_name, st)           
+        agentId, agentAliasId = create_bedrock_agent(model_id, model_name, "Disable", agent_name, agent_alias_name, st)           
     # else:
     #     response = client.get_agent(
     #         agentId=agentId
@@ -1534,7 +1535,7 @@ def run_bedrock_agent(text, agentName, sessionState, st):
     logger.info(f"agentId: {agentId} agentAliasId: {agentAliasId}")
 
     if not agentId or not agentAliasId:        
-        agentId, agentAliasId = check_agent_status(agentName, agentAliasId, agentAliasName, enable_knowledge_base, st)
+        agentId, agentAliasId = check_bedrock_agent_status(agentName, agentAliasId, agentAliasName, st)
         logger.info(f"agentId: {agentId} agentAliasId: {agentAliasId}")
 
         if agentName == agent_name:
@@ -2112,3 +2113,254 @@ def get_image_summarization(object_name, prompt, st):
     logger.info(f"image contents: {contents}")
 
     return contents
+
+####################### Bedrock Agent #######################
+# Bedrock Agent (Multi agent collaboration)
+############################################################# 
+
+# supervisor
+supervisor_agent_id = supervisor_alias_id = None
+supervisor_agent_name = "agent-supervisor"
+supervisor_agent_alias_name = "latest_version"
+
+# collaborator
+stock_agent_id = stock_agent_alias_id = None
+stock_agent_name = "stock-agent"
+stock_agent_alias_name = "latest_version"
+
+search_agent_id = search_agent_alias_id = None
+search_agent_name = "search-agent"
+search_agent_alias_name = "latest_version"
+
+def run_bedrock_multi_agent(text, st):
+    # collaborator: stock agent
+    stock_agent_id, stock_agent_alias_id = check_bedrock_multi_agent_status("COLLABORATOR", stock_agent_name, stock_agent_id, stock_agent_alias_name, st)
+    logger.info(f"stock_agent_id: {stock_agent_id} stock_agent_alias_id: {stock_agent_alias_id}")
+
+    # collaborator: search agent
+    search_agent_id, search_agent_alias_id = check_bedrock_multi_agent_status("COLLABORATOR", search_agent_name, search_agent_id, search_agent_alias_name, st)
+    logger.info(f"search_agent_id: {search_agent_id} search_agent_alias_id: {search_agent_alias_id}")
+
+    # supervisor
+    supervisor_agent_id, supervisor_agent_alias_id = check_bedrock_multi_agent_status("SUPERVISOR", supervisor_agent_name, supervisor_agent_id, supervisor_agent_alias_name, st)
+    logger.info(f"supervisor_agent_id: {supervisor_agent_id} supervisor_agent_alias_id: {supervisor_agent_alias_id}")
+    
+    global sessionId
+    if not userId in sessionId:
+        sessionId[userId] = str(uuid.uuid4())
+
+    result = ""
+    image_url = []
+    if supervisor_agent_id and supervisor_agent_alias_id:
+        if debug_mode=="Enable":
+            st.info('답변을 생성하고 있습니다.')
+
+        client_runtime = boto3.client(
+            service_name='bedrock-agent-runtime',
+            region_name=bedrock_region
+        )
+        try:
+            response = client_runtime.invoke_agent( 
+                agentAliasId=supervisor_agent_alias_id,
+                agentId=supervisor_agent_id,
+                inputText=text, 
+                enableTrace=True,
+                sessionId=sessionId[userId], 
+                memoryId='memory-'+userId
+            )
+            logger.info(f"response of invoke_agent(): {response}")
+            
+            response_stream = response['completion']
+
+            final_result = ""    
+            image_url = []
+            for index, event in enumerate(response_stream):
+                result, image_url = show_output(event, st)
+                if result:
+                    logger.info(f"event: {index}, result: {result}")
+                    final_result = result
+                    
+        except Exception as e:
+            if debug_mode=="Enable":
+                st.error('실패하여 agent 정보를 초기화하였습니다. 재시도해주세요.')
+            err_msg = traceback.format_exc()
+            logger.info(f"error message: {err_msg}")
+                    
+    return final_result, image_url
+
+def create_bedrock_agent_collaborator(modelId, modelName, agentName, agentAliasName, st):
+    if agentName == "stock-agent":
+        functionSchema = {
+            'functions': [
+                {
+                    'name': 'stock_data_lookup',
+                    'description': "Retrieve accurate stock trends for a given ticker.",
+                    'parameters': {
+                        'ticker': {
+                            'description': 'the ticker to retrieve price history for',
+                            'required': True,
+                            'type': 'string'
+                        },
+                        'country': {
+                            'description': 'the english country name of the stock',
+                            'required': True,
+                            'type': 'string'
+                        }
+                    },
+                    'requireConfirmation': 'DISABLED'
+                }
+            ]
+        }
+    elif agentName == "search-agent": 
+        functionSchema = {
+            'functions': [
+                {
+                    'name': 'search_by_tavily',
+                    'description': "Search general information by keyword and then return the result as a string.",
+                    'parameters': {
+                        'keyword': {
+                            'description': 'search keyword',
+                            'required': True,
+                            'type': 'string'
+                        }
+                    },
+                    'requireConfirmation': 'DISABLED'
+                }
+            ]
+        }
+
+    # create collaborator agent
+    if debug_mode=="Enable":
+        st.info(f"Collaborator Agent인 {agentName}를 생성합니다. 사용 모델은 {modelName}입니다.")
+
+    agent_instruction = (
+        "당신의 이름은 서연이고, 질문에 친근한 방식으로 대답하도록 설계된 대화형 AI입니다. "
+        "상황에 맞는 구체적인 세부 정보를 충분히 제공합니다. "
+        "모르는 질문을 받으면 솔직히 모른다고 말합니다. "
+    )
+    logger.info(f"modelId: {modelId}")
+
+    response = client.create_agent(
+        agentResourceRoleArn=agent_role_arn,
+        instruction=agent_instruction,
+        foundationModel=modelId,
+        description=f"Collaborator Agent인 {agentName}입니다. 사용 모델은 {modelName}입니다.",
+        agentName=agentName,
+        idleSessionTTLInSeconds=600
+    )
+    logger.info(f"response of create_bedrock_agent_collaborator(): {response}")
+
+    agentId = response['agent']['agentId']
+    logger.info(f"agentId: {agentId}")
+    time.sleep(5)   
+
+    # create action group    
+    create_action_group(agentId, action_group_name, functionSchema, st)     
+
+    if agentName == "stock-agent":
+        create_action_group_for_code_interpreter(agentId, st)
+    
+    # preparing
+    if debug_mode=="Enable":
+        st.info('Agent를 사용할 수 있도록 "Prepare"로 설정합니다.')    
+    prepare_agent(agentId)
+    
+    # deploy
+    if debug_mode=="Enable":
+        st.info(f'{agentName}을 {agentAliasName}로 배포합니다.')    
+    agentAliasId = deploy_agent(agentId, agentAliasName)
+
+    return agentId, agentAliasId
+
+def create_bedrock_agent_supervisor(modelId, modelName, agentName, agentAliasName, st):
+    # create supervisor agent
+    if debug_mode=="Enable":
+        st.info(f"Supervisor Agent인 {agentName}를 생성합니다. 사용 모델은 {modelName}입니다.")
+
+    agent_instruction = (
+        "당신의 이름은 서연이고, 질문에 친근한 방식으로 대답하도록 설계된 대화형 AI입니다. "
+        "상황에 맞는 구체적인 세부 정보를 충분히 제공합니다. "
+        "모르는 질문을 받으면 솔직히 모른다고 말합니다. "
+    )
+    logger.info(f"modelId: {modelId}")
+
+    response = client.create_agent(
+        agentCollaboration = 'SUPERVISOR_ROUTER',
+        orchestrationType = 'DEFAULT',
+        agentName=agentName,
+        agentResourceRoleArn=agent_role_arn,
+        instruction=agent_instruction,
+        foundationModel=modelId,
+        description=f"Supervisor Agent인 {agentName}입니다. 사용 모델은 {modelName}입니다.",
+        idleSessionTTLInSeconds=600
+    )
+    logger.info(f"response of create_bedrock_agent_collaborator(): {response}")
+
+    agentId = response['agent']['agentId']
+    logger.info(f"agentId: {agentId}")
+    time.sleep(5)
+    
+    # preparing
+    if debug_mode=="Enable":
+        st.info('Agent를 사용할 수 있도록 "Prepare"로 설정합니다.')    
+    prepare_agent(agentId)
+    
+    # deploy
+    if debug_mode=="Enable":
+        st.info(f'{agentName}을 {agentAliasName}로 배포합니다.')    
+    agentAliasId = deploy_agent(agentId, agentAliasName)
+
+    return agentId, agentAliasId
+
+def check_bedrock_multi_agent_status(agentType, agentName, agentAliasId, agentAliasName, st):
+    agentId = retrieve_agent_id(agentName)  
+    
+    # create collaborator agent if no agent
+    if not agentId and agentType=="COLLABORATOR":
+        agentId, agentAliasId = create_bedrock_agent_collaborator(model_id, model_name, agentName, agentAliasName, st)           
+    if not agentId and agentType=="SUPERVISOR":
+        agentId, agentAliasId = create_bedrock_agent_supervisor(model_id, model_name, agentName, agentAliasName, st)           
+
+    if not agentAliasId and agentId:
+        if debug_mode=="Enable":
+            st.info(f"{agentName}의 alias를 검색합니다.")
+
+        # retrieve agent alias
+        response_agent_alias = client.list_agent_aliases(
+            agentId = agentId,
+            maxResults=10
+        )
+        logger.info(f"response of list_agent_aliases(): {response_agent_alias}")
+
+        for summary in response_agent_alias["agentAliasSummaries"]:
+            if summary["agentAliasName"] == agentAliasName:
+                agentAliasId = summary["agentAliasId"]
+                logger.info(f"agentAliasId: {agentAliasId}")
+
+                logger.info(f"agentAliasStatus: {summary['agentAliasStatus']}")
+                if not summary["agentAliasStatus"] == "PREPARED":
+                    if debug_mode=="Enable":
+                        st.info('Agent를 사용할 수 있도록 "Prepare"로 다시 설정합니다.')
+                    prepare_agent(agentId)
+                break
+        
+        # creat agent alias if no alias
+        if not agentAliasId:
+            if debug_mode=="Enable":
+                st.info('Agent의 alias를 생성합니다.')
+
+            response = client.create_agent_alias(
+                agentAliasName=agentAliasName,
+                agentId=agentId,
+                description='the lastest deployment'
+            )
+            logger.info(f"response of create_agent_alias(): {response}")
+
+            agentAliasId = response['agentAlias']['agentAliasId']
+            logger.info(f"agentAliasId: {agentAliasId}")
+            time.sleep(5) # delay 5 seconds
+
+            deploy_agent(agentId, agentAliasName)
+
+    return agentId, agentAliasId
+

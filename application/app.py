@@ -304,6 +304,22 @@ if prompt := st.chat_input("메시지를 입력하세요."):
             
             show_references(reference_docs) 
 
+        elif mode == 'Multi Agent Collaboration':
+            sessionState = ""
+            with st.status("thinking...", expanded=True, state="running") as status:
+                response, image_url, reference_docs = chat.run_bedrock_multi_agent(prompt, st)
+                st.write(response)
+                logger.info(f"response: {response}")
+                
+                st.session_state.messages.append({
+                    "role": "assistant", 
+                    "content": response,
+                    "images": image_url if image_url else []
+                })
+                chat.save_chat_history(prompt, response)
+            
+            show_references(reference_docs) 
+
         elif mode == '번역하기':
             response = chat.translate_text(prompt)
             st.write(response)
