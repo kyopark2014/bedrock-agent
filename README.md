@@ -13,7 +13,7 @@
 
 아래 그림에서는 bedrock agent로 구현된 architecture를 보여주고 있습니다.  Knowledge base로 RAG를 구성하였고, AWS lambda로 구현된 tools에서는 인터넷 검색, 날씨정보 API를 호출할 수 있습니다. 테스트용 애플리케이션은 streamlit으로 구성하였고, 안전하게 접속할 수 있도록 CloudFront와 API Gateway를 이용해 HTTPS 연결을 제공합니다. 애플리케이션에서 문서를 선택하면 Amazon S3에 업로드 되고, Knowledge base를 이용해 OpenSearch Serverless에 자동 동기화 됩니다. 이후 RAG로 검색을 수행하면 CloudFront - S3의 연결로 파일을 공유 할 수 있습니다.
 
-<img width="800" alt="image" src="https://github.com/user-attachments/assets/eb0b415d-1028-4380-a8b7-889dd2ef5ecb" />
+<img width="800" alt="image" src="https://github.com/user-attachments/assets/8acde8fd-e523-45a1-819e-335ac47ee319" />
 
 ## 상세 구현
 
