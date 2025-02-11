@@ -609,6 +609,12 @@ with st.status("thinking...", expanded=True, state="running") as status:
     st.write(response)
 ```
 
+### Multi Agent Collaboration
+
+여기에서는 supervisor agnet를 이용해 stock agent와 search agent를 이용할 수 있습니다. Supervisor에 code interpreter를 위한 action group을 추가하면 stock agent로 가져온 데이터로 그래프를 그릴 수 있습니다. 아래와 같이 superviser agent에게 네이버 주식에 대해 문의하면 stock agent가 실행됩니다. stock agent은 질문을 보고 action group을 실행하는데, 여기서는 stock_data_lookup이 선택되어 주식정보를 가져옵니다.
+
+![image](https://github.com/user-attachments/assets/d8406c6c-8d57-4286-83e1-4b6fd515cbe0)
+
 
 
 
