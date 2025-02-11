@@ -104,7 +104,7 @@ AWS Credential을 입력합니다.
 
 7) Output의 distributionDomainNameforbedrockagent의 URL을 이용하여 접속합니다. 처음 접속시에는 Knowledge base 생성등의 초기화를 하므로 수초에서 수십초 정도 기다릴 수 있습니다. 이때 실행된 화면은 아래와 같습니다.
 
-![image](https://github.com/user-attachments/assets/06a5cbe8-1eaa-447f-88d8-34269cf4c231)
+![image](https://github.com/user-attachments/assets/82112d2a-a18e-40b6-b683-56d3513aa00c)
 
 ## 실행환경 (선택)
 
