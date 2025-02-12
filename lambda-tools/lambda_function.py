@@ -513,17 +513,26 @@ def search_by_knowledge_base(keyword: str) -> str:
                 )
             )    
     
-        # grading                
-        if len(relevant_docs):
-            filtered_docs = grade_documents(keyword, relevant_docs)
-            filtered_docs = check_duplication(filtered_docs) # duplication checker
+    # grading                
+    #     if len(relevant_docs):
+    #         filtered_docs = grade_documents(keyword, relevant_docs)
+    #         filtered_docs = check_duplication(filtered_docs) # duplication checker
         
-    relevant_context = ""
-    if len(filtered_docs):
-        for i, document in enumerate(filtered_docs):
+    # relevant_context = ""
+    # if len(filtered_docs):
+    #     for i, document in enumerate(filtered_docs):
+    #         print(f"{i}: {document}")
+    #         relevant_context += document.page_content + "\n\n"        
+    #     print('relevant_context: ', relevant_context)        
+
+        # relevant_context = ""
+    
+    # no grading
+    if len(relevant_docs):
+        for i, document in enumerate(relevant_docs):
             print(f"{i}: {document}")
             relevant_context += document.page_content + "\n\n"        
-        print('relevant_context: ', relevant_context)        
+        print('relevant_context: ', relevant_context)     
 
     if relevant_context:
         return relevant_context
