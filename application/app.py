@@ -166,6 +166,7 @@ if uploaded_file is not None and clear_button==False:
             st.info(status)
 
         file_name = uploaded_file.name
+        logger.info(f"uploading... file_name: {file_name}")
         file_url = chat.upload_to_s3(uploaded_file.getvalue(), file_name)
         logger.info(f"file_url: {file_url}")
 
