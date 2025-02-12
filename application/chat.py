@@ -1571,6 +1571,7 @@ def run_bedrock_agent(text, agentName, sessionState, st):
 
     result = ""
     image_url = []
+    final_result = ""  
     if agentAliasId and agentId:
         #if debug_mode=="Enable":
         #    st.info('답변을 생성하고 있습니다.')
@@ -1603,8 +1604,7 @@ def run_bedrock_agent(text, agentName, sessionState, st):
             logger.info(f"response of invoke_agent(): {response}")
             
             response_stream = response['completion']
-
-            final_result = ""    
+              
             image_url = []
             for index, event in enumerate(response_stream):
                 result, image_url = show_output(event, st)

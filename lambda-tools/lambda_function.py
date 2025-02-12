@@ -527,9 +527,9 @@ def search_by_knowledge_base(keyword: str) -> str:
 
         # relevant_context = ""
     
-    # no grading
-    relevant_context = ""
+    # no grading    
     if len(relevant_docs):
+        relevant_context = ""
         for i, document in enumerate(relevant_docs):
             print(f"{i}: {document}")
             relevant_context += document.page_content + "\n\n"        
