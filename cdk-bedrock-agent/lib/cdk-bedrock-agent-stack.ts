@@ -509,7 +509,7 @@ export class CdkBedrockAgentStack extends cdk.Stack {
     const agentsMultiAgentsPolicy = new iam.PolicyStatement({ 
       effect: iam.Effect.ALLOW,
       resources: [
-        `arn:aws:bedrock:${region}:${accountId}:agent-alias/*`
+        `arn:aws:bedrock:${region}:${accountId}:agent-alias/*/*`
       ],
       actions: [
         "bedrock:GetAgentAlias",
