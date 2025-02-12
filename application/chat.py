@@ -152,7 +152,7 @@ client = boto3.client(
 def update(modelName, debugMode, st):    
     global model_name, model_id, model_type, debug_mode
     global models, agent_id, agent_kb_id
-    global agent_alias_id, agent_kb_alias_id
+    global agent_alias_id, agent_kb_alias_id, agent_alias_arn, agent_kb_alias_arn
     
     if model_name != modelName:
         model_name = modelName
@@ -170,7 +170,7 @@ def update(modelName, debugMode, st):
         if agent_id: 
             agent_alias_id = update_agent(model_id, model_name, agent_id, agent_name, agent_alias_id, agent_alias_name, st)
         else:
-            agent_id, agent_alias_id = create_agent(model_id, model_name, "Disable", agent_name, agent_alias_name, st)
+            agent_id, agent_alias_id, agent_alias_arn = create_bedrock_agent(model_id, model_name, "Disable", agent_name, agent_alias_name, st)
         
         # retrieve agent_kb_id
         agent_kb_id = retrieve_agent_id(agent_kb_name)
@@ -180,7 +180,7 @@ def update(modelName, debugMode, st):
         if agent_kb_id: 
             agent_kb_alias_id = update_agent(model_id, model_name, agent_kb_id, agent_kb_name, agent_kb_alias_id, agent_kb_alias_name, st)                        
         else:
-            agent_kb_id, agent_kb_alias_id = create_agent(model_id, model_name, "Enable", agent_kb_name, agent_kb_alias_name, st)
+            agent_kb_id, agent_kb_alias_id, agent_kb_alias_arn = create_bedrock_agent(model_id, model_name, "Enable", agent_kb_name, agent_kb_alias_name, st)
                                 
     if debug_mode != debugMode:
         debug_mode = debugMode
@@ -1636,14 +1636,13 @@ def upload_to_s3(file_bytes, file_name):
             service_name='s3',
             region_name=bedrock_region
         )
-        
-        content_type = utils.get_contents_type(file_name)       
-        logger.info(f"content_type: {content_type}") 
-        
         # Generate a unique file name to avoid collisions
         #timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         #unique_id = str(uuid.uuid4())[:8]
         #s3_key = f"uploaded_images/{timestamp}_{unique_id}_{file_name}"
+
+        content_type = utils.get_contents_type(file_name)       
+        logger.info(f"content_type: {content_type}") 
 
         if content_type == "image/jpeg" or content_type == "image/png":
             s3_key = f"{s3_image_prefix}/{file_name}"
@@ -1891,6 +1890,7 @@ def extract_text(img_base64):
     multimodal = get_chat()
     query = "텍스트를 추출해서 markdown 포맷으로 변환하세요. <result> tag를 붙여주세요."
     
+    extracted_text = ""
     messages = [
         HumanMessage(
             content=[
@@ -1918,7 +1918,7 @@ def extract_text(img_base64):
         except Exception:
             err_msg = traceback.format_exc()
             logger.info(f"error message: {err_msg}")                    
-            raise Exception ("Not able to request to LLM")
+            # raise Exception ("Not able to request to LLM")
     
     logger.info(f"xtracted_text: {extracted_text}")
     if len(extracted_text)<10:

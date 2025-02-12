@@ -343,11 +343,14 @@ if prompt := st.chat_input("메시지를 입력하세요."):
                 st.stop()
 
             else:
-                with st.status("thinking...", expanded=True, state="running") as status:
-                    summary = chat.get_image_summarization(file_name, prompt, st)
-                    st.write(summary)
+                if modelName == "Claude 3.5 Haiku":
+                    st.error("Claude 3.5 Haiku은 이미지를 지원하지 않습니다. 다른 모델을 선택해주세요.")
+                else:
+                    with st.status("thinking...", expanded=True, state="running") as status:
+                        summary = chat.get_image_summarization(file_name, prompt, st)
+                        st.write(summary)
 
-                    st.session_state.messages.append({"role": "assistant", "content": summary})
+                        st.session_state.messages.append({"role": "assistant", "content": summary})
 
         else:
             stream = chat.general_conversation(prompt)
