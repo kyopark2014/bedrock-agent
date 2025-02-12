@@ -373,6 +373,7 @@ def grade_documents(question, documents):
     chat = get_chat()
 
     for attempt in range(5):
+        print(f"attempt: {attempt}")
         try:
             retrieval_grader = get_retrieval_grader(chat)
             for i, doc in enumerate(documents):
@@ -382,7 +383,7 @@ def grade_documents(question, documents):
                 # print("score: ", score)
                 
                 grade = score.binary_score
-                print(f"{attempt}--> grade: {grade}")
+                # print(f"--> grade: {grade}")
                 # Document relevant
                 if grade.lower() == "yes":
                     print("---GRADE: DOCUMENT RELEVANT---")
@@ -498,28 +499,28 @@ def search_by_knowledge_base(keyword: str) -> str:
                     )
                 )    
 
-        #     # no grading    
-        #     if len(relevant_docs):
-        #         relevant_context = ""
-        #         for i, document in enumerate(relevant_docs):
-        #             print(f"{i}: {document}")
-        #             relevant_context += document.page_content + "\n\n"        
-        #         print('relevant_context: ', relevant_context)     
+            # no grading    
+            if len(relevant_docs):
+                relevant_context = ""
+                for i, document in enumerate(relevant_docs):
+                    print(f"{i}: {document}")
+                    relevant_context += document.page_content + "\n\n"        
+                print('relevant_context: ', relevant_context)     
         except Exception:
             err_msg = traceback.format_exc()
             print('error message: ', err_msg)    
 
     # grading                
-    if len(relevant_docs):
-        filtered_docs = grade_documents(keyword, relevant_docs)
-        filtered_docs = check_duplication(filtered_docs) # duplication checker
+    # if len(relevant_docs):
+    #     filtered_docs = grade_documents(keyword, relevant_docs)
+    #     filtered_docs = check_duplication(filtered_docs) # duplication checker
         
-    relevant_context = ""
-    if len(filtered_docs):
-        for i, document in enumerate(filtered_docs):
-            print(f"{i}: {document}")
-            relevant_context += document.page_content + "\n\n"        
-        print('relevant_context: ', relevant_context)        
+    # relevant_context = ""
+    # if len(filtered_docs):
+    #     for i, document in enumerate(filtered_docs):
+    #         print(f"{i}: {document}")
+    #         relevant_context += document.page_content + "\n\n"        
+    #     print('relevant_context: ', relevant_context)        
 
     if not relevant_context:
         relevant_context = "관련된 정보를 찾지 못하였습니다."
