@@ -340,28 +340,8 @@ knowledge_base_name = projectName
 s3_prefix = 'docs'
 doc_prefix = s3_prefix+'/'
 
-# retrieve knowledge_base_id
 knowledge_base_id = ""
-try: 
-    client = boto3.client(
-        service_name='bedrock-agent',
-        region_name=bedrock_region
-    )   
-    response = client.list_knowledge_bases(
-        maxResults=10
-    )
-    print('(list_knowledge_bases) response: ', response)
-    
-    if "knowledgeBaseSummaries" in response:
-        summaries = response["knowledgeBaseSummaries"]
-        for summary in summaries:
-            if summary["name"] == knowledge_base_name:
-                knowledge_base_id = summary["knowledgeBaseId"]
-                print('knowledge_base_id: ', knowledge_base_id)
-except Exception:
-    err_msg = traceback.format_exc()
-    print('error message: ', err_msg)                    
-
+                
 class GradeDocuments(BaseModel):
     """Binary score for relevance check on retrieved documents."""
 
@@ -464,27 +444,6 @@ def search_by_knowledge_base(keyword: str) -> str:
     filtered_docs = []
     relevant_context = ""
 
-    if not knowledge_base_id:
-        try: 
-            client = boto3.client(
-                service_name='bedrock-agent',
-                region_name=bedrock_region
-            )   
-            response = client.list_knowledge_bases(
-                maxResults=10
-            )
-            print('(list_knowledge_bases) response: ', response)
-            
-            if "knowledgeBaseSummaries" in response:
-                summaries = response["knowledgeBaseSummaries"]
-                for summary in summaries:
-                    if summary["name"] == knowledge_base_name:
-                        knowledge_base_id = summary["knowledgeBaseId"]
-                        print('knowledge_base_id: ', knowledge_base_id)
-        except Exception:
-            err_msg = traceback.format_exc()
-            print('error message: ', err_msg) 
-
     if knowledge_base_id:    
         try:
             retriever = AmazonKnowledgeBasesRetriever(
@@ -578,6 +537,28 @@ def lambda_handler(event, context):
     print('function: ', function)
     parameters = event.get('parameters', [])
     print('parameters: ', parameters)
+
+    # retrieve knowledge_base_id
+    if not knowledge_base_id:
+        try: 
+            client = boto3.client(
+                service_name='bedrock-agent',
+                region_name=bedrock_region
+            )   
+            response = client.list_knowledge_bases(
+                maxResults=5
+            )
+            print('(list_knowledge_bases) response: ', response)
+            
+            if "knowledgeBaseSummaries" in response:
+                summaries = response["knowledgeBaseSummaries"]
+                for summary in summaries:
+                    if summary["name"] == knowledge_base_name:
+                        knowledge_base_id = summary["knowledgeBaseId"]
+                        print('knowledge_base_id: ', knowledge_base_id)
+        except Exception:
+            err_msg = traceback.format_exc()
+            print('error message: ', err_msg)    
     
     if function == 'get_current_time':
         name = parameters[0]['name']
