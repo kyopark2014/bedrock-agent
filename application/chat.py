@@ -2322,11 +2322,10 @@ def create_bedrock_agent_supervisor(modelId, modelName, agentName, agentAliasNam
 
     agentId = response['agent']['agentId']
     logger.info(f"Supervisor agentId: {agentId}")
-    time.sleep(5)
+    time.sleep(3)
 
     # add code interpreter action group
     create_action_group_for_code_interpreter(agentId, st)
-    time.sleep(5)
                 
     # add stock agent
     logger.info(f"stock_agent_alias_arn: {stock_agent_alias_arn}")
@@ -2341,7 +2340,6 @@ def create_bedrock_agent_supervisor(modelId, modelName, agentName, agentAliasNam
         collaboratorName=stock_agent_name
     )
     logger.info(f"response of associate_agent_collaborator(): {response}")
-    time.sleep(5)
     
     # add search agent
     logger.info(f"search_agent_alias_arn: {search_agent_alias_arn}")
