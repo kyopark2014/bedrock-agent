@@ -517,7 +517,7 @@ export class CdkBedrockAgentStack extends cdk.Stack {
       ],
     });        
     agent_role.attachInlinePolicy( 
-      new iam.Policy(this, `agent-inference-policy-for-${projectName}`, {
+      new iam.Policy(this, `agent-multi-agent-policy-for-${projectName}`, {
         statements: [agentsMultiAgentsPolicy],
       }),
     );  
