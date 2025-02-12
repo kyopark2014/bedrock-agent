@@ -473,21 +473,6 @@ export class CdkBedrockAgentStack extends cdk.Stack {
       )
     });
 
-    const agentInvokePolicy = new iam.PolicyStatement({ 
-      effect: iam.Effect.ALLOW,
-      resources: [
-        `arn:aws:bedrock:*::foundation-model/*`
-      ],
-      actions: [
-        "bedrock:InvokeModel"
-      ],
-    });        
-    agent_role.attachInlinePolicy( 
-      new iam.Policy(this, `agent-invoke-policy-for-${projectName}`, {
-        statements: [agentInvokePolicy],
-      }),
-    );  
-
     const bedrockRetrievePolicy = new iam.PolicyStatement({ 
       effect: iam.Effect.ALLOW,
       resources: [
@@ -518,6 +503,22 @@ export class CdkBedrockAgentStack extends cdk.Stack {
     agent_role.attachInlinePolicy( 
       new iam.Policy(this, `agent-inference-policy-for-${projectName}`, {
         statements: [agentInferencePolicy],
+      }),
+    );  
+
+    const agentsMultiAgentsPolicy = new iam.PolicyStatement({ 
+      effect: iam.Effect.ALLOW,
+      resources: [
+        `arn:aws:bedrock:${region}:${accountId}:agent-alias/*`
+      ],
+      actions: [
+        "bedrock:GetAgentAlias",
+        "bedrock:InvokeAgent"
+      ],
+    });        
+    agent_role.attachInlinePolicy( 
+      new iam.Policy(this, `agent-inference-policy-for-${projectName}`, {
+        statements: [agentsMultiAgentsPolicy],
       }),
     );  
 

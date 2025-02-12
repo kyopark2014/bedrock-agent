@@ -1289,7 +1289,7 @@ def create_action_group_for_code_interpreter(agentId, st):
             agentVersion='DRAFT',
             parentActionGroupSignature='AMAZON.CodeInterpreter'
         )
-        logger.info(f"esponse of create_action_group_for_code_interpreter(): {response}")
+        logger.info(f"response of create_action_group_for_code_interpreter(): {response}")
 
 def prepare_agent(agentId):
     try:
@@ -1457,7 +1457,7 @@ def retrieve_agent_id(agentName):
     response_agent = client.list_agents(
         maxResults=10
     )
-    logger.info(f"esponse of list_agents(): {response_agent}")
+    logger.info(f"response of list_agents(): {response_agent}")
 
     agentId = ""
     for summary in response_agent["agentSummaries"]:
@@ -1473,7 +1473,7 @@ def check_bedrock_agent_status(agentName, agentAliasId, agentAliasName, agentAli
     
     # create agent if no agent
     if not agentId:        
-        agentId, agentAliasId, agentAliasArn = create_bedrock_agent(model_id, model_name, "Disable", agent_name, agent_alias_name, st)           
+        agentId, agentAliasId, agentAliasArn = create_bedrock_agent(model_id, model_name, "Disable", agentName, agentAliasName, st)           
     # else:
     #     response = client.get_agent(
     #         agentId=agentId
@@ -1541,13 +1541,11 @@ def run_bedrock_agent(text, agentName, sessionState, st):
         agentAliasId = agent_alias_id
         agentAliasName = agent_alias_name
         agentAliasArn = agent_alias_arn
-        enable_knowledge_base = "Disable"
     else:
         agentId = agent_kb_id
         agentAliasId = agent_kb_alias_id
         agentAliasName = agent_kb_alias_name
         agentAliasArn = agent_kb_alias_arn
-        enable_knowledge_base = "Enable"
 
     logger.info(f"agentId: {agentId} agentAliasId: {agentAliasId}")
 
@@ -1571,7 +1569,6 @@ def run_bedrock_agent(text, agentName, sessionState, st):
 
     result = ""
     image_url = []
-    final_result = ""  
     if agentAliasId and agentId:
         #if debug_mode=="Enable":
         #    st.info('답변을 생성하고 있습니다.')
@@ -1604,7 +1601,8 @@ def run_bedrock_agent(text, agentName, sessionState, st):
             logger.info(f"response of invoke_agent(): {response}")
             
             response_stream = response['completion']
-              
+
+            final_result = ""    
             image_url = []
             for index, event in enumerate(response_stream):
                 result, image_url = show_output(event, st)
@@ -2323,11 +2321,12 @@ def create_bedrock_agent_supervisor(modelId, modelName, agentName, agentAliasNam
     logger.info(f"response of create_agent(): {response}")
 
     agentId = response['agent']['agentId']
-    logger.info(f"agentId: {agentId}")
+    logger.info(f"Supervisor agentId: {agentId}")
     time.sleep(5)
 
     # add code interpreter action group
     create_action_group_for_code_interpreter(agentId, st)
+    time.sleep(5)
                 
     # add stock agent
     logger.info(f"stock_agent_alias_arn: {stock_agent_alias_arn}")
@@ -2339,11 +2338,10 @@ def create_bedrock_agent_supervisor(modelId, modelName, agentName, agentAliasNam
         agentId=agentId,
         agentVersion='DRAFT',
         collaborationInstruction=f"{stock_agent_name} retrieves accurate stock trends for a given ticker.",
-        collaboratorName=stock_agent_name,
-        relayConversationHistory='DISABLED' # TO_COLLABORATOR
+        collaboratorName=stock_agent_name
     )
     logger.info(f"response of associate_agent_collaborator(): {response}")
-    time.sleep(3)
+    time.sleep(5)
     
     # add search agent
     logger.info(f"search_agent_alias_arn: {search_agent_alias_arn}")
@@ -2355,8 +2353,7 @@ def create_bedrock_agent_supervisor(modelId, modelName, agentName, agentAliasNam
         agentId=agentId,
         agentVersion='DRAFT',
         collaborationInstruction=f"{search_agent_name} searchs general information by keyword and then return the result as a string.",
-        collaboratorName=search_agent_name,
-        relayConversationHistory='DISABLED' # TO_COLLABORATOR
+        collaboratorName=search_agent_name
     )
     logger.info(f"response of associate_agent_collaborator(): {response}")
     time.sleep(3)
