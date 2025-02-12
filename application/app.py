@@ -1,6 +1,7 @@
 import streamlit as st 
 import chat
 import utils
+import knowledge_base as kb
 
 # logging
 logger = utils.CreateLogger("streamlit")
@@ -168,7 +169,7 @@ if uploaded_file is not None and clear_button==False:
         file_url = chat.upload_to_s3(uploaded_file.getvalue(), file_name)
         logger.info(f"file_url: {file_url}")
 
-        chat.sync_data_source()  # sync uploaded files
+        kb.sync_data_source()  # sync uploaded files
             
         status = f'선택한 "{file_name}"의 내용을 요약합니다.'
         # my_bar = st.sidebar.progress(0, text=status)
