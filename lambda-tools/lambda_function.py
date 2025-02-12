@@ -528,6 +528,7 @@ def search_by_knowledge_base(keyword: str) -> str:
         # relevant_context = ""
     
     # no grading
+    relevant_context = ""
     if len(relevant_docs):
         for i, document in enumerate(relevant_docs):
             print(f"{i}: {document}")
