@@ -339,6 +339,8 @@ numberOfDocs = 2
 knowledge_base_name = projectName
 s3_prefix = 'docs'
 doc_prefix = s3_prefix+'/'
+
+# retrieve knowledge_base_id
 knowledge_base_id = ""
 try: 
     client = boto3.client(
@@ -460,59 +462,94 @@ def search_by_knowledge_base(keyword: str) -> str:
     top_k = numberOfDocs
     relevant_docs = []
     filtered_docs = []
+    relevant_context = ""
+
+    if not knowledge_base_id:
+        try: 
+            client = boto3.client(
+                service_name='bedrock-agent',
+                region_name=bedrock_region
+            )   
+            response = client.list_knowledge_bases(
+                maxResults=10
+            )
+            print('(list_knowledge_bases) response: ', response)
+            
+            if "knowledgeBaseSummaries" in response:
+                summaries = response["knowledgeBaseSummaries"]
+                for summary in summaries:
+                    if summary["name"] == knowledge_base_name:
+                        knowledge_base_id = summary["knowledgeBaseId"]
+                        print('knowledge_base_id: ', knowledge_base_id)
+        except Exception:
+            err_msg = traceback.format_exc()
+            print('error message: ', err_msg) 
+
     if knowledge_base_id:    
-        retriever = AmazonKnowledgeBasesRetriever(
-            knowledge_base_id=knowledge_base_id, 
-            retrieval_config={"vectorSearchConfiguration": {
-                "numberOfResults": top_k,
-                "overrideSearchType": "HYBRID"   # SEMANTIC
-            }},
-        )
-        
-        docs = retriever.invoke(keyword)
-        print('length of docs: ', len(docs))        
-        # print('docs: ', docs)
+        try:
+            retriever = AmazonKnowledgeBasesRetriever(
+                knowledge_base_id=knowledge_base_id, 
+                retrieval_config={"vectorSearchConfiguration": {
+                    "numberOfResults": top_k,
+                    "overrideSearchType": "HYBRID"   # SEMANTIC
+                }},
+            )
+            
+            docs = retriever.invoke(keyword)
+            print('length of docs: ', len(docs))        
+            # print('docs: ', docs)
 
-        print('--> docs from knowledge base')
-        for i, doc in enumerate(docs):
-            # print_doc(i, doc)
-            
-            content = ""
-            if doc.page_content:
-                content = doc.page_content
-            
-            score = doc.metadata["score"]
-            
-            link = ""
-            if "s3Location" in doc.metadata["location"]:
-                link = doc.metadata["location"]["s3Location"]["uri"] if doc.metadata["location"]["s3Location"]["uri"] is not None else ""
+            print('--> docs from knowledge base')
+            for i, doc in enumerate(docs):
+                # print_doc(i, doc)
                 
-                # print('link:', link)    
-                pos = link.find(f"/{doc_prefix}")
-                name = link[pos+len(doc_prefix)+1:]
-                encoded_name = parse.quote(name)
-                # print('name:', name)
-                link = f"{path}/{doc_prefix}{encoded_name}"
+                content = ""
+                if doc.page_content:
+                    content = doc.page_content
                 
-            elif "webLocation" in doc.metadata["location"]:
-                link = doc.metadata["location"]["webLocation"]["url"] if doc.metadata["location"]["webLocation"]["url"] is not None else ""
-                name = "WEB"
+                score = doc.metadata["score"]
+                
+                link = ""
+                if "s3Location" in doc.metadata["location"]:
+                    link = doc.metadata["location"]["s3Location"]["uri"] if doc.metadata["location"]["s3Location"]["uri"] is not None else ""
+                    
+                    # print('link:', link)    
+                    pos = link.find(f"/{doc_prefix}")
+                    name = link[pos+len(doc_prefix)+1:]
+                    encoded_name = parse.quote(name)
+                    # print('name:', name)
+                    link = f"{path}/{doc_prefix}{encoded_name}"
+                    
+                elif "webLocation" in doc.metadata["location"]:
+                    link = doc.metadata["location"]["webLocation"]["url"] if doc.metadata["location"]["webLocation"]["url"] is not None else ""
+                    name = "WEB"
 
-            url = link
-            # print('url:', url)
-            
-            relevant_docs.append(
-                Document(
-                    page_content=content,
-                    metadata={
-                        'name': name,
-                        'score': score,
-                        'url': url,
-                        'from': 'RAG'
-                    },
-                )
-            )    
-    
+                url = link
+                # print('url:', url)
+                
+                relevant_docs.append(
+                    Document(
+                        page_content=content,
+                        metadata={
+                            'name': name,
+                            'score': score,
+                            'url': url,
+                            'from': 'RAG'
+                        },
+                    )
+                )    
+
+            # no grading    
+            if len(relevant_docs):
+                relevant_context = ""
+                for i, document in enumerate(relevant_docs):
+                    print(f"{i}: {document}")
+                    relevant_context += document.page_content + "\n\n"        
+                print('relevant_context: ', relevant_context)     
+        except Exception:
+            err_msg = traceback.format_exc()
+            print('error message: ', err_msg)    
+
     # grading                
     #     if len(relevant_docs):
     #         filtered_docs = grade_documents(keyword, relevant_docs)
@@ -525,21 +562,11 @@ def search_by_knowledge_base(keyword: str) -> str:
     #         relevant_context += document.page_content + "\n\n"        
     #     print('relevant_context: ', relevant_context)        
 
-        # relevant_context = ""
+    if not relevant_context:
+        relevant_context = "관련된 정보를 찾지 못하였습니다."
     
-    # no grading    
-    if len(relevant_docs):
-        relevant_context = ""
-        for i, document in enumerate(relevant_docs):
-            print(f"{i}: {document}")
-            relevant_context += document.page_content + "\n\n"        
-        print('relevant_context: ', relevant_context)     
-
-    if relevant_context:
-        return relevant_context
-    else:        
-        return "관련된 정보를 찾지 못하였습니다."
-
+    return relevant_context
+    
 def lambda_handler(event, context):
     print('event: ', event)
     
