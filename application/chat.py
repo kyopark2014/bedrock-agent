@@ -1213,6 +1213,7 @@ def update_agent(modelId, modelName, agentId, agentName, agentAliasId, agentAlia
     if debug_mode=="Enable":
         st.info(f'{agentName}을 {agentAliasName}로 배포합니다.')    
     agentAliasId, agentAliasArn = deploy_agent(agentId, agentAliasName)
+    time.sleep(3) 
 
     return agentAliasId, agentAliasArn
 
@@ -1450,6 +1451,7 @@ def create_bedrock_agent(modelId, modelName, enable_knowledge_base, agentName, a
     if debug_mode=="Enable":
         st.info(f'{agentName}을 {agentAliasName}로 배포합니다.')    
     agentAliasId, agentAliasArn = deploy_agent(agentId, agentAliasName)
+    time.sleep(3) 
 
     return agentId, agentAliasId, agentAliasArn           
 
@@ -2291,6 +2293,7 @@ def create_bedrock_agent_collaborator(modelId, modelName, agentName, agentAliasN
     if debug_mode=="Enable":
         st.info(f'{agentName}을 {agentAliasName}로 배포합니다.')    
     agentAliasId, agentAliasArn = deploy_agent(agentId, agentAliasName)
+    time.sleep(3) 
 
     logger.info(f"agentName: {agentName}, agentId: {agentId}, agentAliasId: {agentAliasId}, agentAliasArn: {agentAliasArn}")
 
@@ -2365,7 +2368,7 @@ def create_bedrock_agent_supervisor(modelId, modelName, agentName, agentAliasNam
     # deploy
     if debug_mode=="Enable":
         st.info(f'{agentName}을 {agentAliasName}로 배포합니다.')    
-    agentAliasId, agentAliasArn = deploy_agent(agentId, agentAliasName)
+    agentAliasId, agentAliasArn = deploy_agent(agentId, agentAliasName)    
     time.sleep(3)
 
     return agentId, agentAliasId, agentAliasArn
