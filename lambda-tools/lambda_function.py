@@ -450,7 +450,7 @@ def search_by_knowledge_base(keyword: str) -> str:
     """    
     print("###### search_by_knowledge_base ######")    
     
-    global contentList
+    global contentList, knowledge_base_id
     contentList = []
  
     print('keyword: ', keyword)
