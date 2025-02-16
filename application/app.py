@@ -192,8 +192,8 @@ if uploaded_file is not None and clear_button==False:
         st.image(uploaded_file, caption="이미지 미리보기", use_container_width=True)
 
         file_name = uploaded_file.name
-        file_url = chat.upload_to_s3(uploaded_file.getvalue(), file_name)
-        logger.info(f"file_url: {file_url}")   
+        url = chat.upload_to_s3(uploaded_file.getvalue(), file_name)
+        logger.info(f"url: {url}")   
 
     elif uploaded_file.name and code_interpreter == "Enable":
         guide = "Code Interpreter가 준비되었습니다. 원하는 동작을 입력하세요."
