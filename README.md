@@ -711,6 +711,11 @@ Bedrock agetn의 code interpreter의 기능을 테스트하기 위하여 "code i
 
 <img src="https://github.com/user-attachments/assets/dc2669b5-b32d-4e5c-ba83-d02660002825" width="600">
 
+"네이버와 카카오의 일일 주가동향을 그래프로 그려주세요. 네이버와 카카오의 향후 투자 전략도 간단히 세워주세요. 그래프 안의 제목등은 영어로 작성하세요."라고 입력후 결과를 확인합니다. Matplotlib로 만들어진 그림의 한글이 깨지는 현상이 있어서 프롬프트에 해당 내용을 추가합니다. 
+
+<img src="https://github.com/user-attachments/assets/ca90d8c5-8204-4ace-ba6a-bcbaeb69a79c" width="600">
+
+
 메뉴에서 [이미지 분석]과 모델로 [Claude 3.5 Sonnet]을 선택한 후에 [기다리는 사람들 사진](./contents/waiting_people.jpg)을 다운받아서 업로드합니다. 이후 "사진속에 있는 사람들은 모두 몇명인가요?"라고 입력후 결과를 확인하면 아래와 같습니다.
 
 <img width="600" alt="image" src="https://github.com/user-attachments/assets/3e1ea017-4e46-4340-87c6-4ebf019dae4f" />
