@@ -764,3 +764,7 @@ cd ~/bedrock-agent/cdk-bedrock-agent && cdk destroy --all
 [종속 항목이 있는 .zip 배포 패키지 생성](https://docs.aws.amazon.com/ko_kr/lambda/latest/dg/python-package.html#python-package-create-dependencies)
 
 [Amazon Bedrock Agent Samples](https://github.com/awslabs/amazon-bedrock-agent-samples)
+
+[Amazon Bedrock Agents 워크샵](https://catalog.workshops.aws/agents-for-amazon-bedrock/ko-KR)
+
+[Amazon Bedrock 다중 에이전트 협업](https://catalog.us-east-1.prod.workshops.aws/workshops/1031afa5-be84-4a6a-9886-4e19ce67b9c2/ko-KR)
