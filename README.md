@@ -627,7 +627,194 @@ with st.status("thinking...", expanded=True, state="running") as status:
 
 ### Multi Agent Collaboration
 
-메뉴에서 "multi agent collaboration"을 선택하면 supervisor agent이 collaborator인 stock agent와 search agent를 이용해 답변을 구합니다. 아래와 같이 superviser agent에게 네이버 주식에 대해 문의하면 stock agent가 실행됩니다. stock agent은 질문을 보고 action group을 실행하는데, 여기서는 stock_data_lookup이 선택되어 주식정보를 가져옵니다.
+Multi agent에서 supervisor와 collaborator들은 agent id, agent name, agent alias name, agent alias arn을 가지고 있습니다. 여기에서는 stock와 search agent들을 가지고 collaborator로 등록합니다.
+
+```python
+# supervisor
+supervisor_agent_id = supervisor_alias_id = None
+supervisor_agent_name = "agent-supervisor"
+supervisor_agent_alias_name = "latest_version"
+supervisor_agent_alias_arn = ""
+
+# collaborator
+stock_agent_id = stock_agent_alias_id = None
+stock_agent_name = "stock-agent"
+stock_agent_alias_name = "latest_version"
+stock_agent_alias_arn = ""
+
+search_agent_id = search_agent_alias_id = None
+search_agent_name = "search-agent"
+search_agent_alias_name = "latest_version"
+search_agent_alias_arn = ""
+```
+
+Multi agent에서 invoke 동작은 single agent에서와 동일하게 supervisor의 agent id, agent alias를 이용해 invoke를 수행합니다. 이때 필요시 trace를 이용해 중간값들을 가져오고, session id를 이용해 파일들을 활용할 수 있으므로 memory id를 이용해 이전 대화이력을 활용할 수 있습니다.
+
+```python
+response = client_runtime.invoke_agent( 
+    agentAliasId=supervisor_agent_alias_id,
+    agentId=supervisor_agent_id,
+    inputText=text, 
+    enableTrace=True,
+    sessionId=sessionId[userId], 
+    memoryId='memory-'+userId
+)
+logger.info(f"response of invoke_agent(): {response}")
+
+response_stream = response['completion']
+```
+
+아래는 collaborator를 생성하는 함수입니다. stock agent는 stock_data_lookup라는 이름을 가지고 있고 주어진 ticker로 부터 stock 정보를 가져옵니다. 이때 ticker와 country 정보가 필요한데, supervisor가 collaborator의 description을 보고 적절한 값을 넣게 됩니다. 한국과 같은 경우에 ticker가 숫자이므로 country를 보고 'ko'를 추가합니다. 아래와 같이 create_agent()로 agent를 생성하고, create_action_group()으로 action group을 생성하고, prepare_agent()를 이용해 prepare 상태를 만들고, deploy_agent()로 배포합니다. 각 state를 정의하는 함수 중간에 의도적으로 delay를 부여합니다. 
+
+```python
+def create_bedrock_agent_collaborator(modelId, modelName, agentName, agentAliasName, st):
+    if agentName == "stock-agent":
+        functionSchema = {
+            'functions': [
+                {
+                    'name': 'stock_data_lookup',
+                    'description': "Retrieve accurate stock trends for a given ticker.",
+                    'parameters': {
+                        'ticker': {
+                            'description': 'the ticker to retrieve price history for',
+                            'required': True,
+                            'type': 'string'
+                        },
+                        'country': {
+                            'description': 'the english country name of the stock',
+                            'required': True,
+                            'type': 'string'
+                        }
+                    },
+                    'requireConfirmation': 'DISABLED'
+                }
+            ]
+        }
+    elif agentName == "search-agent": 
+        functionSchema = {
+            'functions': [
+                {
+                    'name': 'search_by_tavily',
+                    'description': "Search general information by keyword and then return the result as a string.",
+                    'parameters': {
+                        'keyword': {
+                            'description': 'search keyword',
+                            'required': True,
+                            'type': 'string'
+                        }
+                    },
+                    'requireConfirmation': 'DISABLED'
+                }
+            ]
+        }
+
+    agent_instruction = (
+        "당신의 이름은 서연이고, 질문에 친근한 방식으로 대답하도록 설계된 대화형 AI입니다. "
+        "상황에 맞는 구체적인 세부 정보를 충분히 제공합니다. "
+        "모르는 질문을 받으면 솔직히 모른다고 말합니다. "
+    )
+    response = client.create_agent(
+        agentResourceRoleArn=agent_role_arn,
+        instruction=agent_instruction,
+        foundationModel=modelId,
+        description=f"Collaborator Agent인 {agentName}입니다. 사용 모델은 {modelName}입니다.",
+        agentName=agentName,
+        idleSessionTTLInSeconds=600
+    )
+
+    agentId = response['agent']['agentId']
+    time.sleep(5)   
+
+    create_action_group(agentId, action_group_name_for_multi_agent, lambda_tools_arn, functionSchema, st)     
+
+    prepare_agent(agentId)
+    
+    agentAliasId, agentAliasArn = deploy_agent(agentId, agentAliasName)
+    time.sleep(3) 
+
+    return agentId, agentAliasId, agentAliasArn
+```
+
+아래와 같이 supervisor agent를 생성합니다.
+
+```python
+def create_bedrock_agent_supervisor(modelId, modelName, agentName, agentAliasName, st):
+    # create supervisor agent
+    if debug_mode=="Enable":
+        st.info(f"Supervisor Agent인 {agentName}를 생성합니다. 사용 모델은 {modelName}입니다.")
+
+    agent_instruction = (
+        "당신의 이름은 서연이고, 질문에 친근한 방식으로 대답하도록 설계된 대화형 AI입니다. "
+        "상황에 맞는 구체적인 세부 정보를 충분히 제공합니다. "
+        "모르는 질문을 받으면 솔직히 모른다고 말합니다. "
+    )
+    logger.info(f"modelId: {modelId}")
+
+    response = client.create_agent(
+        agentCollaboration = 'SUPERVISOR', # SUPERVISOR_ROUTER
+        orchestrationType = 'DEFAULT',
+        agentName=agentName,
+        agentResourceRoleArn=agent_role_arn,
+        instruction=agent_instruction,
+        foundationModel=modelId,
+        description=f"Supervisor Agent인 {agentName}입니다. 사용 모델은 {modelName}입니다.",
+        idleSessionTTLInSeconds=600
+    )
+    logger.info(f"response of create_agent(): {response}")
+
+    agentId = response['agent']['agentId']
+    logger.info(f"Supervisor agentId: {agentId}")
+    time.sleep(3)
+
+    # add code interpreter action group
+    create_action_group_for_code_interpreter(agentId, st)
+                
+    # add stock agent
+    logger.info(f"stock_agent_alias_arn: {stock_agent_alias_arn}")
+
+    response = client.associate_agent_collaborator(
+        agentDescriptor={
+            'aliasArn': stock_agent_alias_arn
+        },
+        agentId=agentId,
+        agentVersion='DRAFT',
+        collaborationInstruction=f"{stock_agent_name} retrieves accurate stock trends for a given ticker.",
+        collaboratorName=stock_agent_name
+    )
+    logger.info(f"response of associate_agent_collaborator(): {response}")
+    
+    # add search agent
+    logger.info(f"search_agent_alias_arn: {search_agent_alias_arn}")
+
+    response = client.associate_agent_collaborator(
+        agentDescriptor={
+            'aliasArn': search_agent_alias_arn
+        },
+        agentId=agentId,
+        agentVersion='DRAFT',
+        collaborationInstruction=f"{search_agent_name} searchs general information by keyword and then return the result as a string.",
+        collaboratorName=search_agent_name
+    )
+    logger.info(f"response of associate_agent_collaborator(): {response}")
+    time.sleep(3)
+
+    # preparing
+    if debug_mode=="Enable":
+        st.info('Agent를 사용할 수 있도록 "Prepare"로 설정합니다.')    
+    prepare_agent(agentId)
+    time.sleep(3)
+    
+    # deploy
+    if debug_mode=="Enable":
+        st.info(f'{agentName}을 {agentAliasName}로 배포합니다.')    
+    agentAliasId, agentAliasArn = deploy_agent(agentId, agentAliasName)    
+    time.sleep(3)
+
+    return agentId, agentAliasId, agentAliasArn
+```
+
+
+메뉴에서 "multi agent collaboration"을 선택하면 supervisor agent이 collaborator인 stock agent와 search agent를 이용해 답변을 구합니다. 아래와 같이 superviser agent에게 네이버 주식에 대해 문의하면 stock agent가 실행됩니다. stock agent은 질문을 보고 action group을 실행하는데, 여기서는 stock_data_lookup이 선택되어 주식정보를 가져옵니다. 
 
 <img src="https://github.com/user-attachments/assets/d8406c6c-8d57-4286-83e1-4b6fd515cbe0" width="600">
 
