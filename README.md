@@ -165,7 +165,7 @@ msg = result.content
 
 ### Bedrock Agent
 
-Agent를 위해서는 [cdk-bedrock-agent-stack.ts](./cdk-bedrock-agent/lib/cdk-bedrock-agent-stack.ts)와 같이 Bedrock에 대한 invoke, retrieve, inference를 허용하도록 하여야 합니다.
+Agent를 위해서는 [cdk-bedrock-agent-stack.ts](./cdk-bedrock-agent/lib/cdk-bedrock-agent-stack.ts)와 같이 Bedrock에 대한 invoke, retrieve, inference, agent-alias를 허용하도록 하여야 합니다.
 
 ```python
 const agent_role = new iam.Role(this,  `role-agent-for-${projectName}`, {
