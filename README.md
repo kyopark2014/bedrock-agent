@@ -222,6 +222,22 @@ agent_role.attachInlinePolicy(
     statements: [agentInferencePolicy],
   }),
 );
+
+const agentAliasPolicy = new iam.PolicyStatement({ 
+  effect: iam.Effect.ALLOW,
+  resources: [
+    `arn:aws:bedrock:${region}:${accountId}:agent-alias/*`
+  ],
+  actions: [
+    "bedrock:GetAgentAlias",
+    "bedrock:InvokeAgent"
+  ],
+});        
+agent_role.attachInlinePolicy( 
+  new iam.Policy(this, `agent-alias-policy-for-${projectName}`, {
+    statements: [agentAliasPolicy],
+  }),
+);  
 ```
 
 Bedrock agent는 console에서 생성할 수도 있지만 아래와 같이 boto3의 [create_agent](https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/bedrock-agent/client/create_agent.html)을 이용해 생성할 수 있습니다. 이때 agent의 instruction을 지정하고 agent role을 활용합니다. 생성된 agentId는 이후 agent에 추가 설정을 하거나 실행할때 활용됩니다.
