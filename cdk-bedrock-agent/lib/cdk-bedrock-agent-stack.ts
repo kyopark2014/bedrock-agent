@@ -506,7 +506,7 @@ export class CdkBedrockAgentStack extends cdk.Stack {
       }),
     );  
 
-    const agentsMultiAgentsPolicy = new iam.PolicyStatement({ 
+    const agentAliasPolicy = new iam.PolicyStatement({ 
       effect: iam.Effect.ALLOW,
       resources: [
         `arn:aws:bedrock:${region}:${accountId}:agent-alias/*`
@@ -517,8 +517,8 @@ export class CdkBedrockAgentStack extends cdk.Stack {
       ],
     });        
     agent_role.attachInlinePolicy( 
-      new iam.Policy(this, `agent-multi-agent-policy-for-${projectName}`, {
-        statements: [agentsMultiAgentsPolicy],
+      new iam.Policy(this, `agent-alias-policy-for-${projectName}`, {
+        statements: [agentAliasPolicy],
       }),
     );  
 
