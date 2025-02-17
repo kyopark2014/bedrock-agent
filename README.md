@@ -735,21 +735,15 @@ def create_bedrock_agent_collaborator(modelId, modelName, agentName, agentAliasN
     return agentId, agentAliasId, agentAliasArn
 ```
 
-아래와 같이 supervisor agent를 생성합니다.
+아래와 같이 supervisor agent를 생성합니다. agentCollaboration으로 SUPERVISOR를 선택하고 agent의 role과 instruction을 연결합니다. 결과에서 agent를 추출한 후에 supervisor에서 code로 분석할 수 있도록 code interpreter를 action group으로 등록합니다. associate_agent_collaborator()로 collaborator들을 supervisor에 각각 연결합니다. 이후 prepare_agent()로 prepare 상태로 바꾸고, deploy_agent()로 배포합니다.
 
 ```python
 def create_bedrock_agent_supervisor(modelId, modelName, agentName, agentAliasName, st):
-    # create supervisor agent
-    if debug_mode=="Enable":
-        st.info(f"Supervisor Agent인 {agentName}를 생성합니다. 사용 모델은 {modelName}입니다.")
-
     agent_instruction = (
         "당신의 이름은 서연이고, 질문에 친근한 방식으로 대답하도록 설계된 대화형 AI입니다. "
         "상황에 맞는 구체적인 세부 정보를 충분히 제공합니다. "
         "모르는 질문을 받으면 솔직히 모른다고 말합니다. "
     )
-    logger.info(f"modelId: {modelId}")
-
     response = client.create_agent(
         agentCollaboration = 'SUPERVISOR', # SUPERVISOR_ROUTER
         orchestrationType = 'DEFAULT',
@@ -760,18 +754,11 @@ def create_bedrock_agent_supervisor(modelId, modelName, agentName, agentAliasNam
         description=f"Supervisor Agent인 {agentName}입니다. 사용 모델은 {modelName}입니다.",
         idleSessionTTLInSeconds=600
     )
-    logger.info(f"response of create_agent(): {response}")
-
     agentId = response['agent']['agentId']
-    logger.info(f"Supervisor agentId: {agentId}")
     time.sleep(3)
 
-    # add code interpreter action group
     create_action_group_for_code_interpreter(agentId, st)
                 
-    # add stock agent
-    logger.info(f"stock_agent_alias_arn: {stock_agent_alias_arn}")
-
     response = client.associate_agent_collaborator(
         agentDescriptor={
             'aliasArn': stock_agent_alias_arn
@@ -781,11 +768,7 @@ def create_bedrock_agent_supervisor(modelId, modelName, agentName, agentAliasNam
         collaborationInstruction=f"{stock_agent_name} retrieves accurate stock trends for a given ticker.",
         collaboratorName=stock_agent_name
     )
-    logger.info(f"response of associate_agent_collaborator(): {response}")
     
-    # add search agent
-    logger.info(f"search_agent_alias_arn: {search_agent_alias_arn}")
-
     response = client.associate_agent_collaborator(
         agentDescriptor={
             'aliasArn': search_agent_alias_arn
@@ -795,26 +778,18 @@ def create_bedrock_agent_supervisor(modelId, modelName, agentName, agentAliasNam
         collaborationInstruction=f"{search_agent_name} searchs general information by keyword and then return the result as a string.",
         collaboratorName=search_agent_name
     )
-    logger.info(f"response of associate_agent_collaborator(): {response}")
     time.sleep(3)
 
-    # preparing
-    if debug_mode=="Enable":
-        st.info('Agent를 사용할 수 있도록 "Prepare"로 설정합니다.')    
     prepare_agent(agentId)
     time.sleep(3)
     
-    # deploy
-    if debug_mode=="Enable":
-        st.info(f'{agentName}을 {agentAliasName}로 배포합니다.')    
     agentAliasId, agentAliasArn = deploy_agent(agentId, agentAliasName)    
     time.sleep(3)
 
     return agentId, agentAliasId, agentAliasArn
 ```
 
-
-메뉴에서 "multi agent collaboration"을 선택하면 supervisor agent이 collaborator인 stock agent와 search agent를 이용해 답변을 구합니다. 아래와 같이 superviser agent에게 네이버 주식에 대해 문의하면 stock agent가 실행됩니다. stock agent은 질문을 보고 action group을 실행하는데, 여기서는 stock_data_lookup이 선택되어 주식정보를 가져옵니다. 
+왼쪽 메뉴에서 "multi agent collaboration"을 선택하면 supervisor agent이 collaborator인 stock agent와 search agent를 이용해 답변을 구합니다. 아래와 같이 superviser agent에게 네이버 주식에 대해 문의하면 stock agent가 실행됩니다. stock agent은 질문을 보고 action group을 실행하는데, 여기서는 stock_data_lookup이 선택되어 주식정보를 가져옵니다. 
 
 <img src="https://github.com/user-attachments/assets/d8406c6c-8d57-4286-83e1-4b6fd515cbe0" width="600">
 
