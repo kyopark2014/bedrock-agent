@@ -514,7 +514,8 @@ def get_references(docs):
         #excerpt = excerpt.replace('"', '')        
         #excerpt = ''.join(c for c in excerpt if c not in '"')
         excerpt = re.sub('"', '', excerpt)
-        excerpt = re.sub('#', '', excerpt)        
+        excerpt = re.sub('#', '', excerpt)     
+        excerpt = re.sub('\n', '', excerpt)      
         logger.info(f"excerpt(quotation removed): {excerpt}")
         
         if page:                
