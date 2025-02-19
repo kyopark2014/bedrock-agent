@@ -523,12 +523,13 @@ export class CdkBedrockAgentStack extends cdk.Stack {
     );  
 
     const passRoleOfAgentPolicy = new iam.PolicyStatement({  
-      resources: [`arn:aws:iam::${accountId}:role/role-agent-for-${projectName}-${region}`],      
+      //resources: [`arn:aws:iam::${accountId}:role/role-agent-for-${projectName}-${region}`],      
+      resources: [`*`],
       actions: ['iam:PassRole'],
     });      
     agent_role.attachInlinePolicy( // add pass role policy
       new iam.Policy(this, `pass-role-of-agent-for-${projectName}`, {
-      statements: [passRoleOfAgentPolicy],
+        statements: [passRoleOfAgentPolicy],
       }), 
     );  
 
