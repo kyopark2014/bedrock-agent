@@ -1571,6 +1571,7 @@ def run_bedrock_agent(text, agentName, sessionState, st):
         sessionId[userId] = str(uuid.uuid4())
 
     result = ""
+    final_result = "" 
     image_url = []
     if agentAliasId and agentId:
         #if debug_mode=="Enable":
@@ -1604,8 +1605,7 @@ def run_bedrock_agent(text, agentName, sessionState, st):
             logger.info(f"response of invoke_agent(): {response}")
             
             response_stream = response['completion']
-
-            final_result = ""    
+               
             image_url = []
             for index, event in enumerate(response_stream):
                 result, image_url = show_output(event, st)
