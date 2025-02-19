@@ -572,7 +572,7 @@ def lambda_handler(event, context):
     return response
 ```
 
-주식정보를 가져오는 함수의 예제입니다. stock_data_lookup의 경우에 ticker와 country를 받아서 country가 한국인 경우에 "KS"를 붙여서 1개월의 정보를 거래내역을 가져옵니다.
+주식정보를 가져오는 함수의 예제입니다. stock_data_lookup의 경우에 ticker와 country를 받아서 country가 한국인 경우에 "KS"를 붙여서 1개월의 정보를 주식정보를 가져옵니다.
 
 ```python
 import yfinance as yf
