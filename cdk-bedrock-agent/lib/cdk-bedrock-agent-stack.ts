@@ -299,7 +299,7 @@ export class CdkBedrockAgentStack extends cdk.Stack {
     // pass role
     const passRoleResourceArn = knowledge_base_role.roleArn;
     const passRolePolicy = new iam.PolicyStatement({  
-      resources: [passRoleResourceArn],      
+      resources: [passRoleResourceArn, `arn:aws:iam::${accountId}:role/role-agent-for-${projectName}-${region}`],      
       actions: ['iam:PassRole'],
     });      
     ec2Role.attachInlinePolicy( // add pass role policy
@@ -521,24 +521,7 @@ export class CdkBedrockAgentStack extends cdk.Stack {
         statements: [agentAliasPolicy],
       }),
     );  
-
-    const passRoleOfAgentPolicy = new iam.PolicyStatement({  
-      //resources: [`arn:aws:iam::${accountId}:role/role-agent-for-${projectName}-${region}`],      
-      resources: [`*`],
-      actions: ['iam:PassRole'],
-    });      
-    agent_role.attachInlinePolicy( // add pass role policy
-      new iam.Policy(this, `pass-role-of-agent-for-${projectName}`, {
-        statements: [passRoleOfAgentPolicy],
-      }), 
-    );  
-
-    agent_role.attachInlinePolicy( // add bedrock policy
-      new iam.Policy(this, `agent-bedrock-policy-ec2-for-${projectName}`, {
-        statements: [BedrockPolicy],
-      }),
-    ); 
-
+    
     // lambda-tool
     const roleLambdaTools = new iam.Role(this, `role-lambda-tools-for-${projectName}`, {
       roleName: `role-lambda-tools-for-${projectName}-${region}`,
