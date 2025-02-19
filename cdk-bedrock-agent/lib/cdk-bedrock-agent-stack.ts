@@ -211,6 +211,63 @@ export class CdkBedrockAgentStack extends cdk.Stack {
       value: s3Bucket.bucketName,
       description: 'The nmae of bucket',
     });
+
+    // agent role
+    const agent_role = new iam.Role(this,  `role-agent-for-${projectName}`, {
+      roleName: `role-agent-for-${projectName}-${region}`,
+      assumedBy: new iam.CompositePrincipal(
+        new iam.ServicePrincipal("bedrock.amazonaws.com")
+      )
+    });
+
+    const bedrockRetrievePolicy = new iam.PolicyStatement({ 
+      effect: iam.Effect.ALLOW,
+      resources: [
+        `arn:aws:bedrock:${region}:${accountId}:knowledge-base/*`
+      ],
+      actions: [
+        "bedrock:Retrieve"
+      ],
+    });        
+    agent_role.attachInlinePolicy( 
+      new iam.Policy(this, `bedrock-retrieve-policy-for-${projectName}`, {
+        statements: [bedrockRetrievePolicy],
+      }),
+    );  
+    
+    const agentInferencePolicy = new iam.PolicyStatement({ 
+      effect: iam.Effect.ALLOW,
+      resources: [
+        `arn:aws:bedrock:${region}:${accountId}:inference-profile/*`,
+        `arn:aws:bedrock:*::foundation-model/*`
+      ],
+      actions: [
+        "bedrock:InvokeModel",
+        "bedrock:GetInferenceProfile",
+        "bedrock:GetFoundationModel"
+      ],
+    });        
+    agent_role.attachInlinePolicy( 
+      new iam.Policy(this, `agent-inference-policy-for-${projectName}`, {
+        statements: [agentInferencePolicy],
+      }),
+    );  
+
+    const agentAliasPolicy = new iam.PolicyStatement({ 
+      effect: iam.Effect.ALLOW,
+      resources: [
+        `arn:aws:bedrock:${region}:${accountId}:agent-alias/*`
+      ],
+      actions: [
+        "bedrock:GetAgentAlias",
+        "bedrock:InvokeAgent"
+      ],
+    });        
+    agent_role.attachInlinePolicy( 
+      new iam.Policy(this, `agent-alias-policy-for-${projectName}`, {
+        statements: [agentAliasPolicy],
+      }),
+    );
     
     // EC2 Role
     const ec2Role = new iam.Role(this, `role-ec2-for-${projectName}`, {
@@ -297,9 +354,9 @@ export class CdkBedrockAgentStack extends cdk.Stack {
     );
 
     // pass role
-    const passRoleResourceArn = knowledge_base_role.roleArn;
     const passRolePolicy = new iam.PolicyStatement({  
-      resources: [passRoleResourceArn, `arn:aws:iam::${accountId}:role/role-agent-for-${projectName}-${region}`],      
+      // resources: [passRoleResourceArn, `arn:aws:iam::${accountId}:role/role-agent-for-${projectName}-${region}`],      
+      resources: [knowledge_base_role.roleArn, agent_role.roleArn],      
       actions: ['iam:PassRole'],
     });      
     ec2Role.attachInlinePolicy( // add pass role policy
@@ -463,64 +520,7 @@ export class CdkBedrockAgentStack extends cdk.Stack {
     new cdk.CfnOutput(this, `distribution-sharing-DomainName-for-${projectName}`, {
       value: 'https://'+distribution_sharing.domainName,
       description: 'The domain name of the Distribution Sharing',
-    });
-
-    // agent role
-    const agent_role = new iam.Role(this,  `role-agent-for-${projectName}`, {
-      roleName: `role-agent-for-${projectName}-${region}`,
-      assumedBy: new iam.CompositePrincipal(
-        new iam.ServicePrincipal("bedrock.amazonaws.com")
-      )
-    });
-
-    const bedrockRetrievePolicy = new iam.PolicyStatement({ 
-      effect: iam.Effect.ALLOW,
-      resources: [
-        `arn:aws:bedrock:${region}:${accountId}:knowledge-base/*`
-      ],
-      actions: [
-        "bedrock:Retrieve"
-      ],
-    });        
-    agent_role.attachInlinePolicy( 
-      new iam.Policy(this, `bedrock-retrieve-policy-for-${projectName}`, {
-        statements: [bedrockRetrievePolicy],
-      }),
-    );  
-    
-    const agentInferencePolicy = new iam.PolicyStatement({ 
-      effect: iam.Effect.ALLOW,
-      resources: [
-        `arn:aws:bedrock:${region}:${accountId}:inference-profile/*`,
-        `arn:aws:bedrock:*::foundation-model/*`
-      ],
-      actions: [
-        "bedrock:InvokeModel",
-        "bedrock:GetInferenceProfile",
-        "bedrock:GetFoundationModel"
-      ],
-    });        
-    agent_role.attachInlinePolicy( 
-      new iam.Policy(this, `agent-inference-policy-for-${projectName}`, {
-        statements: [agentInferencePolicy],
-      }),
-    );  
-
-    const agentAliasPolicy = new iam.PolicyStatement({ 
-      effect: iam.Effect.ALLOW,
-      resources: [
-        `arn:aws:bedrock:${region}:${accountId}:agent-alias/*`
-      ],
-      actions: [
-        "bedrock:GetAgentAlias",
-        "bedrock:InvokeAgent"
-      ],
-    });        
-    agent_role.attachInlinePolicy( 
-      new iam.Policy(this, `agent-alias-policy-for-${projectName}`, {
-        statements: [agentAliasPolicy],
-      }),
-    );  
+    });      
     
     // lambda-tool
     const roleLambdaTools = new iam.Role(this, `role-lambda-tools-for-${projectName}`, {
