@@ -18,9 +18,6 @@ const accountId = process.env.CDK_DEFAULT_ACCOUNT;
 const targetPort = 8080;
 const bucketName = `storage-for-${projectName}-${accountId}-${region}`; 
 const vectorIndexName = projectName
-const knowledge_base_name = projectName;
-
-const enableHybridSearch = 'true';
 
 export class CdkBedrockAgentStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -362,6 +359,18 @@ export class CdkBedrockAgentStack extends cdk.Stack {
     ec2Role.attachInlinePolicy( // add pass role policy
       new iam.Policy(this, `pass-role-for-${projectName}`, {
       statements: [passRolePolicy],
+      }), 
+    );  
+
+    // pass role - knlowledge base
+    const passRoleKBResourceArn = knowledge_base_role.roleArn;
+    const passRoleKBPolicy = new iam.PolicyStatement({  
+      resources: [passRoleKBResourceArn],      
+      actions: ['iam:PassRole'],
+    });      
+    ec2Role.attachInlinePolicy( // add pass role policy
+      new iam.Policy(this, `pass-role-KB-for-${projectName}`, {
+      statements: [passRoleKBPolicy],
       }), 
     );  
 
