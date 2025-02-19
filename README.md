@@ -572,6 +572,63 @@ def lambda_handler(event, context):
     return response
 ```
 
+주식정보를 가져오는 함수의 예제입니다. stock_data_lookup의 경우에 ticker와 country를 받아서 country가 한국인 경우에 "KS"를 붙여서 1개월의 정보를 거래내역을 가져옵니다.
+
+```python
+import yfinance as yf
+def stock_data_lookup(ticker, country):
+    """
+    Retrieve accurate stock trends for a given ticker.
+    ticker: the ticker to retrieve price history for
+    country: the english country name of the stock
+    return: the information of ticker
+    """ 
+    com = re.compile('[a-zA-Z]') 
+    alphabet = com.findall(ticker)
+    if len(alphabet)==0:        
+        if country == "South Korea" or country == "Korea":
+            ticker += ".KS"
+        elif country == "Japan":
+            ticker += ".T"
+    stock = yf.Ticker(ticker)
+    
+    # get the price history for past 1 month
+    history = stock.history(period="1mo")
+    
+    result = f"## Trading History\n{history}"
+    result += f"\n\n## Financials\n{stock.financials}"
+    result += f"\n\n## Major Holders\n{stock.major_holders}"
+
+    return result
+```
+
+일반 인터넷 검색을 수행하는 함수는 아래와 같습니다.
+
+```python
+def search_by_tavily(keyword: str) -> str:
+    answer = ""    
+    keyword = keyword.replace('\'','')
+    
+    search = TavilySearchResults(
+        max_results=2,
+        include_answer=True,
+        include_raw_content=True,
+        api_wrapper=tavily_api_wrapper,
+        search_depth="advanced", # "basic"
+    )
+    output = search.invoke(keyword)
+    
+    for result in output:
+        print('result: ', result)
+        if result:
+            content = result.get("content")
+            url = result.get("url")                    
+            answer = answer + f"{content}, URL: {url}\n\n"    
+    if answer == "":
+        answer = "관련된 정보를 찾지 못하였습니다."
+    return answer
+```
+
 ### Code Interpreter
 
 Code Interpreter를 위한 action group을 생성합니다. 이때, [Amazon Bedrock에서 코드 해석 활성화](https://docs.aws.amazon.com/ko_kr/bedrock/latest/userguide/agents-enable-code-interpretation.html)와 같이 parentActionGroupSignature을 'AMAZON.CodeInterpreter'로 설정합니다. 이때 [description, actionGroupExecutor](https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/bedrock-agent/client/create_agent_action_group.html)은 사용할 수 없습니다.
