@@ -307,16 +307,6 @@ export class CdkBedrockAgentStack extends cdk.Stack {
       statements: [passRolePolicy],
       }), 
     );  
-    const passRoleResourceArn = knowledge_base_role.roleArn;
-    const passRolePolicy = new iam.PolicyStatement({  
-      resources: [passRoleResourceArn],      
-      actions: ['iam:PassRole'],
-    });      
-    ec2Role.attachInlinePolicy( // add pass role policy
-      new iam.Policy(this, `pass-role-for-${projectName}`, {
-      statements: [passRolePolicy],
-      }), 
-    );  
 
     // aoss
     const aossRolePolicy = new iam.PolicyStatement({  
