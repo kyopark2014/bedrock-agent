@@ -315,23 +315,34 @@ def stock_data_lookup(ticker, country):
         elif country == "Japan":
             ticker += ".T"
     print("ticker:", ticker)
-    
-    stock = yf.Ticker(ticker)
-    
-    # get the price history for past 1 month
-    history = stock.history(period="1mo")
-    print('history: ', history)
-    
-    result = f"## Trading History\n{history}"
-    #history.reset_index().to_json(orient="split", index=False, date_format="iso")    
-    
-    result += f"\n\n## Financials\n{stock.financials}"    
-    print('financials: ', stock.financials)
 
-    result += f"\n\n## Major Holders\n{stock.major_holders}"
-    print('major_holders: ', stock.major_holders)
+    result = ""
+    for attempt in range(5):    
+        try: 
+            stock = yf.Ticker(ticker)
+            
+            # get the price history for past 1 month
+            history = stock.history(period="1mo")
+            print('history: ', history)
+            
+            result = f"## Trading History\n{history}"
+            #history.reset_index().to_json(orient="split", index=False, date_format="iso")    
+            
+            result += f"\n\n## Financials\n{stock.financials}"    
+            print('financials: ', stock.financials)
 
-    print('result: ', result)
+            result += f"\n\n## Major Holders\n{stock.major_holders}"
+            print('major_holders: ', stock.major_holders)
+
+            print('result: ', result)
+            break
+
+        except Exception:
+                err_msg = traceback.format_exc()
+                print('error message: ', err_msg)    
+        
+    if result == "":
+        result = "Not available to use the yahoo finance api"    
 
     return result
 
