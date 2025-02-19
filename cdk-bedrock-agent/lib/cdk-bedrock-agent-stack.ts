@@ -532,6 +532,12 @@ export class CdkBedrockAgentStack extends cdk.Stack {
       }), 
     );  
 
+    agent_role.attachInlinePolicy( // add bedrock policy
+      new iam.Policy(this, `agent-bedrock-policy-ec2-for-${projectName}`, {
+        statements: [BedrockPolicy],
+      }),
+    ); 
+
     // lambda-tool
     const roleLambdaTools = new iam.Role(this, `role-lambda-tools-for-${projectName}`, {
       roleName: `role-lambda-tools-for-${projectName}-${region}`,
