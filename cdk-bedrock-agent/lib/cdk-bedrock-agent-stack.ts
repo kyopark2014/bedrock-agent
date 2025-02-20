@@ -351,7 +351,7 @@ export class CdkBedrockAgentStack extends cdk.Stack {
     );
 
     // pass role
-    const passRolePolicy = new iam.PolicyStatement({  
+  /*  const passRolePolicy = new iam.PolicyStatement({  
       // resources: [passRoleResourceArn, `arn:aws:iam::${accountId}:role/role-agent-for-${projectName}-${region}`],      
       resources: [knowledge_base_role.roleArn, agent_role.roleArn],      
       actions: ['iam:PassRole'],
@@ -362,7 +362,6 @@ export class CdkBedrockAgentStack extends cdk.Stack {
       }), 
     );  
 
-    // pass role - knlowledge base
     const passRoleKBResourceArn = knowledge_base_role.roleArn;
     const passRoleKBPolicy = new iam.PolicyStatement({  
       resources: [passRoleKBResourceArn],      
@@ -372,7 +371,7 @@ export class CdkBedrockAgentStack extends cdk.Stack {
       new iam.Policy(this, `pass-role-KB-for-${projectName}`, {
       statements: [passRoleKBPolicy],
       }), 
-    );  
+    );  */
 
     // aoss
     const aossRolePolicy = new iam.PolicyStatement({  
