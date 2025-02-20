@@ -98,7 +98,7 @@ export class CdkBedrockAgentStack extends cdk.Stack {
     );  
 
     // OpenSearch Serverless
-    const collectionName = vectorIndexName
+  /*  const collectionName = vectorIndexName
     const OpenSearchCollection = new opensearchserverless.CfnCollection(this, `opensearch-correction-for-${projectName}`, {
       name: collectionName,    
       description: `opensearch correction for ${projectName}`,
@@ -184,7 +184,7 @@ export class CdkBedrockAgentStack extends cdk.Stack {
       ]),
     });
     OpenSearchCollection.addDependency(dataAccessPolicy);
-
+*/
     // s3 
     const s3Bucket = new s3.Bucket(this, `storage-${projectName}`,{
       bucketName: bucketName,
@@ -350,15 +350,15 @@ export class CdkBedrockAgentStack extends cdk.Stack {
       }),
     );
 
-    // pass role
-  /*  const passRolePolicy = new iam.PolicyStatement({  
+    // pass role - agent
+    const passRoleAgentPolicy = new iam.PolicyStatement({  
       // resources: [passRoleResourceArn, `arn:aws:iam::${accountId}:role/role-agent-for-${projectName}-${region}`],      
-      resources: [knowledge_base_role.roleArn, agent_role.roleArn],      
+      resources: [agent_role.roleArn],      
       actions: ['iam:PassRole'],
     });      
     ec2Role.attachInlinePolicy( // add pass role policy
-      new iam.Policy(this, `pass-role-for-${projectName}`, {
-      statements: [passRolePolicy],
+      new iam.Policy(this, `pass-role-agent-for-${projectName}`, {
+      statements: [passRoleAgentPolicy],
       }), 
     );  
 
@@ -371,7 +371,7 @@ export class CdkBedrockAgentStack extends cdk.Stack {
       new iam.Policy(this, `pass-role-KB-for-${projectName}`, {
       statements: [passRoleKBPolicy],
       }), 
-    );  */
+    );  
 
     // aoss
     const aossRolePolicy = new iam.PolicyStatement({  
@@ -622,9 +622,9 @@ export class CdkBedrockAgentStack extends cdk.Stack {
       "accountId": accountId,
       "region": region,
       "knowledge_base_role": knowledge_base_role.roleArn,
-      "collectionArn": collectionArn,
+   //   "collectionArn": collectionArn,
       "agent_role_arn": agent_role.roleArn,
-      "opensearch_url": OpenSearchCollection.attrCollectionEndpoint,
+    //  "opensearch_url": OpenSearchCollection.attrCollectionEndpoint,
       "s3_bucket": s3Bucket.bucketName,      
       "s3_arn": s3Bucket.bucketArn,
       "sharing_url": 'https://'+distribution_sharing.domainName,
