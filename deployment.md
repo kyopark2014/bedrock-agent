@@ -1,4 +1,3 @@
-![image](https://github.com/user-attachments/assets/d1109a32-2b6f-41ac-8907-5bb95de93e36)# 인프라 설치하기
 
 ## Bedrock 사용 권한 설정하기
 
