@@ -1,4 +1,4 @@
-# 인프라 설치하기
+![image](https://github.com/user-attachments/assets/d1109a32-2b6f-41ac-8907-5bb95de93e36)# 인프라 설치하기
 
 ## Bedrock 사용 권한 설정하기
 
@@ -71,6 +71,14 @@ aws sts get-caller-identity --query Account --output text
 cdk bootstrap aws://[account-id]/us-west-2
 ```
 
+만약 AWS CLI가 설치가 안되어서 bootstrap이 실패하는 경우에는 아래 명령어로 설치합니다.
+
+```text
+curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+unzip awscliv2.zip
+sudo ./aws/install
+```
+
 4) 아래 명령어로 인프라를 설치합니다.
 
 ```java
@@ -91,7 +99,8 @@ cdk deploy --require-approval never --all
 
 [Secret manager](https://us-west-2.console.aws.amazon.com/secretsmanager/listsecrets?region=us-west-2)에 접속하여, [openweathermap-bedrock-agent](https://us-west-2.console.aws.amazon.com/secretsmanager/secret?name=openweathermap-bedrock-agent&region=us-west-2), [tavilyapikey-bedrock-agent](https://us-west-2.console.aws.amazon.com/secretsmanager/secret?name=tavilyapikey-bedrock-agent&region=us-west-2), [langsmithapikey-bedrock-agent](https://us-west-2.console.aws.amazon.com/secretsmanager/secret?name=langsmithapikey-bedrock-agent&region=us-west-2)에 접속하여, [Retrieve secret value]를 선택 후, api key를 입력합니다.
 
-6) AWS Credential을 입력하기 위해, [Console-EC2](https://us-west-2.console.aws.amazon.com/ec2/home?region=us-west-2#Instances:instanceState=running)에서 "app-for-bedrock-agent"을 선택한 후에 [Connect]를 선택합니다. 여러가지 옵션 중에서 Session Manager를 선택한 후에 [connect]를 접속한 후에 console로 접속합니다. 아래 명령어를 이용하여 ec2-user에 AWS Credential을 입력합니다.
+
+6) 만약 Streamlit에서 AWS Credential이 필요하다면, [Console-EC2](https://us-west-2.console.aws.amazon.com/ec2/home?region=us-west-2#Instances:instanceState=running)에서 "app-for-bedrock-agent"을 선택한 후에 [Connect]를 선택합니다. 여러가지 옵션 중에서 Session Manager를 선택한 후에 [connect]를 접속한 후에 console로 접속합니다. 아래 명령어를 이용하여 ec2-user에 AWS Credential을 입력합니다.
 
 ```text
 sudo runuser -l ec2-user -c 'aws configure'
@@ -203,6 +212,11 @@ cat /opt/aws/amazon-cloudwatch-agent/logs/configuration-validation.log
 cat /opt/aws/amazon-cloudwatch-agent/logs/amazon-cloudwatch-agent.log
 ```
 
+만약 CloudWatch Agent가 설치되지 않은 instance일 경우에는 아래 명령어로 설치합니다.
+
+```text
+sudo yum install amazon-cloudwatch-agent
+```
 
 ### Local에서 실행하기 
 
