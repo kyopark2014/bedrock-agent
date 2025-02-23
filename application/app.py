@@ -3,6 +3,8 @@ import chat
 import utils
 import knowledge_base as kb
 
+import cost_analysis as cost
+
 # logging
 logger = utils.CreateLogger("streamlit")
 
@@ -36,6 +38,9 @@ mode_descriptions = {
     ],
     "이미지 분석": [
         "이미지를 업로드하면 이미지의 내용을 요약할 수 있습니다."
+    ],
+    "비용 분석": [
+        "Cloud 사용에 대한 분석을 수행합니다."
     ]
 }
 
@@ -55,7 +60,7 @@ with st.sidebar:
     # radio selection
     mode = st.radio(
         # label="원하는 대화 형태를 선택하세요. ",options=["일상적인 대화", "RAG", "Flow", "Agent", "번역하기", "문법 검토하기"], index=0
-        label="원하는 대화 형태를 선택하세요. ",options=["일상적인 대화", "RAG", "Agent", "Agent with Knowlege Base", "Multi Agent Collaboration", "번역하기", "문법 검토하기", "이미지 분석"], index=0
+        label="원하는 대화 형태를 선택하세요. ",options=["일상적인 대화", "RAG", "Agent", "Agent with Knowlege Base", "Multi Agent Collaboration", "번역하기", "문법 검토하기", "이미지 분석", "비용 분석"], index=0
     )   
     st.info(mode_descriptions[mode][0])
 
@@ -202,6 +207,32 @@ if uploaded_file is not None and clear_button==False:
         state_of_code_interpreter = True
 
 # print("state_of_code_interpreter: ", state_of_code_interpreter)
+
+if clear_button==False and mode == '비용 분석':
+    st.subheader("📈 Cost Analysis")
+
+    if 'service_pie' in cost.visualizations:
+        st.plotly_chart(cost.visualizations['service_pie'])
+    if 'daily_trend' in cost.visualizations:
+        st.plotly_chart(cost.visualizations['daily_trend'])
+    if 'region_bar' in cost.visualizations:
+        st.plotly_chart(cost.visualizations['region_bar'])
+
+    with st.status("thinking...", expanded=True, state="running") as status:
+        if not cost.cost_data:
+            st.info("비용 데이터를 가져옵니다.")
+            cost_data = cost.get_cost_analysis()
+            logger.info(f"cost_data: {cost_data}")
+            cost.cost_data = cost_data
+        else:
+            if not cost.insights:        
+                st.info("잠시만 기다리세요. 지난 한달간의 사용량을 분석하고 있습니다...")
+                insights = cost.generate_cost_insights()
+                logger.info(f"insights: {insights}")
+                cost.insights = insights
+            
+            st.markdown(cost.insights)
+            st.session_state.messages.append({"role": "assistant", "content": cost.insights})
 
 # Always show the chat input
 if prompt := st.chat_input("메시지를 입력하세요."):
@@ -351,6 +382,13 @@ if prompt := st.chat_input("메시지를 입력하세요."):
                         st.write(summary)
 
                         st.session_state.messages.append({"role": "assistant", "content": summary})
+
+        elif mode == '비용 분석':
+            with st.status("thinking...", expanded=True, state="running") as status:
+                response = cost.ask_cost_insights(prompt)
+                st.write(response)
+
+                st.session_state.messages.append({"role": "assistant", "content": response})
 
         else:
             stream = chat.general_conversation(prompt)

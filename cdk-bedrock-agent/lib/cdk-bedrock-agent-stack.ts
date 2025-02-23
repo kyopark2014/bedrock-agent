@@ -340,6 +340,17 @@ export class CdkBedrockAgentStack extends cdk.Stack {
       }),
     );     
 
+    // Cost Explorer Policy
+    const costExplorerPolicy = new iam.PolicyStatement({  
+      resources: ['*'],
+      actions: ['ce:GetCostAndUsage'],
+    });        
+    ec2Role.attachInlinePolicy( // add costExplorerPolicy
+      new iam.Policy(this, `cost-explorer-policy-for-${projectName}`, {
+        statements: [costExplorerPolicy],
+      }),
+    );      
+
     const ec2Policy = new iam.PolicyStatement({  
       resources: ['arn:aws:ec2:*:*:instance/*'],
       actions: ['ec2:*'],
@@ -669,6 +680,7 @@ EOF'`,
       `runuser -l ec2-user -c 'cd && git clone https://github.com/kyopark2014/${projectName}'`,
       `runuser -l ec2-user -c 'pip install streamlit streamlit_chat beautifulsoup4 pytz tavily-python'`,        
       `runuser -l ec2-user -c 'pip install boto3 langchain_aws langchain langchain_community langgraph opensearch-py PyPDF2'`,
+      `runuser -l ec2-user -c 'pip install PyPDF2 plotly_express'`,
       'systemctl enable streamlit.service',
       'systemctl start streamlit',
       `yum install -y amazon-cloudwatch-agent`,
