@@ -105,6 +105,8 @@ st.title('🔮 '+ mode)
 
 if clear_button==True:
     chat.initiate()
+    cost.cost_data = {}
+    cost.visualizations = {}
 
 # Initialize chat history
 if "messages" not in st.session_state:
