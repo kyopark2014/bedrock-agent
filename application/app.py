@@ -213,8 +213,8 @@ if uploaded_file is not None and clear_button==False:
 if clear_button==False and mode == '비용 분석':
     st.subheader("📈 Cost Analysis")
 
-    if cost.visualizations:
-        cost.get_cost_analysis()
+    if not cost.visualizations:
+        cost.get_visualiation()
 
     if 'service_pie' in cost.visualizations:
         st.plotly_chart(cost.visualizations['service_pie'])

@@ -210,7 +210,7 @@ cost_data = {}
 visualizations = {}
 insights = ""
 
-def get_cost_analysis():
+def get_visualiation():
     global cost_data, visualizations
 
     try:
@@ -224,7 +224,7 @@ def get_cost_analysis():
     except Exception as e:
         print(f"Error to earn cost data: {str(e)}")   
 
-get_cost_analysis() 
+get_visualiation() 
 
 def ask_cost_insights(question):
     if cost_data:
