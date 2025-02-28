@@ -1396,10 +1396,10 @@ def create_bedrock_agent(modelId, modelName, enable_knowledge_base, agentName, a
             },
             {
                 'name': 'stock_data_lookup',
-                'description': "Retrieve accurate stock trends for a given ticker.",
+                'description': "Retrieve accurate stock data for a given ticker.",
                 'parameters': {
                     'ticker': {
-                        'description': 'the ticker to retrieve price history for',
+                        'description': 'the ticker to retrieve price history for. In South Korea, ticker is six dight numbers.',
                         'required': True,
                         'type': 'string'
                     },
