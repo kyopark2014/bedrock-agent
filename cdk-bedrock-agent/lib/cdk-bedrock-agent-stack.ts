@@ -250,6 +250,7 @@ export class CdkBedrockAgentStack extends cdk.Stack {
       }),
     );  
 
+    /*
     const agentAliasPolicy = new iam.PolicyStatement({ 
       effect: iam.Effect.ALLOW,
       resources: [
@@ -264,7 +265,7 @@ export class CdkBedrockAgentStack extends cdk.Stack {
       new iam.Policy(this, `agent-alias-policy-for-${projectName}`, {
         statements: [agentAliasPolicy],
       }),
-    );
+    ); */
 
     // Lambda Invoke
     agent_role.addToPolicy(new iam.PolicyStatement({
