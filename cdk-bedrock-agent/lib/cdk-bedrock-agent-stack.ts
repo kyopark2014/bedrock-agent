@@ -265,6 +265,18 @@ export class CdkBedrockAgentStack extends cdk.Stack {
         statements: [agentAliasPolicy],
       }),
     );
+
+    // Lambda Invoke
+    agent_role.addToPolicy(new iam.PolicyStatement({
+      resources: ['*'],
+      actions: [
+        'lambda:InvokeFunction',
+        'cloudwatch:*'
+      ]
+    }));
+    agent_role.addManagedPolicy({
+      managedPolicyArn: 'arn:aws:iam::aws:policy/AWSLambdaExecute',
+    });
     
     // EC2 Role
     const ec2Role = new iam.Role(this, `role-ec2-for-${projectName}`, {
