@@ -240,6 +240,7 @@ export class CdkBedrockAgentStack extends cdk.Stack {
       ],
       actions: [
         "bedrock:InvokeModel",
+        "bedrock:InvokeModelWithResponseStream",
         "bedrock:GetInferenceProfile",
         "bedrock:GetFoundationModel"
       ],
