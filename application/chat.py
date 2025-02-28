@@ -141,8 +141,8 @@ agent_kb_name = projectName+'-knowledge-base'
 agent_kb_alias_name = "latest_version"
 agent_kb_alias_arn = ""
 
-action_group_name = f"action_group_for-{projectName}"
-action_group_name_for_multi_agent = f"action_group_multi_agent-for-{projectName}"
+action_group_name = f"Tools"
+action_group_name_for_multi_agent = f"MultiAgentTools"
 
 client = boto3.client(
     service_name='bedrock-agent',
@@ -1257,7 +1257,7 @@ def create_action_group(agentId, actionGroupName, lambdaToolsArn, functionSchema
         logger.info(f"response of create_action_group(): {response}")
 
 def create_action_group_for_code_interpreter(agentId, st):
-    actionGroupName = "Code_Interpreter"
+    actionGroupName = "CodeInterpreter"
     if debug_mode=="Enable":
         st.info(f"Action Group에 {actionGroupName}이 존재하는지 확인합니다.")
 
