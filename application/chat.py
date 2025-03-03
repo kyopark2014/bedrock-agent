@@ -2153,7 +2153,7 @@ def get_image_summarization(object_name, prompt, st):
 
 # supervisor
 supervisor_agent_id = supervisor_alias_id = None
-supervisor_agent_name = "agent-supervisor"
+supervisor_agent_name = "supervisor"
 supervisor_agent_alias_name = "latest_version"
 supervisor_agent_alias_arn = ""
 
