@@ -1546,6 +1546,7 @@ def check_bedrock_agent_status(agentName, agentAliasId, agentAliasName, agentAli
 
             agentAliasId, agentAliasArn = deploy_agent(agentId, agentAliasName)
             logger.info(f"agentAliasId: {agentAliasId}, agentAliasArn: {agentAliasArn}")
+            time.sleep(5) # delay 5 seconds
 
     return agentId, agentAliasId, agentAliasArn
 
