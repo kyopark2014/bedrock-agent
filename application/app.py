@@ -201,9 +201,9 @@ if uploaded_file is not None and clear_button==False:
         logger.info(f"url: {url}")   
 
     elif uploaded_file.name and code_interpreter == "Enable":
-        guide = "Code Interpreter가 준비되었습니다. 원하는 동작을 입력하세요."
-        st.write(guide)
-        st.session_state.messages.append({"role": "assistant", "content": guide})
+        # guide = "Code Interpreter가 준비되었습니다. 원하는 동작을 입력하세요."
+        # st.write(guide)
+        # st.session_state.messages.append({"role": "assistant", "content": guide})
         state_of_code_interpreter = True
 
 # print("state_of_code_interpreter: ", state_of_code_interpreter)
@@ -329,7 +329,7 @@ if prompt := st.chat_input("메시지를 입력하세요."):
                         "content": response,
                         "images": image_url if image_url else []
                     })
-        
+                 
         elif mode == 'Agent with Knowlege Base':
             sessionState = ""
             with st.status("thinking...", expanded=True, state="running") as status:
