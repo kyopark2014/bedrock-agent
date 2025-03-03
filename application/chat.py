@@ -2233,7 +2233,7 @@ def create_bedrock_agent_collaborator(modelId, modelName, agentName, agentAliasN
             'functions': [
                 {
                     'name': 'stock',
-                    'description': "Retrieve accurate stock trends for a given ticker.",
+                    'description': "Retrieve accurate stock data for a given ticker.",
                     'parameters': {
                         'ticker': {
                             'description': 'the ticker to retrieve price history for. In South Korea, a ticker is a 6-digit number.',
@@ -2354,7 +2354,7 @@ def create_bedrock_agent_supervisor(modelId, modelName, agentName, agentAliasNam
         },
         agentId=agentId,
         agentVersion='DRAFT',
-        collaborationInstruction=f"{stock_agent_name} retrieves accurate stock trends for a given ticker.",
+        collaborationInstruction=f"{stock_agent_name} retrieves accurate stock data for a given ticker.",
         collaboratorName=stock_agent_name
     )
     logger.info(f"response of associate_agent_collaborator(): {response}")
