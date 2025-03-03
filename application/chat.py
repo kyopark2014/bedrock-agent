@@ -964,6 +964,9 @@ def show_output(event, st):
 
         logger.info(f"Number of files: {len(files)}")
         for i, file in enumerate(files):
+            if "bytes" not in file:
+                continue
+            
             st.image(file["bytes"], caption=file["name"])
             logger.info(f"image[{i}]: {file['name']}")
 
