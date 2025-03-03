@@ -474,7 +474,7 @@ def search_by_knowledge_base(keyword: str) -> str:
             for i, doc in enumerate(docs):
                 # print_doc(i, doc)
                 
-                content = ""
+                content = f"{keyword}에 대해 조사한 결과는 아래와 같습니다.\n\n"
                 if doc.page_content:
                     content = doc.page_content
                 
