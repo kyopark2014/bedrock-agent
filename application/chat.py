@@ -1411,7 +1411,7 @@ def create_bedrock_agent(modelId, modelName, enable_knowledge_base, agentName, a
                 'description': "Retrieve accurate stock data for a given ticker.",
                 'parameters': {
                     'ticker': {
-                        'description': 'the ticker to retrieve price history for. In South Korea, ticker is six dight numbers.',
+                        'description': 'the ticker to retrieve price history for. In South Korea, ticker is six digit numbers.',
                         'required': True,
                         'type': 'string'
                     },
@@ -2234,7 +2234,7 @@ def create_bedrock_agent_collaborator(modelId, modelName, agentName, agentAliasN
                     'description': "Retrieve accurate stock trends for a given ticker.",
                     'parameters': {
                         'ticker': {
-                            'description': 'the ticker to retrieve price history for',
+                            'description': 'the ticker to retrieve price history for. In South Korea, ticker is six digit numbers.',
                             'required': True,
                             'type': 'string'
                         },
