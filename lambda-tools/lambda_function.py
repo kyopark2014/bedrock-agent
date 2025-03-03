@@ -608,7 +608,7 @@ def lambda_handler(event, context):
         print('keyword: ', keyword)
         output = search_by_knowledge_base(keyword)
 
-    elif function == 'stock_data_lookup':
+    elif function == 'stock':
         country = ticker = ""
         for p in parameters:
             if p['name'] == 'country':

@@ -1407,7 +1407,7 @@ def create_bedrock_agent(modelId, modelName, enable_knowledge_base, agentName, a
                 'requireConfirmation': 'DISABLED'
             },
             {
-                'name': 'stock_data_lookup',
+                'name': 'stock',
                 'description': "Retrieve accurate stock data for a given ticker.",
                 'parameters': {
                     'ticker': {
@@ -2230,7 +2230,7 @@ def create_bedrock_agent_collaborator(modelId, modelName, agentName, agentAliasN
         functionSchema = {
             'functions': [
                 {
-                    'name': 'stock_data_lookup',
+                    'name': 'stock',
                     'description': "Retrieve accurate stock trends for a given ticker.",
                     'parameters': {
                         'ticker': {
