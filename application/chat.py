@@ -1238,7 +1238,7 @@ def create_action_group(agentId, actionGroupName, lambdaToolsArn, functionSchema
         agentId=agentId,
         agentVersion='DRAFT',
         maxResults=10
-    )
+    ) 
     logger.info(f"response of list_agent_action_groups(): {response}")
 
     actionGroupSummaries = response['actionGroupSummaries']
