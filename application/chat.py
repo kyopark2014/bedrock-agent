@@ -1416,7 +1416,7 @@ def create_bedrock_agent(modelId, modelName, enable_knowledge_base, agentName, a
                         'type': 'string'
                     },
                     'country': {
-                        'description': 'the english country name of the stock',
+                        'description': 'the English country name of the stock',
                         'required': True,
                         'type': 'string'
                     }
@@ -2241,7 +2241,7 @@ def create_bedrock_agent_collaborator(modelId, modelName, agentName, agentAliasN
                             'type': 'string'
                         },
                         'country': {
-                            'description': 'the english country name of the stock',
+                            'description': 'the English country name of the stock',
                             'required': True,
                             'type': 'string'
                         }
