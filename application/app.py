@@ -282,9 +282,9 @@ if prompt := st.chat_input("메시지를 입력하세요."):
                 with st.status("thinking...", expanded=True, state="running") as status:                
                     response, image_url, reference_docs = chat.run_bedrock_agent(prompt, chat.agent_name, sessionState, st)
 
-                    if chat.isKorean(response)==False:
-                        logger.info(f"translate to korean")
-                        response = chat.translate_text(response)
+                    # if chat.isKorean(response)==False:
+                    #     logger.info(f"translate to korean")
+                    #     response = chat.translate_text(response)
 
                     st.write(response)
                     logger.info(f"response: {response}, image_url: {image_url}")
