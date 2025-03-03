@@ -629,6 +629,36 @@ def search_by_tavily(keyword: str) -> str:
     return answer
 ```
 
+도서 검색용 Tool은 아래와 같이 정의할 수 있습니다.
+
+```python
+def get_book_list(keyword: str) -> str:
+    """
+    Search book list by keyword and then return book list
+    keyword: search keyword
+    return: book list
+    """
+    
+    keyword = keyword.replace('\'','')
+
+    answer = ""
+    url = f"https://search.kyobobook.co.kr/search?keyword={keyword}&gbCode=TOT&target=total"
+    response = requests.get(url)
+    if response.status_code == 200:
+        soup = BeautifulSoup(response.text, "html.parser")
+        prod_info = soup.find_all("a", attrs={"class": "prod_info"})
+        
+        if len(prod_info):
+            answer = "추천 도서는 아래와 같습니다.\n"
+            
+        for prod in prod_info[:5]:
+            title = prod.text.strip().replace("\n", "")       
+            link = prod.get("href")
+            answer = answer + f"{title}, URL: {link}\n\n"
+    
+    return answer
+```
+
 ### Code Interpreter
 
 Code Interpreter를 위한 action group을 생성합니다. 이때, [Amazon Bedrock에서 코드 해석 활성화](https://docs.aws.amazon.com/ko_kr/bedrock/latest/userguide/agents-enable-code-interpretation.html)와 같이 parentActionGroupSignature을 'AMAZON.CodeInterpreter'로 설정합니다. 이때 [description, actionGroupExecutor](https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/bedrock-agent/client/create_agent_action_group.html)은 사용할 수 없습니다.
