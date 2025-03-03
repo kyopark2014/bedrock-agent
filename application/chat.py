@@ -2159,12 +2159,12 @@ supervisor_agent_alias_arn = ""
 
 # collaborator
 stock_agent_id = stock_agent_alias_id = None
-stock_agent_name = "stock-agent"
+stock_agent_name = "stock"
 stock_agent_alias_name = "latest_version"
 stock_agent_alias_arn = ""
 
 search_agent_id = search_agent_alias_id = None
-search_agent_name = "search-agent"
+search_agent_name = "search"
 search_agent_alias_name = "latest_version"
 search_agent_alias_arn = ""
 
@@ -2212,6 +2212,7 @@ def run_bedrock_multi_agent_collaboration(text, st):
 
             final_result = ""    
             image_url = []
+            
             for index, event in enumerate(response_stream):
                 result, image_url = show_output(event, st)
                 if result:
@@ -2227,7 +2228,7 @@ def run_bedrock_multi_agent_collaboration(text, st):
     return final_result, image_url
 
 def create_bedrock_agent_collaborator(modelId, modelName, agentName, agentAliasName, st):
-    if agentName == "stock-agent":
+    if agentName == "stock":
         functionSchema = {
             'functions': [
                 {
@@ -2249,7 +2250,7 @@ def create_bedrock_agent_collaborator(modelId, modelName, agentName, agentAliasN
                 }
             ]
         }
-    elif agentName == "search-agent": 
+    elif agentName == "search": 
         functionSchema = {
             'functions': [
                 {
@@ -2295,7 +2296,7 @@ def create_bedrock_agent_collaborator(modelId, modelName, agentName, agentAliasN
     # create action group    
     create_action_group(agentId, action_group_name_for_multi_agent, lambda_tools_arn, functionSchema, st)     
 
-    if agentName == "stock-agent":
+    if agentName == "stock":
         create_action_group_for_code_interpreter(agentId, st)
     
     # preparing
