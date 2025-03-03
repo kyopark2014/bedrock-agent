@@ -346,7 +346,7 @@ def stock_data_lookup(ticker, country):
 
     return result
 
-numberOfDocs = 2
+numberOfDocs = 3
 knowledge_base_name = projectName
 s3_prefix = 'docs'
 doc_prefix = s3_prefix+'/'
