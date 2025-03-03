@@ -1225,6 +1225,9 @@ def update_agent(modelId, modelName, agentId, agentName, agentAliasId, agentAlia
     agentAliasId, agentAliasArn = deploy_agent(agentId, agentAliasName)
     time.sleep(3) 
 
+    global agent_id, agent_alias_id, agent_kb_id, agent_kb_alias_id
+    agent_id = agent_alias_id = agent_kb_id = agent_kb_alias_id = ""
+
     return agentAliasId, agentAliasArn
 
 def create_action_group(agentId, actionGroupName, lambdaToolsArn, functionSchema, st):    
