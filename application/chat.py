@@ -1315,6 +1315,7 @@ def create_bedrock_agent(modelId, modelName, enable_knowledge_base, agentName, a
         "당신의 이름은 서연이고, 질문에 친근한 방식으로 대답하도록 설계된 대화형 AI입니다. "
         "상황에 맞는 구체적인 세부 정보를 충분히 제공합니다. "
         "모르는 질문을 받으면 솔직히 모른다고 말합니다. "
+        "답변은 한국어로 합니다."
     )
     logger.info(f"modelId: {modelId}")
 
