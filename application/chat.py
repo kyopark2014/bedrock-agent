@@ -1336,7 +1336,7 @@ def create_bedrock_agent(modelId, modelName, enable_knowledge_base, agentName, a
     functionSchema = {
         'functions': [
             {
-                'name': 'get_book_list',
+                'name': 'book_list',
                 'description': 'Search book list by keyword and then return book list',                        
                 'parameters': {
                     'keyword': {
@@ -1348,7 +1348,7 @@ def create_bedrock_agent(modelId, modelName, enable_knowledge_base, agentName, a
                 'requireConfirmation': 'DISABLED'
             },
             {
-                'name': 'get_current_time',
+                'name': 'current_time',
                 'description': "Returns the current date and time in the specified format such as %Y-%m-%d %H:%M:%S",
                 'parameters': {
                     'format': {
@@ -1360,7 +1360,7 @@ def create_bedrock_agent(modelId, modelName, enable_knowledge_base, agentName, a
                 'requireConfirmation': 'DISABLED'
             },
             {
-                'name': 'get_weather_info',
+                'name': 'weather',
                 'description': "Retrieve weather information by city name and then return weather statement.",
                 'parameters': {
                     'city': {
@@ -1372,7 +1372,7 @@ def create_bedrock_agent(modelId, modelName, enable_knowledge_base, agentName, a
                 'requireConfirmation': 'DISABLED'
             },
             {
-                'name': 'search_by_tavily',
+                'name': 'search_internet',
                 'description': "Search general information by keyword and then return the result as a string.",
                 'parameters': {
                     'keyword': {
@@ -1384,7 +1384,7 @@ def create_bedrock_agent(modelId, modelName, enable_knowledge_base, agentName, a
                 'requireConfirmation': 'DISABLED'
             },
             {
-                'name': 'search_by_knowledge_base',
+                'name': 'search_rag',
                 'description': "Search technical information by keyword and then return the result as a string.",
                 'parameters': {
                     'keyword': {

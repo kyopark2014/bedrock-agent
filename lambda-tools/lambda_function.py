@@ -573,35 +573,35 @@ def lambda_handler(event, context):
             err_msg = traceback.format_exc()
             print('error message: ', err_msg)    
     
-    if function == 'get_current_time':
+    if function == 'current_time':
         name = parameters[0]['name']
         print('name: ', name)
         format = parameters[0]['value']
         print('format: ', format)
         output = get_current_time(format)        
 
-    elif function == 'get_book_list':
+    elif function == 'book_list':
         name = parameters[0]['name']
         print('name: ', name)
         keyword = parameters[0]['value']
         print('keyword: ', keyword)
         output = get_book_list(keyword)     
 
-    elif function == 'get_weather_info':  
+    elif function == 'weather':
         name = parameters[0]['name']
         print('name: ', name)
         city = parameters[0]['value']
         print('city: ', city)      
         output = get_weather_info(city)
 
-    elif function == 'search_by_tavily':
+    elif function == 'search_internet':
         name = parameters[0]['name']
         print('name: ', name)
         keyword = parameters[0]['value']
         print('keyword: ', keyword)
         output = search_by_tavily(keyword)
         
-    elif function == 'search_by_knowledge_base':
+    elif function == 'search_rag':
         name = parameters[0]['name']
         print('name: ', name)
         keyword = parameters[0]['value']
