@@ -659,6 +659,48 @@ def get_book_list(keyword: str) -> str:
     return answer
 ```
 
+날씨 Tool은 [OpenWeather](https://openweathermap.org/)에서 무료로 제공하는 API를 이용해 구현하였습니다.
+
+```python
+def get_weather_info(city: str) -> str:
+    """
+    retrieve weather information by city name and then return weather statement.
+    city: the name of city to retrieve
+    return: weather statement
+    """    
+    
+    city = city.replace('\n','')
+    city = city.replace('\'','')
+    city = city.replace('\"','')
+                
+    chat = get_chat()
+    if isKorean(city):
+        place = traslation(chat, city, "Korean", "English")
+        print('city (translated): ', place)
+    else:
+        place = city
+        city = traslation(chat, city, "English", "Korean")
+        
+    weather_str: str = f"{city}에 대한 날씨 정보가 없습니다."
+    if weather_api_key: 
+        apiKey = weather_api_key
+        lang = 'en' 
+        units = 'metric' 
+        api = f"https://api.openweathermap.org/data/2.5/weather?q={place}&APPID={apiKey}&lang={lang}&units={units}"
+        result = requests.get(api)
+        result = json.loads(result.text)    
+        if 'weather' in result:
+            overall = result['weather'][0]['main']
+            current_temp = result['main']['temp']
+            min_temp = result['main']['temp_min']
+            max_temp = result['main']['temp_max']
+            humidity = result['main']['humidity']
+            wind_speed = result['wind']['speed']
+            cloud = result['clouds']['all']            
+            weather_str = f"{city}의 현재 날씨의 특징은 {overall}이며, 현재 온도는 {current_temp} 입니다. 현재 습도는 {humidity}% 이고, 바람은 초당 {wind_speed} 미터 입니다. 구름은 {cloud}% 입니다."                        
+    return weather_str
+```
+
 ### Code Interpreter
 
 Code Interpreter를 위한 action group을 생성합니다. 이때, [Amazon Bedrock에서 코드 해석 활성화](https://docs.aws.amazon.com/ko_kr/bedrock/latest/userguide/agents-enable-code-interpretation.html)와 같이 parentActionGroupSignature을 'AMAZON.CodeInterpreter'로 설정합니다. 이때 [description, actionGroupExecutor](https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/bedrock-agent/client/create_agent_action_group.html)은 사용할 수 없습니다.
