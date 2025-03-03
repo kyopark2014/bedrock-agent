@@ -289,7 +289,7 @@ if not isExist:
         functionSchema={
             'functions': [
                 {
-                    'name': 'get_book_list',
+                    'name': 'book_list',
                     'description': 'Search book list by keyword and then return book list',                        
                     'parameters': {
                         'keyword': {
@@ -301,7 +301,7 @@ if not isExist:
                     'requireConfirmation': 'DISABLED'
                 },
                 {
-                    'name': 'get_current_time',
+                    'name': 'current_time',
                     'description': "Returns the current date and time in the specified format such as %Y-%m-%d %H:%M:%S",
                     'parameters': {
                         'format': {
@@ -313,7 +313,7 @@ if not isExist:
                     'requireConfirmation': 'DISABLED'
                 },
                 {
-                    'name': 'get_weather_info',
+                    'name': 'weather',
                     'description': "Retrieve weather information by city name and then return weather statement.",
                     'parameters': {
                         'city': {
@@ -325,7 +325,7 @@ if not isExist:
                     'requireConfirmation': 'DISABLED'
                 },
                 {
-                    'name': 'search_by_tavily',
+                    'name': 'search_internet',
                     'description': "Search general information by keyword and then return the result as a string.",
                     'parameters': {
                         'keyword': {
@@ -337,7 +337,7 @@ if not isExist:
                     'requireConfirmation': 'DISABLED'
                 },
                 {
-                    'name': 'search_by_knowledge_base',
+                    'name': 'search_rag',
                     'description': "Search technical information by keyword and then return the result as a string.",
                     'parameters': {
                         'keyword': {
@@ -542,15 +542,15 @@ def lambda_handler(event, context):
     name = parameters[0]['name']
     value = parameters[0]['value']
     
-    if function == 'get_current_time':
+    if function == 'current_time':
         output = get_current_time(value)        
-    elif function == 'get_book_list':
+    elif function == 'book_list':
         output = get_book_list(value)            
-    elif function == 'get_weather_info':        
+    elif function == 'weather':        
         output = get_weather_info(value)
-    elif function == 'search_by_tavily':
+    elif function == 'search_internet':
         output = search_by_tavily(value)
-    elif function == 'search_by_knowledge_base':
+    elif function == 'search_rag':
         output = search_by_knowledge_base(value)
 
     responseBody =  {
@@ -707,7 +707,7 @@ Code Interpreter를 위한 action group을 생성합니다. 이때, [Amazon Bedr
 
 ```python
 def create_action_group_for_code_interpreter(agentId, st):
-    actionGroupName = "Code_Interpreter"
+    actionGroupName = "CodeInterpreter"
     response = client.list_agent_action_groups(
         agentId=agentId,
         agentVersion='DRAFT',
