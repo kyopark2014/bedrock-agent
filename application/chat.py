@@ -964,19 +964,24 @@ def show_output(event, st):
 
         logger.info(f"Number of files: {len(files)}")
         for i, file in enumerate(files):
-            if "bytes" not in file:
-                continue
-            
-            st.image(file["bytes"], caption=file["name"])
-            logger.info(f"image[{i}]: {file['name']}")
+            output_type = file["type"]
 
-            file_url = upload_to_s3(file["bytes"], file["name"])
-            logger.info(f"file_url[{i}]: {file_url}")
+            if output_type == "image/jpeg" or output_type == "image/png":
+                st.image(file["bytes"], caption=file["name"])
+                logger.info(f"image[{i}]: {file['name']}")
 
-            file_name = file_url[file_url.rfind('/')+1:]
-            url = f"{path}/{s3_image_prefix}/{file_name}"
-            logger.info(f"(files) image_url[{i}]: {url}")
-            image_url.append(url)
+                file_url = upload_to_s3(file["bytes"], file["name"])
+                logger.info(f"file_url[{i}]: {file_url}")
+
+                file_name = file_url[file_url.rfind('/')+1:]
+                url = f"{path}/{s3_image_prefix}/{file_name}"
+                logger.info(f"(files) image_url[{i}]: {url}")
+                image_url.append(url)
+            elif output_type=="text/csv":
+                st.info(file["bytes"].decode("utf-8"))
+                logger.info(f"csv[{i}]: {file['name']}")
+            else:
+                logger.info(f"unexpected type: {file['name']}, {file['type']}")
 
     # Check trace
     if "trace" in event:
