@@ -2241,7 +2241,7 @@ def create_bedrock_agent_collaborator(modelId, modelName, agentName, agentAliasN
         functionSchema = {
             'functions': [
                 {
-                    'name': 'search_by_tavily',
+                    'name': 'search_internet',
                     'description': "Search general information by keyword and then return the result as a string.",
                     'parameters': {
                         'keyword': {
