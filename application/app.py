@@ -192,8 +192,6 @@ if uploaded_file is not None and clear_button==False:
         msg = chat.get_summary_of_uploaded_file(file_name, st)
         st.session_state.messages.append({"role": "assistant", "content": f"선택한 문서({file_name})를 요약하면 아래와 같습니다.\n\n{msg}"})    
         logger.info(f"msg: {msg}")
-        if debugMode=='Enable':
-            st.rerun()
 
     if uploaded_file and clear_button==False and mode == '이미지 분석':
         st.image(uploaded_file, caption="이미지 미리보기", use_container_width=True)
@@ -253,8 +251,6 @@ if prompt := st.chat_input("메시지를 입력하세요."):
             response = st.write_stream(stream)
             logger.info(f"response: {response}")
             st.session_state.messages.append({"role": "assistant", "content": response})
-            if debugMode=='Enable':
-                st.rerun()
 
             chat.save_chat_history(prompt, response)
 
