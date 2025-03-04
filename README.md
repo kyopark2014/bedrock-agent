@@ -1059,3 +1059,5 @@ cd ~/bedrock-agent/cdk-bedrock-agent && cdk destroy --all
 [Amazon Bedrock Agents 워크샵](https://catalog.workshops.aws/agents-for-amazon-bedrock/ko-KR)
 
 [Amazon Bedrock 다중 에이전트 협업](https://catalog.us-east-1.prod.workshops.aws/workshops/1031afa5-be84-4a6a-9886-4e19ce67b9c2/ko-KR)
+
+[AI Agent Stack](https://www.linkedin.com/posts/zahir-aftab_ai-agents-are-evolving-fast-but-most-people-activity-7301833387445493760-qRZM/?utm_source=share&utm_medium=member_android&rcm=ACoAAA5jTp0BX-JuOkof3Ak56U3VlXjQVT43NzQ)
