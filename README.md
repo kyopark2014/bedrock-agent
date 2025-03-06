@@ -705,7 +705,7 @@ def get_weather_info(city: str) -> str:
 
 [Customize your Amazon Bedrock Agent's behavior with custom orchestration](https://docs.aws.amazon.com/bedrock/latest/userguide/agents-custom-orchestration.html)와 같이 아래와 같은 event를 lambda를 이용해 처리 할 수 있습니다. START, MODEL_INVOKED,TOOL_INVOKED의 event와 stopReason == "end_turn"로 end turn의 동작을 지정할 수 있습니다.
 
-"actionEvent"의 종류는 "INVOKE_MODEL | INVOKE_TOOL | APPLY_GUARDRAIL | FINISH | user defined" 입니다. 
+Lambda payload의 "actionEvent"의 종류는 "INVOKE_MODEL | INVOKE_TOOL | APPLY_GUARDRAIL | FINISH | user defined"가 있습니다.
 
 
 ### Code Interpreter
