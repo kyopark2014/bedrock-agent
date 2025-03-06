@@ -701,6 +701,13 @@ def get_weather_info(city: str) -> str:
     return weather_str
 ```
 
+### Custom Orchestration
+
+[Customize your Amazon Bedrock Agent's behavior with custom orchestration](https://docs.aws.amazon.com/bedrock/latest/userguide/agents-custom-orchestration.html)와 같이 아래와 같은 event를 lambda를 이용해 처리 할 수 있습니다. START, MODEL_INVOKED,TOOL_INVOKED의 event와 stopReason == "end_turn"로 end turn의 동작을 지정할 수 있습니다.
+
+"actionEvent"의 종류는 "INVOKE_MODEL | INVOKE_TOOL | APPLY_GUARDRAIL | FINISH | user defined" 입니다. 
+
+
 ### Code Interpreter
 
 Code Interpreter를 위한 action group을 생성합니다. 이때, [Amazon Bedrock에서 코드 해석 활성화](https://docs.aws.amazon.com/ko_kr/bedrock/latest/userguide/agents-enable-code-interpretation.html)와 같이 parentActionGroupSignature을 'AMAZON.CodeInterpreter'로 설정합니다. 이때 [description, actionGroupExecutor](https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/bedrock-agent/client/create_agent_action_group.html)은 사용할 수 없습니다.
