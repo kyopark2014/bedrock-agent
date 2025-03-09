@@ -1304,7 +1304,6 @@ def create_action_group_for_code_interpreter(agentId, st):
             parentActionGroupSignature='AMAZON.CodeInterpreter'
         )
         logger.info(f"response of create_action_group_for_code_interpreter(): {response}")
-        time.sleep(5) 
 
 def prepare_agent(agentId):
     try:
@@ -2344,7 +2343,7 @@ def create_bedrock_agent_supervisor(modelId, modelName, agentName, agentAliasNam
     time.sleep(5)
 
     # add code interpreter action group
-    create_action_group_for_code_interpreter(agentId, st)
+    #create_action_group_for_code_interpreter(agentId, st)
                 
     # add stock agent
     logger.info(f"stock_agent_alias_arn: {stock_agent_alias_arn}")
