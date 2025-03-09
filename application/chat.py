@@ -1136,7 +1136,8 @@ def show_output(event, st):
                                 if debug_mode=="Enable":
                                     st.error(f"Guardrail blocked topic {topic['name']}")            
 
-    logger.info(f'image_url: {image_url}')
+    if image_url:
+        logger.info(f'image_url: {image_url}')
 
     if final_result:                
         return final_result, image_url 
