@@ -2384,7 +2384,7 @@ def create_bedrock_agent_supervisor(modelId, modelName, agentName, agentAliasNam
     if debug_mode=="Enable":
         st.info(f'{agentName}을 {agentAliasName}로 배포합니다.')    
     agentAliasId, agentAliasArn = deploy_agent(agentId, agentAliasName)    
-    time.sleep(5)
+    time.sleep(10)
 
     return agentId, agentAliasId, agentAliasArn
 
