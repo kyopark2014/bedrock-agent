@@ -1304,6 +1304,7 @@ def create_action_group_for_code_interpreter(agentId, st):
             parentActionGroupSignature='AMAZON.CodeInterpreter'
         )
         logger.info(f"response of create_action_group_for_code_interpreter(): {response}")
+        time.sleep(5) 
 
 def prepare_agent(agentId):
     try:
