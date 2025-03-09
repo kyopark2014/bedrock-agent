@@ -262,6 +262,17 @@ export class CdkBedrockAgentStack extends cdk.Stack {
     agent_role.addManagedPolicy({
       managedPolicyArn: 'arn:aws:iam::aws:policy/AWSLambdaExecute',
     });
+
+    // Bedrock
+    const BedrockPolicy = new iam.PolicyStatement({  
+      resources: ['*'],
+      actions: ['bedrock:*'],
+    });     
+    agent_role.attachInlinePolicy( // add bedrock policy
+      new iam.Policy(this, `bedrock-policy-agent-for-${projectName}`, {
+        statements: [BedrockPolicy],
+      }),
+    );   
     
     // EC2 Role
     const ec2Role = new iam.Role(this, `role-ec2-for-${projectName}`, {
@@ -326,11 +337,7 @@ export class CdkBedrockAgentStack extends cdk.Stack {
         statements: [pvrePolicy],
       }),
     );  
-
-    const BedrockPolicy = new iam.PolicyStatement({  
-      resources: ['*'],
-      actions: ['bedrock:*'],
-    });        
+       
     ec2Role.attachInlinePolicy( // add bedrock policy
       new iam.Policy(this, `bedrock-policy-ec2-for-${projectName}`, {
         statements: [BedrockPolicy],
