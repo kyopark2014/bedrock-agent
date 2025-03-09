@@ -1223,7 +1223,7 @@ def update_agent(modelId, modelName, agentId, agentName, agentAliasId, agentAlia
     if debug_mode=="Enable":
         st.info(f'{agentName}을 {agentAliasName}로 배포합니다.')    
     agentAliasId, agentAliasArn = deploy_agent(agentId, agentAliasName)
-    time.sleep(3) 
+    time.sleep(5) 
 
     global agent_id, agent_alias_id, agent_kb_id, agent_kb_alias_id
     agent_id = agent_alias_id = agent_kb_id = agent_kb_alias_id = ""
@@ -1464,7 +1464,7 @@ def create_bedrock_agent(modelId, modelName, enable_knowledge_base, agentName, a
     if debug_mode=="Enable":
         st.info(f'{agentName}을 {agentAliasName}로 배포합니다.')    
     agentAliasId, agentAliasArn = deploy_agent(agentId, agentAliasName)
-    time.sleep(3) 
+    time.sleep(5) 
 
     return agentId, agentAliasId, agentAliasArn           
 
@@ -2308,7 +2308,7 @@ def create_bedrock_agent_collaborator(modelId, modelName, agentName, agentAliasN
     if debug_mode=="Enable":
         st.info(f'{agentName}을 {agentAliasName}로 배포합니다.')    
     agentAliasId, agentAliasArn = deploy_agent(agentId, agentAliasName)
-    time.sleep(3) 
+    time.sleep(5) 
 
     logger.info(f"agentName: {agentName}, agentId: {agentId}, agentAliasId: {agentAliasId}, agentAliasArn: {agentAliasArn}")
 
@@ -2340,7 +2340,7 @@ def create_bedrock_agent_supervisor(modelId, modelName, agentName, agentAliasNam
 
     agentId = response['agent']['agentId']
     logger.info(f"Supervisor agentId: {agentId}")
-    time.sleep(3)
+    time.sleep(5)
 
     # add code interpreter action group
     create_action_group_for_code_interpreter(agentId, st)
@@ -2372,19 +2372,19 @@ def create_bedrock_agent_supervisor(modelId, modelName, agentName, agentAliasNam
         collaboratorName=search_agent_name
     )
     logger.info(f"response of associate_agent_collaborator(): {response}")
-    time.sleep(3)
+    time.sleep(5)
 
     # preparing
     if debug_mode=="Enable":
         st.info('Agent를 사용할 수 있도록 "Prepare"로 설정합니다.')    
     prepare_agent(agentId)
-    time.sleep(3)
+    time.sleep(5)
     
     # deploy
     if debug_mode=="Enable":
         st.info(f'{agentName}을 {agentAliasName}로 배포합니다.')    
     agentAliasId, agentAliasArn = deploy_agent(agentId, agentAliasName)    
-    time.sleep(3)
+    time.sleep(5)
 
     return agentId, agentAliasId, agentAliasArn
 
