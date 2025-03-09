@@ -1376,7 +1376,7 @@ def create_bedrock_agent(modelId, modelName, enable_knowledge_base, agentName, a
                 'description': "Retrieve weather information by city name and then return weather statement.",
                 'parameters': {
                     'city': {
-                        'description': 'the name of city to retrieve',
+                        'description': 'the English name of city to retrieve',
                         'required': True,
                         'type': 'string'
                     }
