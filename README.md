@@ -1,7 +1,6 @@
 # Bedrock Agent 활용하기
 
 <p align="left">
-    <a href="https://hits.seeyoufarm.com"><img src="https://hits.seeyoufarm.com/api/count/incr/badge.svg?url=https%3A%2F%2Fgithub.com%2Fkyopark2014%2Fbedrock-agent&count_bg=%2379C83D&title_bg=%23555555&icon=&icon_color=%23E7E7E7&title=hits&edge_flat=false)](https://hits.seeyoufarm.com"/></a>
     <img alt="License" src="https://img.shields.io/badge/license-Apache%202.0-blue?style=flat-square">
 </p>
 
@@ -978,7 +977,25 @@ cd package && zip -r ../my_deployment_package.zip .
 cd .. && zip my_deployment_package.zip lambda_function.py info.py # add lambda_function.py
 ```
 
+## MCP
 
+MCP를 action group으로 지정할 수 있습니다. 상세한 내용은 [Harness the power of MCP servers with Amazon Bedrock Agents](https://aws.amazon.com/ko/blogs/machine-learning/harness-the-power-of-mcp-servers-with-amazon-bedrock-agents/)을 참조합니다.
+
+이때 action group은 아래와 같이 설정합니다.
+
+```java
+InlineAgent(
+    foundation_model="us.anthropic.claude-3-5-sonnet-20241022-v2:0",
+    instruction="You are a friendly assistant for resolving user queries",
+    agent_name="SampleAgent",
+    action_groups=[
+        ActionGroup(
+            name="SampleActionGroup",
+            mcp_clients=[mcp_client_1, mcp_client_2],
+        )
+    ],
+).invoke(input_text=”Convert 11am from NYC time to London time”)
+```
 
 
 ## 직접 실습 해보기
