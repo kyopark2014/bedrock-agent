@@ -979,23 +979,9 @@ cd .. && zip my_deployment_package.zip lambda_function.py info.py # add lambda_f
 
 ## MCP
 
-MCP를 action group으로 지정할 수 있습니다. 상세한 내용은 [Harness the power of MCP servers with Amazon Bedrock Agents](https://aws.amazon.com/ko/blogs/machine-learning/harness-the-power-of-mcp-servers-with-amazon-bedrock-agents/)을 참조합니다.
+Bedrock agent에서 MCP를 사용하기 위해서는 InlineAgent SDSK를 이용합니다. 상세한 내용은 [MCP를 이용해 Bedrock Agent 이용하기](https://github.com/kyopark2014/mcp-bedrock-agent)을 참조합니다. 
 
-이때 action group은 아래와 같이 설정합니다.
-
-```java
-InlineAgent(
-    foundation_model="us.anthropic.claude-3-5-sonnet-20241022-v2:0",
-    instruction="You are a friendly assistant for resolving user queries",
-    agent_name="SampleAgent",
-    action_groups=[
-        ActionGroup(
-            name="SampleActionGroup",
-            mcp_clients=[mcp_client_1, mcp_client_2],
-        )
-    ],
-).invoke(input_text=”Convert 11am from NYC time to London time”)
-```
+To-Do: MCP는 python3.10 이상인데 현재 EC2는 3.9이므로 python 버전을 바꾸거나 docker로 전환을 하여야 함
 
 
 ## 직접 실습 해보기
