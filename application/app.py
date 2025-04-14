@@ -1,6 +1,7 @@
 import streamlit as st 
 import chat
 import utils
+import json
 import knowledge_base as kb
 
 import cost_analysis as cost
@@ -26,9 +27,12 @@ mode_descriptions = {
     ],
     "Agent with Knowlege Base": [
         "Bedrock Agent와 Knowledge Base를 이용하여 Workflow를 구현합니다."
-    ],
+    ],    
     "Multi Agent Collaboration": [
         "Multi Bedrock Collabotion을 통해 suprervisor가 여러개의 collaborator Agent들을 효과적으로 활용할 수 있습니다."
+    ],
+    "Agent (MCP)": [
+        "MCP를 이용한 Bedrock Agent를 이용합니다."
     ],
     "번역하기": [
         "한국어와 영어에 대한 번역을 제공합니다. 한국어로 입력하면 영어로, 영어로 입력하면 한국어로 번역합니다."        
@@ -60,7 +64,7 @@ with st.sidebar:
     # radio selection
     mode = st.radio(
         # label="원하는 대화 형태를 선택하세요. ",options=["일상적인 대화", "RAG", "Flow", "Agent", "번역하기", "문법 검토하기"], index=0
-        label="원하는 대화 형태를 선택하세요. ",options=["일상적인 대화", "RAG", "Agent", "Agent with Knowlege Base", "Multi Agent Collaboration", "번역하기", "문법 검토하기", "이미지 분석", "비용 분석"], index=0
+        label="원하는 대화 형태를 선택하세요. ",options=["일상적인 대화", "RAG", "Agent", "Agent with Knowlege Base", "Multi Agent Collaboration", "Agent (MCP)", "번역하기", "문법 검토하기", "이미지 분석", "비용 분석"], index=0
     )   
     st.info(mode_descriptions[mode][0])
 
@@ -95,7 +99,23 @@ with st.sidebar:
     debugMode = 'Enable' if select_debugMode else 'Disable'
     #print('debugMode: ', debugMode)
 
-    chat.update(modelName, debugMode, st)
+    # MCP Config JSON 입력
+    st.subheader("⚙️ MCP Config")
+
+    config = utils.load_config()
+    mcp = json.loads(config["mcp"])
+    logger.info(f"mcp: {mcp}")
+    if mcp:
+        mcp_config = st.text_area(
+            "MCP 설정을 JSON 형식으로 입력하세요",
+            value=mcp,
+            height=150
+        )
+        if mcp_config != mcp:
+            mcp = mcp_config
+            chat.update(modelName, debugMode, mcp)
+
+    chat.update(modelName, debugMode, mcp, st)
 
     st.success(f"Connected to {modelName}", icon="💚")
     clear_button = st.button("대화 초기화", key="clear")
@@ -359,6 +379,13 @@ if prompt := st.chat_input("메시지를 입력하세요."):
                     "images": image_url if image_url else []
                 })
                 chat.save_chat_history(prompt, response)                    
+
+        elif mode == "Agent (MCP)":
+            sessionState = ""
+            with st.status("thinking...", expanded=True, state="running") as status:
+                import asyncio
+
+                asyncio.run(chat.run_bedrock_agent_with_mcp(prompt, st))
 
         elif mode == '번역하기':
             response = chat.translate_text(prompt)

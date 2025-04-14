@@ -11,6 +11,7 @@ import PyPDF2
 import csv
 import knowledge_base as kb
 import utils
+import mcp_server
 
 from io import BytesIO
 from PIL import Image
@@ -149,10 +150,12 @@ client = boto3.client(
     region_name=bedrock_region
 )  
 
-def update(modelName, debugMode, st):    
+mcp_config = ""
+def update(modelName, debugMode, mcp, st):    
     global model_name, model_id, model_type, debug_mode
     global models, agent_id, agent_kb_id
     global agent_alias_id, agent_kb_alias_id, agent_alias_arn, agent_kb_alias_arn
+    global mcp_config
     
     if model_name != modelName:
         model_name = modelName
@@ -185,6 +188,9 @@ def update(modelName, debugMode, st):
     if debug_mode != debugMode:
         debug_mode = debugMode
         logger.info(f"debug_mode: {debug_mode}")
+    
+    mcp_config = mcp
+    logger.info(f"mcp_config: {mcp_config}")
 
 def clear_chat_history():
     memory_chain = []
@@ -2453,3 +2459,9 @@ def check_bedrock_multi_agent_status(agentType, agentName, agentAliasName, agent
         
     return agentId, agentAliasId, agentAliasArn
 
+####################### Bedrock Agent #######################
+# Bedrock Agent with MCP
+############################################################# 
+
+async def run_bedrock_agent_with_mcp(text, st):                
+    await mcp_server.run(text, mcp_config, st)
