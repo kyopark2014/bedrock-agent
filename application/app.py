@@ -115,8 +115,9 @@ with st.sidebar:
     #         mcp = mcp_config
     #         chat.update(modelName, debugMode, mcp)
 
+    mcp = ""
     chat.update(modelName, debugMode, mcp, st)
-
+    
     st.success(f"Connected to {modelName}", icon="💚")
     clear_button = st.button("대화 초기화", key="clear")
     # logger.info(f"clear_button: {clear_button}")
