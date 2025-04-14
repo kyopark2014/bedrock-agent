@@ -63,8 +63,8 @@ with st.sidebar:
     
     # radio selection
     mode = st.radio(
-        # label="원하는 대화 형태를 선택하세요. ",options=["일상적인 대화", "RAG", "Flow", "Agent", "번역하기", "문법 검토하기"], index=0
-        label="원하는 대화 형태를 선택하세요. ",options=["일상적인 대화", "RAG", "Agent", "Agent with Knowlege Base", "Multi Agent Collaboration", "Agent (MCP)", "번역하기", "문법 검토하기", "이미지 분석", "비용 분석"], index=0
+        # label="원하는 대화 형태를 선택하세요. ",options=["일상적인 대화", "RAG", "Agent", "Agent with Knowlege Base", "Multi Agent Collaboration", "Agent (MCP)", "번역하기", "문법 검토하기", "이미지 분석", "비용 분석"], index=0
+        label="원하는 대화 형태를 선택하세요. ",options=["일상적인 대화", "RAG", "Agent", "Agent with Knowlege Base", "Multi Agent Collaboration", "번역하기", "문법 검토하기", "이미지 분석", "비용 분석"], index=0
     )   
     st.info(mode_descriptions[mode][0])
 
@@ -100,20 +100,20 @@ with st.sidebar:
     #print('debugMode: ', debugMode)
 
     # MCP Config JSON 입력
-    st.subheader("⚙️ MCP Config")
+    # st.subheader("⚙️ MCP Config")
 
-    config = utils.load_config()
-    mcp = json.loads(config["mcp"])
-    logger.info(f"mcp: {mcp}")
-    if mcp:
-        mcp_config = st.text_area(
-            "MCP 설정을 JSON 형식으로 입력하세요",
-            value=mcp,
-            height=150
-        )
-        if mcp_config != mcp:
-            mcp = mcp_config
-            chat.update(modelName, debugMode, mcp)
+    # config = utils.load_config()
+    # mcp = json.loads(config["mcp"])
+    # logger.info(f"mcp: {mcp}")
+    # if mcp:
+    #     mcp_config = st.text_area(
+    #         "MCP 설정을 JSON 형식으로 입력하세요",
+    #         value=mcp,
+    #         height=150
+    #     )
+    #     if mcp_config != mcp:
+    #         mcp = mcp_config
+    #         chat.update(modelName, debugMode, mcp)
 
     chat.update(modelName, debugMode, mcp, st)
 
@@ -380,12 +380,12 @@ if prompt := st.chat_input("메시지를 입력하세요."):
                 })
                 chat.save_chat_history(prompt, response)                    
 
-        elif mode == "Agent (MCP)":
-            sessionState = ""
-            with st.status("thinking...", expanded=True, state="running") as status:
-                import asyncio
+        # elif mode == "Agent (MCP)":
+        #     sessionState = ""
+        #     with st.status("thinking...", expanded=True, state="running") as status:
+        #         import asyncio
 
-                asyncio.run(chat.run_bedrock_agent_with_mcp(prompt, st))
+        #         asyncio.run(chat.run_bedrock_agent_with_mcp(prompt, st))
 
         elif mode == '번역하기':
             response = chat.translate_text(prompt)
