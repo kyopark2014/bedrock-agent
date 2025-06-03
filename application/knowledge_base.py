@@ -11,16 +11,9 @@ from opensearchpy import OpenSearch, RequestsHttpConnection, AWSV4SignerAuth
 
 logger = utils.CreateLogger('knowledge_base')
 
-try:
-    with open("/home/config.json", "r", encoding="utf-8") as f:
-        config = json.load(f)
-        logger.info(f"config: {config}")
-
-except Exception:
-    logger.info(f"use local configuration")
-    with open("application/config.json", "r", encoding="utf-8") as f:
-        config = json.load(f)
-        logger.info(f"config: {config}")
+with open("application/config.json", "r", encoding="utf-8") as f:
+    config = json.load(f)
+    logger.info(f"config: {config}")
 
 # variables
 projectName = config["projectName"] if "projectName" in config else "langgraph-nova"
