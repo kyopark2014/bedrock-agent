@@ -2,6 +2,7 @@ import traceback
 import json
 import time
 import boto3
+import utils
 
 from langchain_aws import AmazonKnowledgeBasesRetriever
 from urllib import parse
@@ -20,19 +21,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger("knowledge_base")
 
-def load_config():
-    config = None
-    try:
-        with open("application/config.json", "r", encoding="utf-8") as f:
-            config = json.load(f)
-            print(f"config: {config}")
-    except Exception:
-        err_msg = traceback.format_exc()
-        print(f"error message: {err_msg}")    
-    return config
-
-config = load_config()
-
+config = utils.load_config()
+    
 # variables
 projectName = config["projectName"] if "projectName" in config else "bedrock-agent"
 
