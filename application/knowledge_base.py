@@ -23,7 +23,7 @@ logger = logging.getLogger("knowledge_base")
 def load_config():
     config = None
     try:
-        with open("/home/ec2-user/bedrock-agent/application/config.json", "r", encoding="utf-8") as f:
+        with open("application/config.json", "r", encoding="utf-8") as f:
             config = json.load(f)
             print(f"config: {config}")
     except Exception:

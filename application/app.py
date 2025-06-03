@@ -39,9 +39,6 @@ mode_descriptions = {
     "Multi Agent Collaboration": [
         "Multi Bedrock Collabotion을 통해 suprervisor가 여러개의 collaborator Agent들을 효과적으로 활용할 수 있습니다."
     ],
-    "Agent (MCP)": [
-        "MCP를 이용한 Bedrock Agent를 이용합니다."
-    ],
     "번역하기": [
         "한국어와 영어에 대한 번역을 제공합니다. 한국어로 입력하면 영어로, 영어로 입력하면 한국어로 번역합니다."        
     ],
@@ -107,24 +104,7 @@ with st.sidebar:
     debugMode = 'Enable' if select_debugMode else 'Disable'
     #print('debugMode: ', debugMode)
 
-    # MCP Config JSON 입력
-    # st.subheader("⚙️ MCP Config")
-
-    # config = utils.load_config()
-    # mcp = json.loads(config["mcp"])
-    # logger.info(f"mcp: {mcp}")
-    # if mcp:
-    #     mcp_config = st.text_area(
-    #         "MCP 설정을 JSON 형식으로 입력하세요",
-    #         value=mcp,
-    #         height=150
-    #     )
-    #     if mcp_config != mcp:
-    #         mcp = mcp_config
-    #         chat.update(modelName, debugMode, mcp)
-
-    mcp = ""
-    chat.update(modelName, debugMode, mcp, st)
+    chat.update(modelName, debugMode, st)
     
     st.success(f"Connected to {modelName}", icon="💚")
     clear_button = st.button("대화 초기화", key="clear")
@@ -388,13 +368,6 @@ if prompt := st.chat_input("메시지를 입력하세요."):
                     "images": image_url if image_url else []
                 })
                 chat.save_chat_history(prompt, response)                    
-
-        # elif mode == "Agent (MCP)":
-        #     sessionState = ""
-        #     with st.status("thinking...", expanded=True, state="running") as status:
-        #         import asyncio
-
-        #         asyncio.run(chat.run_bedrock_agent_with_mcp(prompt, st))
 
         elif mode == '번역하기':
             response = chat.translate_text(prompt)
