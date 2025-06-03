@@ -1,13 +1,21 @@
 import streamlit as st 
 import chat
 import utils
-import json
 import knowledge_base as kb
 
 import cost_analysis as cost
 
-# logging
-logger = utils.CreateLogger("streamlit")
+import logging
+import sys
+
+logging.basicConfig(
+    level=logging.INFO,  # Default to INFO level
+    format='%(filename)s:%(lineno)d | %(message)s',
+    handlers=[
+        logging.StreamHandler(sys.stderr)
+    ]
+)
+logger = logging.getLogger("streamlit")
 
 # title
 st.set_page_config(page_title='Bedrock Agent', page_icon=None, layout="centered", initial_sidebar_state="auto", menu_items=None)
