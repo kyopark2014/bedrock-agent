@@ -11,7 +11,6 @@ from opensearchpy import OpenSearch, RequestsHttpConnection, AWSV4SignerAuth
 
 import logging
 import sys
-
 logging.basicConfig(
     level=logging.INFO,  # Default to INFO level
     format='%(filename)s:%(lineno)d | %(message)s',
@@ -22,9 +21,9 @@ logging.basicConfig(
 logger = logging.getLogger("knowledge_base")
 
 config = utils.load_config()
-    
+
 # variables
-projectName = config["projectName"] if "projectName" in config else "bedrock-agent"
+projectName = config["projectName"] if "projectName" in config else "langgraph-nova"
 
 vectorIndexName = projectName
 knowledge_base_name = projectName
@@ -35,7 +34,7 @@ s3_bucket = config["s3_bucket"] if "s3_bucket" in config else None
 if s3_bucket is None:
     raise Exception ("No storage!")
 
-parsingModelArn = f"arn:aws:bedrock:{region}::foundation-model/anthropic.claude-3-haiku-20240307-v1:0"
+parsingModelArn = f"arn:aws:bedrock:{region}::foundation-model/anthropic.claude-3-5-sonnet-20241022-v2:0"
 embeddingModelArn = f"arn:aws:bedrock:{region}::foundation-model/amazon.titan-embed-text-v2:0"
 
 collectionArn = config["collectionArn"] if "collectionArn" in config else None
@@ -199,10 +198,10 @@ def initiate_knowledge_base():
     except Exception:
         err_msg = traceback.format_exc()
         logger.info(f"error message: {err_msg}")
-                    
+    
     if not knowledge_base_id:
         logger.info(f"creating knowledge base...")  
-        for atempt in range(20):
+        for atempt in range(3):
             try:
                 response = client.create_knowledge_base(
                     name=knowledge_base_name,
@@ -216,6 +215,14 @@ def initiate_knowledge_base():
                                 'bedrockEmbeddingModelConfiguration': {
                                     'dimensions': 1024
                                 }
+                            },
+                            'supplementalDataStorageConfiguration': {
+                            'storageLocations': [{
+                                    'type': 'S3',
+                                    's3Location': {
+                                        'uri': f"s3://{s3_bucket}"
+                                    }
+                                }]
                             }
                         }
                     },
@@ -230,7 +237,7 @@ def initiate_knowledge_base():
                             },
                             'vectorIndexName': vectorIndexName
                         }
-                    }                
+                    }                    
                 )   
                 logger.info(f"(create_knowledge_base) response: {response}")
             
@@ -304,9 +311,14 @@ def initiate_knowledge_base():
                     },
                     'parsingConfiguration': {
                         'bedrockFoundationModelConfiguration': {
-                            'modelArn': parsingModelArn
+                            'modelArn': parsingModelArn,
+                            'parsingModality': 'MULTIMODAL'
                         },
                         'parsingStrategy': 'BEDROCK_FOUNDATION_MODEL'
+                        # 'bedrockDataAutomationConfiguration': {
+                        #     'parsingModality': 'MULTIMODAL'
+                        # },
+                        # 'parsingStrategy': 'BEDROCK_DATA_AUTOMATION'
                     }
                 }
             )
