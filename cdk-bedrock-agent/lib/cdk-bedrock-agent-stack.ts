@@ -45,19 +45,7 @@ export class CdkBedrockAgentStack extends cdk.Stack {
     const bedrockKnowledgeBaseS3Policy = new iam.PolicyStatement({
       effect: iam.Effect.ALLOW,
       resources: ['*'],
-      actions: [
-        "s3:GetBucketLocation",
-        "s3:GetObject",
-        "s3:ListBucket",
-        "s3:ListBucketMultipartUploads",
-        "s3:ListMultipartUploadParts",
-        "s3:AbortMultipartUpload",
-        "s3:CreateBucket",
-        "s3:PutObject",
-        "s3:PutBucketLogging",
-        "s3:PutBucketVersioning",
-        "s3:PutBucketNotification",
-      ],
+      actions: ["s3:*"],
     });
     knowledge_base_role.attachInlinePolicy( 
       new iam.Policy(this, `knowledge-base-s3-policy-for-${projectName}`, {
