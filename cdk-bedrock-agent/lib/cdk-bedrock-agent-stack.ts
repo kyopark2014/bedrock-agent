@@ -662,7 +662,7 @@ export class CdkBedrockAgentStack extends cdk.Stack {
       description: `environment-${projectName}`,
       exportName: `environment-${projectName}`
     });
-/*
+
     const commands = [
       // 'yum install nginx -y',
       // 'service nginx start',
@@ -759,6 +759,6 @@ EOF'`,
     })
     listener.addAction(`RedirectHttpListener-for-${projectName}`, {
       action: defaultAction
-    });  */     
+    });       
   }
 }
