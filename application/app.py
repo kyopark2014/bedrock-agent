@@ -60,7 +60,6 @@ with st.sidebar:
         "Amazon Bedrock을 이용해 다양한 형태의 대화를 구현합니다." 
         "여기에서는 일상적인 대화와 각종 툴을 이용해 Agent를 구현할 수 있습니다." 
         "또한 번역이나 문법 확인과 같은 용도로 사용할 수 있습니다."
-        "주요 코드는 LangChain과 LangGraph를 이용해 구현되었습니다.\n"
         "상세한 코드는 [Github](https://github.com/kyopark2014/bedrock-agent)을 참조하세요."
     )
 
