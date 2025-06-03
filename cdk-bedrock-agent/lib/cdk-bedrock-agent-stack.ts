@@ -273,6 +273,15 @@ export class CdkBedrockAgentStack extends cdk.Stack {
       managedPolicies: [cdk.aws_iam.ManagedPolicy.fromAwsManagedPolicyName('CloudWatchAgentServerPolicy')] 
     });
 
+    // add permission for DescribeFileSystems
+    ec2Role.addToPolicy(new iam.PolicyStatement({
+      resources: ['*'],
+      actions: [
+        'ec2:DescribeFileSystems',
+        'elasticfilesystem:DescribeFileSystems'
+      ]
+    }));
+
     const secreatManagerPolicy = new iam.PolicyStatement({  
       resources: ['*'],
       actions: ['secretsmanager:GetSecretValue'],
@@ -398,6 +407,38 @@ export class CdkBedrockAgentStack extends cdk.Stack {
         statements: [getRolePolicy],
       }),
     ); 
+
+    // S3 Bucket Access
+    const s3BucketAccessPolicy = new iam.PolicyStatement({
+      resources: [`*`],
+      actions: ['s3:*'],
+    });
+    ec2Role.attachInlinePolicy(
+      new iam.Policy(this, `s3-bucket-access-policy-for-${projectName}`, {
+        statements: [s3BucketAccessPolicy],
+      }),
+    );
+
+    // CloudWatch Logs 
+    const cloudWatchLogsPolicy = new iam.PolicyStatement({
+      resources: ['*'],
+      actions: [
+        'logs:DescribeLogGroups',
+        'logs:DescribeLogStreams',
+        'logs:GetLogEvents',
+        'logs:FilterLogEvents',
+        'logs:GetLogGroupFields',
+        'logs:GetLogRecord',
+        'logs:GetQueryResults',
+        'logs:StartQuery',
+        'logs:StopQuery'
+      ],
+    });
+    ec2Role.attachInlinePolicy(
+      new iam.Policy(this, `cloudwatch-logs-policy-for-${projectName}`, {
+        statements: [cloudWatchLogsPolicy],
+      }),
+    );
 
     // VPC
     const vpc = new ec2.Vpc(this, `vpc-for-${projectName}`, {
