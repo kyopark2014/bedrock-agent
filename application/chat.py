@@ -62,9 +62,18 @@ def initiate():
 
 initiate()
 
-with open("application/config.json", "r", encoding="utf-8") as f:
-    config = json.load(f)
-    logger.info(f"config: {config}")
+def load_config():
+    config = None
+    try:
+        with open("application/config.json", "r", encoding="utf-8") as f:
+            config = json.load(f)
+            print(f"config: {config}")
+    except Exception:
+        err_msg = traceback.format_exc()
+        print(f"error message: {err_msg}")    
+    return config
+
+config = load_config()
 
 bedrock_region = config["region"] if "region" in config else "us-west-2"
 
