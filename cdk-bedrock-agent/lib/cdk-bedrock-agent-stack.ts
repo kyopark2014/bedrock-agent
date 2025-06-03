@@ -74,7 +74,6 @@ export class CdkBedrockAgentStack extends cdk.Stack {
         statements: [bedrockKnowledgeBaseS3Policy],
       }),
     );  
-    
     const knowledgeBaseOpenSearchPolicy = new iam.PolicyStatement({
       effect: iam.Effect.ALLOW,
       resources: ['*'],
@@ -85,7 +84,7 @@ export class CdkBedrockAgentStack extends cdk.Stack {
         statements: [knowledgeBaseOpenSearchPolicy],
       }),
     );  
-
+    
     const knowledgeBaseBedrockPolicy = new iam.PolicyStatement({
       effect: iam.Effect.ALLOW,
       resources: ['*'],
