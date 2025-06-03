@@ -661,17 +661,6 @@ export class CdkBedrockAgentStack extends cdk.Stack {
     // user data for setting EC2
     const userData = ec2.UserData.forLinux();
 
-    const mcp_config = JSON.stringify(`{
-      "mcpServers": {
-        "playwright": {
-          "command": "npx",
-          "args": [
-            "@playwright/mcp@latest"
-          ]
-        }
-      }
-    }`)
-
     const environment = {
       "projectName": projectName,
       "accountId": accountId,
@@ -683,8 +672,7 @@ export class CdkBedrockAgentStack extends cdk.Stack {
       "s3_bucket": s3Bucket.bucketName,      
       "s3_arn": s3Bucket.bucketArn,
       "sharing_url": 'https://'+distribution.domainName,
-      "lambda-tools": lambdaTools.functionArn,
-      "mcp": mcp_config
+      "lambda-tools": lambdaTools.functionArn
     }    
     new cdk.CfnOutput(this, `environment-for-${projectName}`, {
       value: JSON.stringify(environment),
